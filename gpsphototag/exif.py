@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import shutil
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
 import piexif
@@ -19,6 +19,7 @@ from PIL import ExifTags, Image
 
 from gpsphototag import raw_writer
 from gpsphototag.collectors import RAW_EXTS
+from gpsphototag.dates import parse_exif_datetime
 
 try:
     import pillow_heif  # type: ignore
@@ -35,19 +36,6 @@ PNG_EXTS = {".png"}
 _TAG_DATETIME_ORIGINAL = next(k for k, v in ExifTags.TAGS.items() if v == "DateTimeOriginal")
 _TAG_OFFSET_ORIGINAL = next((k for k, v in ExifTags.TAGS.items() if v == "OffsetTimeOriginal"), 36881)
 _TAG_GPSINFO = next(k for k, v in ExifTags.TAGS.items() if v == "GPSInfo")
-
-
-def _parse_offset(s: str) -> tzinfo | None:
-    """Parse an EXIF offset like ``+02:00`` into a tzinfo."""
-    s = s.strip()
-    if not s or s in ("Z", "+00:00", "-00:00"):
-        return timezone.utc
-    try:
-        sign = 1 if s[0] == "+" else -1
-        hh, mm = s[1:].split(":")
-        return timezone(sign * timedelta(hours=int(hh), minutes=int(mm)))
-    except (ValueError, IndexError):
-        return None
 
 
 def read_timestamp(path: Path, fallback_tz: tzinfo) -> datetime | None:
@@ -72,14 +60,10 @@ def read_timestamp(path: Path, fallback_tz: tzinfo) -> datetime | None:
         logger.debug("Could not read EXIF for %s: %s", path, e)
         return None
 
-    try:
-        dt = datetime.strptime(str(dt_raw).strip(), "%Y:%m:%d %H:%M:%S")
-    except ValueError:
+    dt = parse_exif_datetime(str(dt_raw), str(offset_raw) if offset_raw else None, fallback_tz)
+    if dt is None:
         logger.debug("Unparseable DateTimeOriginal %r for %s", dt_raw, path)
-        return None
-
-    tz = _parse_offset(str(offset_raw)) if offset_raw else None
-    return dt.replace(tzinfo=tz or fallback_tz)
+    return dt
 
 
 def has_gps(path: Path) -> bool:
@@ -111,31 +95,41 @@ def _dms_to_decimal(dms, ref: str) -> float:
     return -decimal if ref.upper() in ("S", "W") else decimal
 
 
+def _valid_latlon(lat: float, lon: float) -> bool:
+    """True if the pair lies inside the WGS-84 coordinate domain."""
+    return -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
+
+
 def read_gps(path: Path) -> tuple[float, float] | None:
     """Return ``(lat, lon)`` in signed decimal degrees, or None if absent.
 
     The read-side mirror of :func:`has_gps`. RAW formats read from the XMP
     sidecar or embedded EXIF via ``raw_writer``; everything else via Pillow's
     GPS IFD, converting the DMS rationals + hemisphere refs to decimals.
+    Out-of-range coordinates (corrupt EXIF) are treated as absent.
     """
     if path.suffix.lower() in RAW_EXTS:
-        return raw_writer.read_raw_gps(path)
-    try:
-        with Image.open(path) as img:
-            gps = img.getexif().get_ifd(_TAG_GPSINFO)
-    except Exception as e:
-        logger.debug("Could not read GPS for %s: %s", path, e)
+        latlon = raw_writer.read_raw_gps(path)
+    else:
+        try:
+            with Image.open(path) as img:
+                gps = img.getexif().get_ifd(_TAG_GPSINFO)
+        except Exception as e:
+            logger.debug("Could not read GPS for %s: %s", path, e)
+            return None
+        # 1/2 = LatitudeRef/Latitude, 3/4 = LongitudeRef/Longitude.
+        if not gps or 2 not in gps or 4 not in gps:
+            return None
+        try:
+            latlon = (_dms_to_decimal(gps[2], str(gps.get(1, "N"))),
+                      _dms_to_decimal(gps[4], str(gps.get(3, "E"))))
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            logger.debug("Malformed GPS IFD in %s: %s", path, e)
+            return None
+    if latlon is not None and not _valid_latlon(*latlon):
+        logger.debug("Out-of-range GPS %s in %s; ignoring", latlon, path)
         return None
-    # 1/2 = LatitudeRef/Latitude, 3/4 = LongitudeRef/Longitude.
-    if not gps or 2 not in gps or 4 not in gps:
-        return None
-    try:
-        lat = _dms_to_decimal(gps[2], str(gps.get(1, "N")))
-        lon = _dms_to_decimal(gps[4], str(gps.get(3, "E")))
-    except (TypeError, ValueError, ZeroDivisionError) as e:
-        logger.debug("Malformed GPS IFD in %s: %s", path, e)
-        return None
-    return lat, lon
+    return latlon
 
 
 def _to_dms(value: float) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int]]:

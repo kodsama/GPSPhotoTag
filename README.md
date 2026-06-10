@@ -80,7 +80,7 @@ gpsphototag --photo ~/Pictures/Trip/ --gps trip.gpx --dry-run
 | `--raw-mode {auto,sidecar,embed}` | RAW write strategy. `auto` (default) embeds GPS into the RAW via `exiftool` when available, else writes `photo.raf.xmp`. `sidecar` always writes the XMP sidecar (never touches the RAW). `embed` forces `exiftool`. |
 | `--fix-dates {exif,file}` | Also fix dates. `exif`: set the file's created/modified date from the EXIF timestamp. `file`: write EXIF `DateTimeOriginal` from the file's created date. Runs standalone (no GPS source required). See [Fixing dates](#fixing-dates---fix-dates). |
 | `--map PNG` | **Read-only.** Render a heatmap PNG of where the photos were taken (from GPS already in the photos) and exit — no tagging. See [Heatmap](#heatmap---map). |
-| `--map-dpi DPI` | Resolution of the `--map` PNG. Default `200`. |
+| `--map-dpi DPI` | Resolution of the `--map` PNG (30–1200). Default `200`. |
 | `--map-clusters SEL` | When photos span multiple locations, which to include: `all`, or comma-separated cluster numbers (e.g. `1,2`). If omitted you're prompted interactively. |
 | `--map-names` | Label each area on the map with its filename range (e.g. `DSCF0795-0801`). |
 | `--max-time-diff SECONDS` | Max gap between photo time and GPS point(s). Default `300`. |
@@ -171,6 +171,11 @@ gpsphototag --photo ~/Pictures/Trip/ --map trip.png --map-dpi 300
   `pip install 'gpsphototag[map]'` (adds `matplotlib`, `contextily`, `geopy`).
   Basemap tiles are fetched from CARTO, so an internet connection is required
   when generating.
+- **Privacy.** Generating a map makes two kinds of network requests: basemap
+  tiles are fetched from CARTO for the photos' bounding box, and cluster names
+  come from OpenStreetMap Nominatim reverse geocoding (cluster centroids only,
+  never individual photo coordinates). Nothing else leaves your machine, and
+  tagging itself (`--gps` / `--maps-history`) is fully offline.
 
 ```text
 Photos span 2 distinct locations:

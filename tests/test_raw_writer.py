@@ -227,10 +227,26 @@ def test_apply_exif_auto_sidecar_when_no_exiftool(monkeypatch, dng_factory):
     assert raw_writer.sidecar_path_for(raw).exists()
 
 
-def test_parse_offset_in_raw_writer():
-    assert raw_writer._parse_offset("Z") is timezone.utc
-    assert raw_writer._parse_offset("+02:00").utcoffset(None).total_seconds() == 2 * 3600
-    assert raw_writer._parse_offset("garbage") is None
+def test_subprocess_paths_are_absolute(monkeypatch, dng_factory, tmp_path):
+    """A filename starting with '-' must never be parseable as an exiftool option."""
+    import os
+
+    monkeypatch.chdir(tmp_path)
+    raw = dng_factory("e.dng", datetime(2024, 8, 15, tzinfo=UTC))
+    rel = Path(os.path.relpath(raw))  # a relative path into tmp_path
+    calls: list[list[str]] = []
+    monkeypatch.setattr(raw_writer, "exiftool_available", lambda: True)
+    monkeypatch.setattr(subprocess, "run",
+                        lambda cmd, **k: calls.append(cmd)
+                        or subprocess.CompletedProcess(cmd, 0, "[{}]", ""))
+
+    raw_writer.write_embedded(rel, rel, gps=(1.0, 2.0))
+    raw_writer._read_with_exiftool(rel, fallback_tz=UTC)
+    raw_writer._read_embedded_gps(rel)
+
+    assert len(calls) == 3
+    for cmd in calls:
+        assert os.path.isabs(cmd[-1]), f"non-absolute path passed to exiftool: {cmd[-1]}"
 
 
 def test_read_raw_metadata_unparseable_datetime_returns_none(monkeypatch, dng_factory):

@@ -20,11 +20,13 @@ import logging
 import re
 import shutil
 import subprocess
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import datetime, tzinfo
 from pathlib import Path
 from shutil import which
 
 import exifread
+
+from gpsphototag.dates import parse_exif_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -46,27 +48,27 @@ def resolve_raw_mode(mode: str) -> str:
     return mode
 
 
-def _parse_offset(value: str) -> tzinfo | None:
-    """Parse an EXIF offset string like ``+02:00`` to a tzinfo (None if invalid)."""
-    s = value.strip()
-    if not s or s in ("Z", "+00:00", "-00:00"):
-        return timezone.utc
-    try:
-        sign = 1 if s[0] == "+" else -1
-        hh, mm = s[1:].split(":")
-        return timezone(sign * timedelta(hours=int(hh), minutes=int(mm)))
-    except (ValueError, IndexError):
-        return None
+def _exiftool_json(path: Path, args: list[str]) -> dict | None:
+    """Run ``exiftool -json <args> <path>`` and return the first record.
 
-
-def _parse_exif_datetime(raw: str, offset: str | None, fallback_tz: tzinfo) -> datetime | None:
-    """Parse an EXIF ``YYYY:MM:DD HH:MM:SS`` string into a tz-aware datetime."""
-    try:
-        dt = datetime.strptime(raw.strip(), "%Y:%m:%d %H:%M:%S")
-    except ValueError:
+    The path is resolved to absolute so a filename starting with ``-`` can
+    never be misread as an exiftool option. Returns None when exiftool is
+    unavailable, exits non-zero, or emits unparseable output.
+    """
+    if not exiftool_available():
         return None
-    tz = _parse_offset(offset) if offset else None
-    return dt.replace(tzinfo=tz or fallback_tz)
+    cmd = ["exiftool", "-json", *args, str(path.resolve())]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except OSError as e:  # pragma: no cover - exiftool vanished mid-run
+        logger.debug("exiftool read failed for %s: %s", path, e)
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        return json.loads(result.stdout)[0]
+    except (json.JSONDecodeError, IndexError):
+        return None
 
 
 def _read_with_exiftool(path: Path, fallback_tz: tzinfo) -> tuple[datetime | None, bool]:
@@ -76,27 +78,15 @@ def _read_with_exiftool(path: Path, fallback_tz: tzinfo) -> tuple[datetime | Non
     ``.RAF``, Canon ``.CR3``, …). Returns ``(None, False)`` when exiftool is
     absent or yields nothing usable.
     """
-    if not exiftool_available():
+    data = _exiftool_json(path, ["-DateTimeOriginal", "-CreateDate",
+                                 "-OffsetTimeOriginal", "-GPSLatitude"])
+    if data is None:
         return None, False
-    cmd = ["exiftool", "-json", "-DateTimeOriginal", "-CreateDate",
-           "-OffsetTimeOriginal", "-GPSLatitude", str(path)]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except OSError as e:  # pragma: no cover - exiftool vanished mid-run
-        logger.debug("exiftool read failed for %s: %s", path, e)
-        return None, False
-    if result.returncode != 0 or not result.stdout.strip():
-        return None, False
-    try:
-        data = json.loads(result.stdout)[0]
-    except (json.JSONDecodeError, IndexError, KeyError):
-        return None, False
-
     has_gps = "GPSLatitude" in data
     dt_raw = data.get("DateTimeOriginal") or data.get("CreateDate")
     if not dt_raw:
         return None, has_gps
-    return _parse_exif_datetime(str(dt_raw), data.get("OffsetTimeOriginal"), fallback_tz), has_gps
+    return parse_exif_datetime(str(dt_raw), data.get("OffsetTimeOriginal"), fallback_tz), has_gps
 
 
 def read_raw_metadata(path: Path, fallback_tz: tzinfo) -> tuple[datetime | None, bool]:
@@ -118,7 +108,7 @@ def read_raw_metadata(path: Path, fallback_tz: tzinfo) -> tuple[datetime | None,
     has_gps = "GPS GPSLatitude" in tags
 
     if dt_tag is not None:
-        dt = _parse_exif_datetime(str(dt_tag), str(offset_tag) if offset_tag else None, fallback_tz)
+        dt = parse_exif_datetime(str(dt_tag), str(offset_tag) if offset_tag else None, fallback_tz)
         if dt is not None:
             return dt, has_gps
         logger.debug("Unparseable RAW DateTimeOriginal %r in %s", dt_tag, path)
@@ -174,19 +164,12 @@ def _read_sidecar_gps(raw_path: Path) -> tuple[float, float] | None:
 
 def _read_embedded_gps(raw_path: Path) -> tuple[float, float] | None:
     """Read embedded ``(lat, lon)`` via exiftool numeric output, or None."""
-    if not exiftool_available():
-        return None
-    cmd = ["exiftool", "-json", "-n", "-GPSLatitude", "-GPSLongitude", str(raw_path)]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except OSError:  # pragma: no cover - exiftool vanished mid-run
-        return None
-    if result.returncode != 0 or not result.stdout.strip():
+    data = _exiftool_json(raw_path, ["-n", "-GPSLatitude", "-GPSLongitude"])
+    if data is None:
         return None
     try:
-        data = json.loads(result.stdout)[0]
         return float(data["GPSLatitude"]), float(data["GPSLongitude"])
-    except (json.JSONDecodeError, IndexError, KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError):
         return None
 
 
@@ -267,7 +250,8 @@ def write_embedded(raw_src: Path, raw_dst: Path, *, gps=None, dt=None) -> None:
     if dt is not None:
         stamp = dt.strftime("%Y:%m:%d %H:%M:%S")
         cmd += [f"-DateTimeOriginal={stamp}", f"-CreateDate={stamp}"]
-    cmd.append(str(raw_dst))
+    # Absolute path so a filename starting with '-' can't read as an option.
+    cmd.append(str(raw_dst.resolve()))
 
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:

@@ -36,6 +36,21 @@ from gpsphototag.types import Status
 logger = logging.getLogger("gpsphototag")
 
 
+def _dpi_arg(value: str) -> int:
+    """argparse type for --map-dpi: an int within a sane rendering range.
+
+    The bounds keep the output usable: below ~30 DPI the basemap is illegible,
+    and very large values balloon memory during rendering.
+    """
+    try:
+        dpi = int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"invalid int value: {value!r}") from e
+    if not 30 <= dpi <= 1200:
+        raise argparse.ArgumentTypeError("must be between 30 and 1200")
+    return dpi
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argparse parser. Kept separate so tests can exercise it."""
     p = argparse.ArgumentParser(
@@ -69,8 +84,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--map", type=Path, metavar="PNG", dest="map",
                    help="read-only: render a heatmap PNG of where the photos were "
                         "taken (from GPS already in the photos) and exit; no tagging")
-    p.add_argument("--map-dpi", type=int, default=200, metavar="DPI",
-                   help="resolution of the --map PNG [default: 200]")
+    p.add_argument("--map-dpi", type=_dpi_arg, default=200, metavar="DPI",
+                   help="resolution of the --map PNG, 30-1200 [default: 200]")
     p.add_argument("--map-clusters", default=None, metavar="SEL",
                    help="when photos span multiple locations, which to include: "
                         "'all', or comma-separated cluster numbers (e.g. '1,2'); "
@@ -187,7 +202,7 @@ def run_map(photos: list[Path], out_path: Path, dpi: int,
         logger.error("No photos carry GPS coordinates; nothing to map.")
         return 1
 
-    groups = mapper._cluster_indices(coords, 50.0)
+    groups = mapper.cluster_indices(coords)
     if len(groups) > 1:
         clusters = [[coords[i] for i in g] for g in groups]
         chosen = resolve_clusters(clusters, selection)
@@ -221,6 +236,19 @@ def validate_destination(args: argparse.Namespace) -> str | None:
     return None
 
 
+def _build_locator(args: argparse.Namespace) -> Locator:
+    """Collect and load the GPS sources from the CLI args into a Locator."""
+    gpx_paths = collect_paths(args.gps, GPX_EXTS)
+    maps_paths = collect_paths(args.maps_history, MAPS_EXTS)
+    if not gpx_paths and not maps_paths:
+        logger.warning("No GPS sources provided; only existing tags will be reported.")
+
+    gpx_points = gpx_source.load(gpx_paths)
+    google_points = google_source.load(maps_paths)
+    logger.info("Loaded %d GPX point(s), %d Google point(s)", len(gpx_points), len(google_points))
+    return Locator(gpx_points, google_points, max_time_diff_seconds=args.max_time_diff)
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code."""
     parser = build_parser()
@@ -245,17 +273,13 @@ def main(argv: list[str] | None = None) -> int:
         return run_map(photos, args.map, args.map_dpi, args.map_clusters,
                        args.map_names)
 
-    gpx_paths = collect_paths(args.gps, GPX_EXTS)
-    maps_paths = collect_paths(args.maps_history, MAPS_EXTS)
-    if not gpx_paths and not maps_paths:
-        logger.warning("No GPS sources provided; only existing tags will be reported.")
+    locator = _build_locator(args)
 
-    gpx_points = gpx_source.load(gpx_paths)
-    google_points = google_source.load(maps_paths)
-    logger.info("Loaded %d GPX point(s), %d Google point(s)", len(gpx_points), len(google_points))
-
-    fallback_tz = resolve_timezone(args.timezone)
-    locator = Locator(gpx_points, google_points, max_time_diff_seconds=args.max_time_diff)
+    try:
+        fallback_tz = resolve_timezone(args.timezone)
+    except (KeyError, ValueError):  # ZoneInfoNotFoundError subclasses KeyError
+        parser.error(f"unknown timezone {args.timezone!r} "
+                     "(use an IANA name like 'Europe/Paris')")
 
     try:
         opts = TaggerOptions(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import typing
 from datetime import datetime, timezone
 
 import pytest
@@ -46,6 +47,23 @@ def test_haversine_km_known_distance():
     assert 1500 < d < 1750
 
 
+def test_haversine_km_antipodal_no_domain_error():
+    """Float rounding near h=1.0 must not crash asin (half Earth circumference)."""
+    d = mapper.haversine_km((0.0, 0.0), (0.0, 180.0))
+    assert d == pytest.approx(20015, abs=15)
+    d = mapper.haversine_km((90.0, 0.0), (-90.0, 0.0))
+    assert d == pytest.approx(20015, abs=15)
+
+
+def test_lonlat_to_mercator_clamps_poles():
+    """Latitudes at/near ±90° must stay finite (Web Mercator diverges there)."""
+    import numpy as np
+
+    x, y = mapper._lonlat_to_mercator([0.0, 181.0], [90.0, -90.0])
+    assert np.isfinite(x).all()
+    assert np.isfinite(y).all()
+
+
 @pytest.mark.parametrize("text,expected", [
     ("all", [0, 1, 2]),
     ("", [0, 1, 2]),
@@ -87,7 +105,7 @@ def test_cluster_indices_groups_and_orders():
         COPENHAGEN,                            # group B (far)
         (41.333, 19.822),                      # group A
     ]
-    groups = mapper._cluster_indices(coords, 50.0)
+    groups = mapper.cluster_indices(coords, 50.0)
     assert len(groups) == 2
     assert groups[0] == [0, 1, 3]  # largest first, original order preserved
     assert groups[1] == [2]
@@ -179,7 +197,7 @@ def test_render_heatmap_writes_png(monkeypatch, tmp_path):
 
 
 def _airport_pixel_intensity(out_path, coords, isolated):
-    """Return how far-from-white (0–255) the brightest pixel near ``isolated`` is."""
+    """Return how far-from-white (0-255) the brightest pixel near ``isolated`` is."""
     import numpy as np
 
     im = np.asarray(Image.open(out_path).convert("RGB"))
@@ -202,7 +220,7 @@ def test_render_marks_isolated_photo_visibly(monkeypatch, tmp_path):
 
     busy = [(41.327 + 0.0003 * i, 19.818 + 0.0003 * i) for i in range(8)]
     isolated = (41.41, 19.71)
-    coords = busy + [isolated]
+    coords = [*busy, isolated]
     out = tmp_path / "m.png"
     mapper.render_heatmap(coords, out, dpi=80)
 
@@ -268,7 +286,7 @@ def _patch_nominatim(monkeypatch, reverse_result):
 
 def test_describe_location_returns_place_name(monkeypatch):
     class FakeLoc:
-        raw = {"address": {"city": "Tirana", "country": "Albania"}}
+        raw: typing.ClassVar = {"address": {"city": "Tirana", "country": "Albania"}}
 
     _patch_nominatim(monkeypatch, FakeLoc())
     assert mapper.describe_location(41.33, 19.82) == "Tirana, Albania"

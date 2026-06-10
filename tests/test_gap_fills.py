@@ -98,11 +98,13 @@ def test_google_source_invalid_kml(tmp_path, caplog):
 
 
 def test_exif_parse_offset_branches():
-    assert exif_mod._parse_offset("Z") is timezone.utc
-    assert exif_mod._parse_offset("+02:30").utcoffset(None).total_seconds() == 2.5 * 3600
-    assert exif_mod._parse_offset("-05:00").utcoffset(None).total_seconds() == -5 * 3600
-    assert exif_mod._parse_offset("garbage") is None
-    assert exif_mod._parse_offset("") is timezone.utc
+    from gpsphototag.dates import parse_exif_offset
+
+    assert parse_exif_offset("Z") is timezone.utc
+    assert parse_exif_offset("+02:30").utcoffset(None).total_seconds() == 2.5 * 3600
+    assert parse_exif_offset("-05:00").utcoffset(None).total_seconds() == -5 * 3600
+    assert parse_exif_offset("garbage") is None
+    assert parse_exif_offset("") is timezone.utc
 
 
 def test_exif_read_timestamp_handles_unreadable(tmp_path):
@@ -239,10 +241,11 @@ def test_cli_main_error_returns_nonzero(monkeypatch, jpeg_factory, sample_gpx, t
 def test_display_print_summary(jpeg_factory, tmp_path):
     """print_summary writes the panel to the console without error."""
     from rich.console import Console
-    console = Console(file=open(tmp_path / "out.txt", "w"), width=120)
-    disp = StatusDisplay(console=console)
-    disp.add(PhotoRow(path=Path("a.jpg"), status=Status.TAGGED))
-    disp.print_summary()
+    with open(tmp_path / "out.txt", "w") as fh:
+        console = Console(file=fh, width=120)
+        disp = StatusDisplay(console=console)
+        disp.add(PhotoRow(path=Path("a.jpg"), status=Status.TAGGED))
+        disp.print_summary()
     text = (tmp_path / "out.txt").read_text()
     assert "summary" in text.lower() or "total" in text.lower()
 

@@ -1,6 +1,8 @@
-"""Read and set filesystem timestamps for ``--fix-dates``.
+"""Date/time helpers: EXIF string parsing + filesystem timestamps.
 
-Two directions, driven by the CLI:
+The EXIF parsers (``parse_exif_offset``, ``parse_exif_datetime``) are shared by
+``exif`` and ``raw_writer``. The filesystem half implements ``--fix-dates``,
+with two directions driven by the CLI:
 
 * ``--fix-dates exif`` — set the file's dates *from* its EXIF timestamp
   (``set_file_dates``).
@@ -19,11 +21,42 @@ import logging
 import os
 import platform
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from shutil import which
 
 logger = logging.getLogger(__name__)
+
+
+def parse_exif_offset(value: str) -> tzinfo | None:
+    """Parse an EXIF UTC-offset string like ``+02:00`` into a tzinfo.
+
+    ``Z`` / ``+00:00`` / ``-00:00`` mean UTC. Returns None for malformed input
+    so callers can fall back to a default timezone.
+    """
+    s = value.strip()
+    if not s or s in ("Z", "+00:00", "-00:00"):
+        return timezone.utc
+    try:
+        sign = 1 if s[0] == "+" else -1
+        hh, mm = s[1:].split(":")
+        return timezone(sign * timedelta(hours=int(hh), minutes=int(mm)))
+    except (ValueError, IndexError):
+        return None
+
+
+def parse_exif_datetime(raw: str, offset: str | None, fallback_tz: tzinfo) -> datetime | None:
+    """Parse an EXIF ``YYYY:MM:DD HH:MM:SS`` string into a tz-aware datetime.
+
+    ``offset`` (e.g. ``+02:00``) is applied when present and valid; otherwise
+    ``fallback_tz``. Returns None when the datetime itself is unparseable.
+    """
+    try:
+        dt = datetime.strptime(raw.strip(), "%Y:%m:%d %H:%M:%S")
+    except ValueError:
+        return None
+    tz = parse_exif_offset(offset) if offset else None
+    return dt.replace(tzinfo=tz or fallback_tz)
 
 
 def read_file_created(path: Path) -> datetime:
@@ -62,10 +95,11 @@ def set_file_dates(path: Path, dt: datetime) -> bool:
         )
         return False
 
-    # SetFile -d expects local time formatted as MM/DD/YYYY HH:MM:SS.
+    # SetFile -d expects local time formatted as MM/DD/YYYY HH:MM:SS. The path
+    # is resolved to absolute so a name starting with '-' can't read as a flag.
     stamp = dt.astimezone().strftime("%m/%d/%Y %H:%M:%S")
     result = subprocess.run(
-        ["SetFile", "-d", stamp, str(path)],
+        ["SetFile", "-d", stamp, str(path.resolve())],
         capture_output=True, text=True, check=False,
     )
     if result.returncode != 0:

@@ -6,6 +6,11 @@ Carto Positron basemap. Output is a high-resolution PNG.
 
 Plotting deps (matplotlib, contextily) are optional — installed via the ``map``
 extra. They are imported lazily so the core tool stays usable without them.
+
+Privacy: rendering makes two kinds of network requests — basemap tiles are
+fetched from CARTO for the photos' bounding box, and cluster names come from
+OSM Nominatim reverse geocoding (cluster centroids only, never per photo).
+Nothing else leaves the machine.
 """
 
 from __future__ import annotations
@@ -78,10 +83,12 @@ def haversine_km(a, b) -> float:
     lat2, lon2 = math.radians(b[0]), math.radians(b[1])
     dlat, dlon = lat2 - lat1, lon2 - lon1
     h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(h))
+    # Clamp: float rounding can push h fractionally past 1.0 for near-antipodal
+    # points, which would take sqrt(h) outside asin's domain.
+    return 2 * r * math.asin(min(1.0, math.sqrt(h)))
 
 
-def _cluster_indices(coords, threshold_km: float):
+def cluster_indices(coords, threshold_km: float = 50.0):
     """Single-linkage cluster ``coords``; return index groups, largest-first.
 
     Two points join the same group when within ``threshold_km`` (transitively).
@@ -112,9 +119,9 @@ def _cluster_indices(coords, threshold_km: float):
 def cluster_coordinates(coords, *, threshold_km: float = 50.0):
     """Group ``coords`` into geographically distinct clusters, largest-first.
 
-    Each cluster is a list of ``(lat, lon)``. See :func:`_cluster_indices`.
+    Each cluster is a list of ``(lat, lon)``. See :func:`cluster_indices`.
     """
-    return [[coords[i] for i in g] for g in _cluster_indices(coords, threshold_km)]
+    return [[coords[i] for i in g] for g in cluster_indices(coords, threshold_km)]
 
 
 _TRAILING_NUM = re.compile(r"^(.*?)(\d+)$")
@@ -183,7 +190,7 @@ def area_labels(coords, names, *, threshold_km: float = 0.25):
     the collapsed filename range of the photos in it.
     """
     labels = []
-    for group in _cluster_indices(coords, threshold_km):
+    for group in cluster_indices(coords, threshold_km):
         lat = sum(coords[i][0] for i in group) / len(group)
         lon = sum(coords[i][1] for i in group) / len(group)
         labels.append((lat, lon, collapse_filenames([names[i] for i in group])))
@@ -214,6 +221,9 @@ def describe_location(lat: float, lon: float) -> str | None:
 
     Uses geopy's Nominatim if available and reachable; any failure (offline,
     rate-limited, not installed) returns None so callers fall back to coords.
+
+    Privacy: this sends the (cluster-centroid) coordinate to the public OSM
+    Nominatim service. Only called for cluster naming, never per photo.
     """
     try:
         from geopy.geocoders import Nominatim
@@ -277,18 +287,28 @@ def compute_extent(coords):
     )
 
 
+# Web Mercator is undefined at the poles; this is its conventional latitude cap.
+_MAX_MERCATOR_LAT = 85.05113
+
+
 def _lonlat_to_mercator(lon, lat):
-    """Project decimal lon/lat to Web Mercator (EPSG:3857) metres."""
+    """Project decimal lon/lat to Web Mercator (EPSG:3857) metres.
+
+    Inputs are clamped to the projection's valid domain (lat ±85.05113°,
+    lon ±180°) so near-pole coordinates can't produce infinities.
+    """
     import numpy as np
 
     r = 6378137.0
-    x = np.radians(np.asarray(lon, dtype=float)) * r
-    y = np.log(np.tan(np.pi / 4.0 + np.radians(np.asarray(lat, dtype=float)) / 2.0)) * r
+    lon_a = np.clip(np.asarray(lon, dtype=float), -180.0, 180.0)
+    lat_a = np.clip(np.asarray(lat, dtype=float), -_MAX_MERCATOR_LAT, _MAX_MERCATOR_LAT)
+    x = np.radians(lon_a) * r
+    y = np.log(np.tan(np.pi / 4.0 + np.radians(lat_a) / 2.0)) * r
     return x, y
 
 
 def _density_grid(xs, ys, extent, *, size, sigma_px):
-    """Accumulate a Gaussian splat per point onto a ``size``×``size`` grid.
+    """Accumulate a Gaussian splat per point onto a ``size`` x ``size`` grid.
 
     ``extent`` is ``(min_x, min_y, max_x, max_y)`` in the same units as
     ``xs``/``ys``. Returns a 2-D array indexed ``[row_y, col_x]`` (origin at the
@@ -377,7 +397,7 @@ def render_maps(coords, out_path: Path, *, dpi: int = 200, names=None) -> list[P
     render_heatmap(coords, out_path, dpi=dpi, names=names)
 
     if _bbox_diagonal_km(coords) > _ZOOM_TRIGGER_KM:
-        regions = _cluster_indices(coords, _ZOOM_REGION_KM)
+        regions = cluster_indices(coords, _ZOOM_REGION_KM)
         if len(regions) > 1:
             for n, region in enumerate(regions, 1):
                 zoom_coords = [coords[i] for i in region]

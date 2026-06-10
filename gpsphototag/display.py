@@ -36,6 +36,7 @@ def format_coords(loc: LocationResult | None) -> str:
 
 
 def format_time(row: PhotoRow) -> str:
+    """Render the row's timestamp with offset, or an em-dash if missing."""
     return row.timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if row.timestamp else "—"
 
 
@@ -98,7 +99,9 @@ class StatusDisplay:
                      title="GPSPhotoTag — summary", expand=False)
 
     def print_summary(self) -> None:
+        """Print the final summary panel to the console."""
         self.console.print(self.render_summary())
 
     def __iter__(self) -> Iterator[tuple[Status, int]]:
+        """Iterate ``(status, count)`` pairs from the run summary."""
         return iter(self.summary.counts.items())

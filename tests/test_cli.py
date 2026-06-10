@@ -224,3 +224,21 @@ def test_map_mode_missing_deps_returns_error(jpeg_factory, tmp_path, monkeypatch
     monkeypatch.setattr(cli.mapper, "render_heatmap", boom)
     rc = cli.main(["--photo", str(photo), "--map", str(tmp_path / "x.png")])
     assert rc == 1
+
+
+@pytest.mark.parametrize("bad", ["0", "-50", "10", "5000", "abc"])
+def test_map_dpi_out_of_range_rejected(bad):
+    with pytest.raises(SystemExit):
+        _parse(["--photo", "x.jpg", "--map", "m.png", "--map-dpi", bad])
+
+
+def test_map_dpi_in_range_accepted():
+    args = _parse(["--photo", "x.jpg", "--map", "m.png", "--map-dpi", "300"])
+    assert args.map_dpi == 300
+
+
+def test_invalid_timezone_friendly_error(jpeg_factory, capsys):
+    photo = jpeg_factory("tz.jpg", datetime(2024, 8, 15, 10, 0, 0, tzinfo=UTC))
+    with pytest.raises(SystemExit):
+        cli.main(["--photo", str(photo), "--overwrite", "--timezone", "Not/AZone"])
+    assert "timezone" in capsys.readouterr().err.lower()

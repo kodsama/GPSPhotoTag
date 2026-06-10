@@ -27,15 +27,16 @@ def test_format_time_none():
 
 
 def test_summary_counts_increment_per_row(tmp_path):
-    # Capture rich output to a string to avoid noisy stdout in tests.
-    console = Console(file=open(tmp_path / "out.txt", "w"), force_terminal=False, width=120)
-    disp = StatusDisplay(console=console)
-    row1 = PhotoRow(path=tmp_path / "a.jpg", status=Status.TAGGED,
-                    timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
-                    location=LocationResult(1.0, 2.0, "gpx", "exact", 0.0))
-    row2 = PhotoRow(path=tmp_path / "b.jpg", status=Status.NO_GPS)
-    disp.add(row1)
-    disp.add(row2)
+    # Capture rich output to a file to avoid noisy stdout in tests.
+    with open(tmp_path / "out.txt", "w") as fh:
+        console = Console(file=fh, force_terminal=False, width=120)
+        disp = StatusDisplay(console=console)
+        row1 = PhotoRow(path=tmp_path / "a.jpg", status=Status.TAGGED,
+                        timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                        location=LocationResult(1.0, 2.0, "gpx", "exact", 0.0))
+        row2 = PhotoRow(path=tmp_path / "b.jpg", status=Status.NO_GPS)
+        disp.add(row1)
+        disp.add(row2)
     assert disp.summary.counts[Status.TAGGED] == 1
     assert disp.summary.counts[Status.NO_GPS] == 1
     assert disp.summary.total == 2
