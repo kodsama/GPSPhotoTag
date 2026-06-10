@@ -82,6 +82,7 @@ gpsphototag --photo ~/Pictures/Trip/ --gps trip.gpx --dry-run
 | `--map PNG` | **Read-only.** Render a heatmap PNG of where the photos were taken (from GPS already in the photos) and exit — no tagging. See [Heatmap](#heatmap---map). |
 | `--map-dpi DPI` | Resolution of the `--map` PNG. Default `200`. |
 | `--map-clusters SEL` | When photos span multiple locations, which to include: `all`, or comma-separated cluster numbers (e.g. `1,2`). If omitted you're prompted interactively. |
+| `--map-names` | Label each area on the map with its filename range (e.g. `DSCF0795-0801`). |
 | `--max-time-diff SECONDS` | Max gap between photo time and GPS point(s). Default `300`. |
 | `--timezone TZ` | IANA tz used when EXIF lacks `OffsetTimeOriginal`. Default: system local. |
 | `--dry-run` | Locate + report only; write nothing. |
@@ -155,7 +156,12 @@ gpsphototag --photo ~/Pictures/Trip/ --map trip.png --map-dpi 300
 ```
 
 - **Auto-zoom.** The map fits the bounding box of the photos — tight for a
-  single neighbourhood, wide for a road trip.
+  single neighbourhood, wide for a road trip. When the photos are spread far
+  apart, an overview is written *plus* a zoomed-in PNG per dense sub-area
+  (`trip.png`, `trip-zoom1.png`, `trip-zoom2.png`, …) so detail isn't lost.
+- **Filename labels.** With `--map-names`, each area is labelled with its
+  collapsed filename range — `DSCF0795, DSCF0796, DSCF0797` becomes
+  `DSCF0795-0797`; gaps show as `DSCF0820-0822, 0825`.
 - **Multiple locations.** If your photos fall into geographically distinct
   groups (e.g. a trip plus a stray shot from the departure airport), the tool
   lists the clusters — reverse-geocoded to place names — and asks which to

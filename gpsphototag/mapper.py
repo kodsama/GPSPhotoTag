@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from pathlib import Path
 
 from gpsphototag import exif
@@ -31,6 +32,11 @@ _SIGMA_PX = 7.0
 _MARKER_SIZE = 44
 _MARKER_FILL = (0.85, 0.08, 0.40)  # magenta-red
 _MARKER_ALPHA = 0.7
+# Auto-zoom: when photos span more than the trigger, emit a zoom map per region.
+_ZOOM_TRIGGER_KM = 2.0
+_ZOOM_REGION_KM = 1.5
+# Photos within this distance share one filename-range label.
+_LABEL_SPOT_KM = 0.25
 # Bounds on the displayed window's height/width ratio so the PNG isn't absurdly
 # elongated; the deficient axis is widened (never squashed) to land in range.
 _MIN_ASPECT = 0.5
@@ -61,15 +67,8 @@ def collect_coordinates(photos):
 
     ``coords`` is a list of ``(lat, lon)`` for every photo carrying usable GPS.
     """
-    coords: list[tuple[float, float]] = []
-    n_without = 0
-    for path in photos:
-        latlon = exif.read_gps(path)
-        if latlon is None:
-            n_without += 1
-        else:
-            coords.append(latlon)
-    return coords, len(coords), n_without
+    coords, _names, n_with, n_without = collect_located(photos)
+    return coords, n_with, n_without
 
 
 def haversine_km(a, b) -> float:
@@ -82,12 +81,13 @@ def haversine_km(a, b) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
-def cluster_coordinates(coords, *, threshold_km: float = 50.0):
-    """Group ``coords`` into geographically distinct clusters.
+def _cluster_indices(coords, threshold_km: float):
+    """Single-linkage cluster ``coords``; return index groups, largest-first.
 
-    Single-linkage: two points join the same cluster if they are within
-    ``threshold_km`` of each other (transitively). Returns a list of clusters
-    (each a list of ``(lat, lon)``), sorted largest-first.
+    Two points join the same group when within ``threshold_km`` (transitively).
+    Each group is a list of indices into ``coords``, in ascending order; groups
+    are sorted largest-first. Working in indices lets callers keep parallel data
+    (e.g. filenames) aligned with the coordinates.
     """
     n = len(coords)
     parent = list(range(n))
@@ -105,8 +105,89 @@ def cluster_coordinates(coords, *, threshold_km: float = 50.0):
 
     groups: dict[int, list] = {}
     for i in range(n):
-        groups.setdefault(find(i), []).append(coords[i])
+        groups.setdefault(find(i), []).append(i)
     return sorted(groups.values(), key=len, reverse=True)
+
+
+def cluster_coordinates(coords, *, threshold_km: float = 50.0):
+    """Group ``coords`` into geographically distinct clusters, largest-first.
+
+    Each cluster is a list of ``(lat, lon)``. See :func:`_cluster_indices`.
+    """
+    return [[coords[i] for i in g] for g in _cluster_indices(coords, threshold_km)]
+
+
+_TRAILING_NUM = re.compile(r"^(.*?)(\d+)$")
+
+
+def _split_name(stem: str):
+    """Split a filename stem into ``(prefix, number, width)``; number is None if
+    there is no trailing digit run."""
+    m = _TRAILING_NUM.match(stem)
+    if not m:
+        return stem, None, 0
+    return m.group(1), int(m.group(2)), len(m.group(2))
+
+
+def collapse_filenames(stems, *, max_len: int = 32) -> str:
+    """Collapse filename stems into compact ranges.
+
+    Consecutive numbers under a shared prefix become ``PREFIX0001-0003``; gaps
+    split into ``…, 0005``; distinct prefixes join with ``; ``. The result is
+    truncated to ``max_len`` (with an ellipsis) so labels stay readable.
+    """
+    groups: dict[str, list] = {}
+    order: list[str] = []
+    for s in stems:
+        prefix, num, width = _split_name(s)
+        if prefix not in groups:
+            groups[prefix] = []
+            order.append(prefix)
+        groups[prefix].append((num, width))
+
+    group_strs = []
+    for prefix in order:
+        entries = groups[prefix]
+        nums = sorted({n for n, _ in entries if n is not None})
+        if not nums:
+            group_strs.append(prefix)
+            continue
+        width = max(w for n, w in entries if n is not None)
+        runs = []
+        start = prev = nums[0]
+        for n in nums[1:]:
+            if n == prev + 1:
+                prev = n
+                continue
+            runs.append((start, prev))
+            start = prev = n
+        runs.append((start, prev))
+        parts = []
+        for k, (s_, e_) in enumerate(runs):
+            tok = f"{prefix}{s_:0{width}d}" if k == 0 else f"{s_:0{width}d}"
+            if e_ != s_:
+                tok += f"-{e_:0{width}d}"
+            parts.append(tok)
+        group_strs.append(", ".join(parts))
+
+    result = "; ".join(group_strs)
+    if len(result) > max_len:
+        result = result[:max_len - 1].rstrip(", ") + "…"
+    return result
+
+
+def area_labels(coords, names, *, threshold_km: float = 0.25):
+    """Return ``(lat, lon, text)`` labels — one per spot of nearby photos.
+
+    Photos within ``threshold_km`` form a spot; its label is the centroid plus
+    the collapsed filename range of the photos in it.
+    """
+    labels = []
+    for group in _cluster_indices(coords, threshold_km):
+        lat = sum(coords[i][0] for i in group) / len(group)
+        lon = sum(coords[i][1] for i in group) / len(group)
+        labels.append((lat, lon, collapse_filenames([names[i] for i in group])))
+    return labels
 
 
 def parse_cluster_selection(text: str, n_clusters: int):
@@ -148,6 +229,26 @@ def describe_location(lat: float, lon: float) -> str | None:
     country = addr.get("country")
     parts = [p for p in (city, country) if p]
     return ", ".join(parts) if parts else None
+
+
+def collect_located(photos):
+    """Like :func:`collect_coordinates` but also returns parallel filename stems.
+
+    Returns ``(coords, names, n_with_gps, n_without_gps)`` where ``coords`` is
+    ``[(lat, lon), ...]`` and ``names[i]`` is the stem of the photo at
+    ``coords[i]`` — kept aligned for filename-range labels.
+    """
+    coords: list[tuple[float, float]] = []
+    names: list[str] = []
+    n_without = 0
+    for path in photos:
+        latlon = exif.read_gps(path)
+        if latlon is None:
+            n_without += 1
+        else:
+            coords.append(latlon)
+            names.append(path.stem)
+    return coords, names, len(coords), n_without
 
 
 def compute_extent(coords):
@@ -256,11 +357,44 @@ def _fit_aspect(x0, y0, x1, y1):
     return x0, y0, x1, y1
 
 
-def render_heatmap(coords, out_path: Path, *, dpi: int = 200) -> None:
+def _bbox_diagonal_km(coords) -> float:
+    """Great-circle distance across the bounding box of ``coords``."""
+    lats = [c[0] for c in coords]
+    lons = [c[1] for c in coords]
+    return haversine_km((min(lats), min(lons)), (max(lats), max(lons)))
+
+
+def render_maps(coords, out_path: Path, *, dpi: int = 200, names=None) -> list[Path]:
+    """Render the overview map, plus a zoomed map per region when spread out.
+
+    Always writes the overview to ``out_path``. When the photos span more than
+    ``_ZOOM_TRIGGER_KM`` and fall into multiple regions, also writes one
+    zoomed-in PNG per region as ``<stem>-zoom<N><suffix>``. ``names`` (parallel
+    to ``coords``) enables filename-range labels on every map. Returns the list
+    of written paths.
+    """
+    written = [out_path]
+    render_heatmap(coords, out_path, dpi=dpi, names=names)
+
+    if _bbox_diagonal_km(coords) > _ZOOM_TRIGGER_KM:
+        regions = _cluster_indices(coords, _ZOOM_REGION_KM)
+        if len(regions) > 1:
+            for n, region in enumerate(regions, 1):
+                zoom_coords = [coords[i] for i in region]
+                zoom_names = [names[i] for i in region] if names is not None else None
+                zoom_path = out_path.with_name(
+                    f"{out_path.stem}-zoom{n}{out_path.suffix}")
+                render_heatmap(zoom_coords, zoom_path, dpi=dpi, names=zoom_names)
+                written.append(zoom_path)
+    return written
+
+
+def render_heatmap(coords, out_path: Path, *, dpi: int = 200, names=None) -> None:
     """Render ``coords`` (``[(lat, lon), ...]``) to a heatmap PNG at ``out_path``.
 
     The map window is the (padded) bounding box of every photo, so it zooms to
     fit the whole set — tight for a single neighbourhood, wide for a road trip.
+    ``names`` (parallel to ``coords``) adds per-area filename-range labels.
 
     Raises :class:`ValueError` if ``coords`` is empty and
     :class:`MapDependencyError` if the plotting deps are unavailable or tiles
@@ -309,6 +443,18 @@ def render_heatmap(coords, out_path: Path, *, dpi: int = 200) -> None:
     # busy spots darken naturally, reinforcing the density read.
     ax.scatter(xs, ys, s=_MARKER_SIZE, c=[_MARKER_FILL], alpha=_MARKER_ALPHA,
                edgecolors="white", linewidths=0.4, zorder=4)
+
+    # Optional per-area filename-range labels (one per spot of nearby photos).
+    if names is not None:
+        for lat, lon, text in area_labels(coords, names, threshold_km=_LABEL_SPOT_KM):
+            (lx,), (ly,) = _lonlat_to_mercator([lon], [lat])
+            ax.annotate(
+                text, (float(lx), float(ly)), xytext=(0, 7),
+                textcoords="offset points", ha="center", va="bottom",
+                fontsize=6.5, color="#222222", zorder=5,
+                bbox={"boxstyle": "round,pad=0.2", "facecolor": "white",
+                      "edgecolor": "none", "alpha": 0.65},
+            )
 
     # Re-assert the window: add_basemap / imshow can nudge the limits.
     ax.set_xlim(x0, x1)

@@ -62,6 +62,67 @@ def test_parse_cluster_selection_invalid_returns_none(text):
     assert mapper.parse_cluster_selection(text, 3) is None
 
 
+@pytest.mark.parametrize("stems,expected", [
+    (["DSCF0795", "DSCF0796", "DSCF0797"], "DSCF0795-0797"),
+    (["DSCF0820", "DSCF0821", "DSCF0822", "DSCF0825"], "DSCF0820-0822, 0825"),
+    (["DSCF0795"], "DSCF0795"),
+    (["DSC_001", "DSC_002", "DSC_003"], "DSC_001-003"),
+    (["DSCF0795", "IMG0001"], "DSCF0795; IMG0001"),
+    (["holiday"], "holiday"),
+])
+def test_collapse_filenames(stems, expected):
+    assert mapper.collapse_filenames(stems) == expected
+
+
+def test_collapse_filenames_truncates_long_result():
+    stems = [f"PXL_2026061{i:08d}" for i in range(20)]
+    out = mapper.collapse_filenames(stems, max_len=24)
+    assert len(out) <= 24
+    assert out.endswith("…")
+
+
+def test_cluster_indices_groups_and_orders():
+    coords = [
+        (41.327, 19.818), (41.330, 19.820),  # group A (close)
+        COPENHAGEN,                            # group B (far)
+        (41.333, 19.822),                      # group A
+    ]
+    groups = mapper._cluster_indices(coords, 50.0)
+    assert len(groups) == 2
+    assert groups[0] == [0, 1, 3]  # largest first, original order preserved
+    assert groups[1] == [2]
+
+
+def test_area_labels_one_per_spot():
+    coords = [(41.327, 19.818), (41.3271, 19.8181), COPENHAGEN]
+    names = ["DSCF0795", "DSCF0796", "PXL_001"]
+    labels = mapper.area_labels(coords, names, threshold_km=50.0)
+    texts = sorted(text for _, _, text in labels)
+    assert texts == ["DSCF0795-0796", "PXL_001"]
+
+
+def test_render_maps_overview_only_when_compact(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(mapper, "render_heatmap",
+                        lambda coords, out, *, dpi, names=None: (
+                            calls.append(out), out.write_bytes(b"x")))
+    coords = [(41.327, 19.818), (41.328, 19.819)]  # ~150 m apart
+    paths = mapper.render_maps(coords, tmp_path / "m.png", dpi=50)
+    assert paths == [tmp_path / "m.png"]
+    assert len(calls) == 1
+
+
+def test_render_maps_adds_zooms_when_spread(monkeypatch, tmp_path):
+    monkeypatch.setattr(mapper, "render_heatmap",
+                        lambda coords, out, *, dpi, names=None: out.write_bytes(b"x"))
+    downtown = [(41.327 + 0.0002 * i, 19.818 + 0.0002 * i) for i in range(5)]
+    airport = [(41.41, 19.71)]  # ~12 km away
+    paths = mapper.render_maps(downtown + airport, tmp_path / "m.png", dpi=50)
+    assert (tmp_path / "m.png") in paths
+    assert (tmp_path / "m-zoom1.png") in paths
+    assert (tmp_path / "m-zoom2.png") in paths
+
+
 def test_collect_coordinates_counts(jpeg_factory):
     tagged = jpeg_factory("a.jpg", datetime(2024, 8, 15, tzinfo=UTC))
     exif_mod.write_gps(tagged, tagged, lat=TIRANA[0], lon=TIRANA[1])
@@ -146,6 +207,20 @@ def test_render_marks_isolated_photo_visibly(monkeypatch, tmp_path):
     mapper.render_heatmap(coords, out, dpi=80)
 
     assert _airport_pixel_intensity(out, coords, isolated) > 120
+
+
+def test_render_heatmap_with_names_draws_labels(monkeypatch, tmp_path):
+    import contextily as cx
+    monkeypatch.setattr(cx, "add_basemap", lambda *a, **k: None)
+
+    coords = [(41.327, 19.818), (41.3271, 19.8181), (41.41, 19.71)]
+    names = ["DSCF0795", "DSCF0796", "DSCF0900"]
+    out = tmp_path / "named.png"
+    mapper.render_heatmap(coords, out, dpi=60, names=names)
+
+    assert out.exists()
+    with Image.open(out) as img:
+        assert img.format == "PNG"
 
 
 def test_render_heatmap_no_coords_raises(tmp_path):

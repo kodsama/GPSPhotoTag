@@ -75,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="when photos span multiple locations, which to include: "
                         "'all', or comma-separated cluster numbers (e.g. '1,2'); "
                         "if omitted you'll be prompted interactively")
+    p.add_argument("--map-names", action="store_true",
+                   help="label each area on the map with its filename range "
+                        "(e.g. 'DSCF0795-0801')")
     p.add_argument("--dry-run", action="store_true",
                    help="locate + report only; write nothing")
     p.add_argument("--verbose", "-v", action="store_true",
@@ -176,27 +179,32 @@ def resolve_clusters(clusters, selection: str | None) -> list[int] | None:
 
 
 def run_map(photos: list[Path], out_path: Path, dpi: int,
-            selection: str | None = None) -> int:
+            selection: str | None = None, want_names: bool = False) -> int:
     """Render a heatmap of ``photos`` to ``out_path``. Returns an exit code."""
-    coords, n_with, n_without = mapper.collect_coordinates(photos)
+    coords, names, n_with, n_without = mapper.collect_located(photos)
     logger.info("%d of %d photo(s) had GPS", n_with, n_with + n_without)
     if not coords:
         logger.error("No photos carry GPS coordinates; nothing to map.")
         return 1
 
-    clusters = mapper.cluster_coordinates(coords)
-    if len(clusters) > 1:
+    groups = mapper._cluster_indices(coords, 50.0)
+    if len(groups) > 1:
+        clusters = [[coords[i] for i in g] for g in groups]
         chosen = resolve_clusters(clusters, selection)
         if chosen is None:
             return 1
-        coords = [pt for i in chosen for pt in clusters[i]]
+        selected = [i for k in chosen for i in groups[k]]
+        coords = [coords[i] for i in selected]
+        names = [names[i] for i in selected]
 
     try:
-        mapper.render_heatmap(coords, out_path, dpi=dpi)
+        written = mapper.render_maps(coords, out_path, dpi=dpi,
+                                     names=names if want_names else None)
     except mapper.MapDependencyError as e:
         logger.error("%s", e)
         return 1
-    logger.info("Wrote heatmap to %s", out_path)
+    for path in written:
+        logger.info("Wrote %s", path)
     return 0
 
 
@@ -234,7 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Resolved %d photo(s)", len(photos))
 
     if args.map is not None:
-        return run_map(photos, args.map, args.map_dpi, args.map_clusters)
+        return run_map(photos, args.map, args.map_dpi, args.map_clusters,
+                       args.map_names)
 
     gpx_paths = collect_paths(args.gps, GPX_EXTS)
     maps_paths = collect_paths(args.maps_history, MAPS_EXTS)

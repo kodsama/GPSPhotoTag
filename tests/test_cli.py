@@ -103,7 +103,7 @@ def test_map_mode_renders_png(jpeg_factory, tmp_path, monkeypatch):
 
     captured = {}
 
-    def fake_render(coords, out_path, *, dpi):
+    def fake_render(coords, out_path, *, dpi, names=None):
         captured["coords"] = coords
         captured["out"] = out_path
         out_path.write_bytes(b"PNG")
@@ -130,7 +130,7 @@ def test_map_mode_cluster_selection_filters(jpeg_factory, tmp_path, monkeypatch)
     monkeypatch.setattr(cli.mapper, "describe_location", lambda *a, **k: None)
     captured = {}
     monkeypatch.setattr(cli.mapper, "render_heatmap",
-                        lambda coords, out, *, dpi: captured.update(coords=coords))
+                        lambda coords, out, *, dpi, names=None: captured.update(coords=coords))
 
     rc = cli.main(["--photo", str(t1), str(t2), str(cph),
                    "--map", str(tmp_path / "m.png"), "--map-clusters", "1"])
@@ -148,13 +148,13 @@ def test_map_mode_non_interactive_includes_all(jpeg_factory, tmp_path, monkeypat
     exif_mod.write_gps(cph, cph, lat=55.626, lon=12.650)
     monkeypatch.setattr(cli.mapper, "describe_location", lambda *a, **k: None)
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
-    captured = {}
+    calls = []
     monkeypatch.setattr(cli.mapper, "render_heatmap",
-                        lambda coords, out, *, dpi: captured.update(coords=coords))
+                        lambda coords, out, *, dpi, names=None: calls.append(list(coords)))
 
     rc = cli.main(["--photo", str(t), str(cph), "--map", str(tmp_path / "m.png")])
     assert rc == 0
-    assert len(captured["coords"]) == 2
+    assert len(calls[0]) == 2  # the overview map includes both clusters
 
 
 def test_map_mode_interactive_prompt_selects(jpeg_factory, tmp_path, monkeypatch):
@@ -169,7 +169,7 @@ def test_map_mode_interactive_prompt_selects(jpeg_factory, tmp_path, monkeypatch
     monkeypatch.setattr("builtins.input", lambda *a: "1")
     captured = {}
     monkeypatch.setattr(cli.mapper, "render_heatmap",
-                        lambda coords, out, *, dpi: captured.update(coords=coords))
+                        lambda coords, out, *, dpi, names=None: captured.update(coords=coords))
 
     rc = cli.main(["--photo", str(t1), str(t2), str(cph), "--map", str(tmp_path / "m.png")])
     assert rc == 0
