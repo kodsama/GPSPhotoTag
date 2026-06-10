@@ -22,7 +22,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
+map = ["matplotlib>=3.7", "contextily>=1.5", "geopy>=2.4"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6", "matplotlib>=3.7", "contextily>=1.5", "geopy>=2.4"]
 
 [project.scripts]
 gpsphototag = "gpsphototag.cli:main"

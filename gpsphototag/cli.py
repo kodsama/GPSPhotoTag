@@ -19,13 +19,14 @@ if __name__ == "__main__" and __package__ in (None, ""):
 
 import argparse
 import logging
+import sys
 from datetime import tzinfo
 from pathlib import Path
 
 from rich.console import Console
 from rich.logging import RichHandler
 
-from gpsphototag import __version__, google_source, gpx_source
+from gpsphototag import __version__, google_source, gpx_source, mapper
 from gpsphototag.collectors import GPX_EXTS, MAPS_EXTS, PHOTO_EXTS, collect_paths
 from gpsphototag.display import StatusDisplay
 from gpsphototag.locator import Locator
@@ -65,6 +66,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help="max gap between photo time and GPS point(s) [default: 300]")
     p.add_argument("--timezone", default=None, metavar="TZ",
                    help="IANA tz used when EXIF lacks OffsetTimeOriginal (default: system local)")
+    p.add_argument("--map", type=Path, metavar="PNG", dest="map",
+                   help="read-only: render a heatmap PNG of where the photos were "
+                        "taken (from GPS already in the photos) and exit; no tagging")
+    p.add_argument("--map-dpi", type=int, default=200, metavar="DPI",
+                   help="resolution of the --map PNG [default: 200]")
+    p.add_argument("--map-clusters", default=None, metavar="SEL",
+                   help="when photos span multiple locations, which to include: "
+                        "'all', or comma-separated cluster numbers (e.g. '1,2'); "
+                        "if omitted you'll be prompted interactively")
     p.add_argument("--dry-run", action="store_true",
                    help="locate + report only; write nothing")
     p.add_argument("--verbose", "-v", action="store_true",
@@ -104,6 +114,92 @@ def resolve_timezone(name: str | None) -> tzinfo:
     return ZoneInfo(name)
 
 
+def validate_map_mode(args: argparse.Namespace) -> str | None:
+    """Return an error string if --map is combined with any writing flag."""
+    if args.map is None:
+        return None
+    conflicts = {
+        "--out": args.out is not None,
+        "--overwrite": args.overwrite,
+        "--replace": args.replace,
+        "--gps": args.gps is not None,
+        "--maps-history": args.maps_history is not None,
+        "--fix-dates": args.fix_dates is not None,
+    }
+    used = [flag for flag, present in conflicts.items() if present]
+    if used:
+        return f"--map is read-only; remove writing flags: {', '.join(used)}"
+    return None
+
+
+def _describe_clusters(clusters) -> list[str]:
+    """Human-readable labels for each cluster: place name (or centroid) + count."""
+    labels = []
+    for cluster in clusters:
+        lat = sum(p[0] for p in cluster) / len(cluster)
+        lon = sum(p[1] for p in cluster) / len(cluster)
+        where = mapper.describe_location(lat, lon) or f"{lat:.4f}, {lon:.4f}"
+        labels.append(f"{where} — {len(cluster)} photo(s)")
+    return labels
+
+
+def resolve_clusters(clusters, selection: str | None) -> list[int] | None:
+    """Pick which clusters to map. Returns 0-based indices, or None to abort.
+
+    With ``selection`` (from --map-clusters) the choice is parsed directly. On a
+    TTY the user is prompted. Non-interactively with no selection, all clusters
+    are included (a warning points at --map-clusters).
+    """
+    labels = _describe_clusters(clusters)
+    logger.info("Photos span %d distinct locations:", len(clusters))
+    for i, label in enumerate(labels, 1):
+        logger.info("  [%d] %s", i, label)
+
+    if selection is not None:
+        idx = mapper.parse_cluster_selection(selection, len(clusters))
+        if idx is None:
+            logger.error("Invalid --map-clusters value: %r", selection)
+        return idx
+
+    if sys.stdin.isatty():
+        for _ in range(5):
+            resp = input("Which location(s) to map? [number(s) e.g. 1,2 — or 'all']: ")
+            idx = mapper.parse_cluster_selection(resp, len(clusters))
+            if idx is not None:
+                return idx
+            print("Invalid selection — try again.")
+        logger.error("No valid selection provided.")
+        return None
+
+    logger.warning("Including all locations; pass --map-clusters to choose a subset.")
+    return list(range(len(clusters)))
+
+
+def run_map(photos: list[Path], out_path: Path, dpi: int,
+            selection: str | None = None) -> int:
+    """Render a heatmap of ``photos`` to ``out_path``. Returns an exit code."""
+    coords, n_with, n_without = mapper.collect_coordinates(photos)
+    logger.info("%d of %d photo(s) had GPS", n_with, n_with + n_without)
+    if not coords:
+        logger.error("No photos carry GPS coordinates; nothing to map.")
+        return 1
+
+    clusters = mapper.cluster_coordinates(coords)
+    if len(clusters) > 1:
+        chosen = resolve_clusters(clusters, selection)
+        if chosen is None:
+            return 1
+        coords = [pt for i in chosen for pt in clusters[i]]
+
+    try:
+        mapper.render_heatmap(coords, out_path, dpi=dpi)
+    except mapper.MapDependencyError as e:
+        logger.error("%s", e)
+        return 1
+    logger.info("Wrote heatmap to %s", out_path)
+    return 0
+
+
 def validate_destination(args: argparse.Namespace) -> str | None:
     """Return an error string if the destination flags are invalid."""
     if args.dry_run:
@@ -123,15 +219,22 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     setup_logging(args.verbose, args.log_file)
 
-    err = validate_destination(args)
-    if err:
-        parser.error(err)
+    map_err = validate_map_mode(args)
+    if map_err:
+        parser.error(map_err)
+    if args.map is None:
+        err = validate_destination(args)
+        if err:
+            parser.error(err)
 
     photos = collect_paths(args.photo, PHOTO_EXTS)
     if not photos:
         logger.error("No photos matched --photo arguments.")
         return 1
     logger.info("Resolved %d photo(s)", len(photos))
+
+    if args.map is not None:
+        return run_map(photos, args.map, args.map_dpi, args.map_clusters)
 
     gpx_paths = collect_paths(args.gps, GPX_EXTS)
     maps_paths = collect_paths(args.maps_history, MAPS_EXTS)

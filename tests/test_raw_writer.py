@@ -386,3 +386,38 @@ def test_read_with_exiftool_real_roundtrip(dng_factory):
     ts, _ = raw_writer._read_with_exiftool(raw, fallback_tz=UTC)
     assert ts is not None
     assert (ts.hour, ts.minute) == (9, 30)
+
+
+def test_read_raw_gps_from_sidecar(dng_factory):
+    raw = dng_factory("sc.dng", datetime(2024, 8, 15, tzinfo=UTC))
+    raw_writer.write_sidecar(raw, raw, 41.3275, -19.8187)
+    got = raw_writer.read_raw_gps(raw)
+    assert got is not None
+    assert got[0] == pytest.approx(41.3275, abs=1e-4)
+    assert got[1] == pytest.approx(-19.8187, abs=1e-4)
+
+
+def test_read_raw_gps_returns_none_without_any_gps(dng_factory):
+    raw = dng_factory("none.dng", datetime(2024, 8, 15, tzinfo=UTC))
+    assert raw_writer.read_raw_gps(raw) is None
+
+
+@pytest.mark.skipif(not raw_writer.exiftool_available(), reason="exiftool not installed")
+def test_read_raw_gps_from_embedded(dng_factory):
+    """No sidecar: coordinates are read from EXIF embedded in the RAW."""
+    raw = dng_factory("emb.dng", datetime(2024, 8, 15, tzinfo=UTC), with_gps=True)
+    got = raw_writer.read_raw_gps(raw)
+    assert got is not None
+    assert got[0] == pytest.approx(48.856, abs=1e-2)
+    assert got[1] == pytest.approx(2.352, abs=1e-2)
+
+
+@pytest.mark.parametrize("bad", ["", "nodelim", "41,19.5X", "41,abc N"])
+def test_from_xmp_coord_rejects_malformed(bad):
+    assert raw_writer._from_xmp_coord(bad) is None
+
+
+def test_read_sidecar_gps_handles_malformed_xmp(dng_factory):
+    raw = dng_factory("mal.dng", datetime(2024, 8, 15, tzinfo=UTC))
+    raw_writer.sidecar_path_for(raw).write_text("<x>not xmp gps</x>", encoding="utf-8")
+    assert raw_writer._read_sidecar_gps(raw) is None

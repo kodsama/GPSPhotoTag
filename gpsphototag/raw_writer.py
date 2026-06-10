@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone, tzinfo
@@ -136,6 +137,67 @@ def read_raw_metadata(path: Path, fallback_tz: tzinfo) -> tuple[datetime | None,
 def sidecar_path_for(raw_path: Path) -> Path:
     """Return the conventional XMP sidecar path next to ``raw_path``."""
     return raw_path.with_suffix(raw_path.suffix + ".xmp")
+
+
+def _from_xmp_coord(value: str) -> float | None:
+    """Parse an XMP ``DD,MM.MMMMM[N|S|E|W]`` coordinate back to decimal degrees."""
+    s = value.strip()
+    if not s or "," not in s:
+        return None
+    hemi = s[-1].upper()
+    if hemi not in ("N", "S", "E", "W"):
+        return None
+    try:
+        deg_str, min_str = s[:-1].split(",")
+        decimal = int(deg_str) + float(min_str) / 60.0
+    except (ValueError, IndexError):
+        return None
+    return -decimal if hemi in ("S", "W") else decimal
+
+
+def _read_sidecar_gps(raw_path: Path) -> tuple[float, float] | None:
+    """Read ``(lat, lon)`` from the XMP sidecar next to ``raw_path``, or None."""
+    sidecar = sidecar_path_for(raw_path)
+    if not sidecar.exists():
+        return None
+    text = sidecar.read_text(encoding="utf-8")
+    lat_m = re.search(r"<exif:GPSLatitude>(.*?)</exif:GPSLatitude>", text)
+    lon_m = re.search(r"<exif:GPSLongitude>(.*?)</exif:GPSLongitude>", text)
+    if not lat_m or not lon_m:
+        return None
+    lat = _from_xmp_coord(lat_m.group(1))
+    lon = _from_xmp_coord(lon_m.group(1))
+    if lat is None or lon is None:
+        return None
+    return lat, lon
+
+
+def _read_embedded_gps(raw_path: Path) -> tuple[float, float] | None:
+    """Read embedded ``(lat, lon)`` via exiftool numeric output, or None."""
+    if not exiftool_available():
+        return None
+    cmd = ["exiftool", "-json", "-n", "-GPSLatitude", "-GPSLongitude", str(raw_path)]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except OSError:  # pragma: no cover - exiftool vanished mid-run
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        data = json.loads(result.stdout)[0]
+        return float(data["GPSLatitude"]), float(data["GPSLongitude"])
+    except (json.JSONDecodeError, IndexError, KeyError, TypeError, ValueError):
+        return None
+
+
+def read_raw_gps(raw_path: Path) -> tuple[float, float] | None:
+    """Return ``(lat, lon)`` for a RAW file, preferring the XMP sidecar.
+
+    Mirrors :func:`gpsphototag.exif.has_gps`'s RAW handling: an XMP sidecar
+    written by GPSPhotoTag takes precedence; otherwise we ask ``exiftool`` for
+    coordinates embedded in the RAW container. Returns None when neither has GPS.
+    """
+    return _read_sidecar_gps(raw_path) or _read_embedded_gps(raw_path)
 
 
 def _to_xmp_coord(value: float, *, is_latitude: bool) -> str:

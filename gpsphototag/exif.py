@@ -104,6 +104,40 @@ def has_gps(path: Path) -> bool:
         return False
 
 
+def _dms_to_decimal(dms, ref: str) -> float:
+    """Convert EXIF ((deg),(min),(sec)) rationals + N/S/E/W ref to signed decimal."""
+    deg, minutes, seconds = (float(v) for v in dms)
+    decimal = deg + minutes / 60.0 + seconds / 3600.0
+    return -decimal if ref.upper() in ("S", "W") else decimal
+
+
+def read_gps(path: Path) -> tuple[float, float] | None:
+    """Return ``(lat, lon)`` in signed decimal degrees, or None if absent.
+
+    The read-side mirror of :func:`has_gps`. RAW formats read from the XMP
+    sidecar or embedded EXIF via ``raw_writer``; everything else via Pillow's
+    GPS IFD, converting the DMS rationals + hemisphere refs to decimals.
+    """
+    if path.suffix.lower() in RAW_EXTS:
+        return raw_writer.read_raw_gps(path)
+    try:
+        with Image.open(path) as img:
+            gps = img.getexif().get_ifd(_TAG_GPSINFO)
+    except Exception as e:
+        logger.debug("Could not read GPS for %s: %s", path, e)
+        return None
+    # 1/2 = LatitudeRef/Latitude, 3/4 = LongitudeRef/Longitude.
+    if not gps or 2 not in gps or 4 not in gps:
+        return None
+    try:
+        lat = _dms_to_decimal(gps[2], str(gps.get(1, "N")))
+        lon = _dms_to_decimal(gps[4], str(gps.get(3, "E")))
+    except (TypeError, ValueError, ZeroDivisionError) as e:
+        logger.debug("Malformed GPS IFD in %s: %s", path, e)
+        return None
+    return lat, lon
+
+
 def _to_dms(value: float) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int]]:
     """Convert decimal degrees → ((deg,1),(min,1),(sec*10000,10000)) rationals."""
     v = abs(value)

@@ -79,6 +79,9 @@ gpsphototag --photo ~/Pictures/Trip/ --gps trip.gpx --dry-run
 | `--replace` | Overwrite existing GPS bytes inside the photo (otherwise such photos are skipped). |
 | `--raw-mode {auto,sidecar,embed}` | RAW write strategy. `auto` (default) embeds GPS into the RAW via `exiftool` when available, else writes `photo.raf.xmp`. `sidecar` always writes the XMP sidecar (never touches the RAW). `embed` forces `exiftool`. |
 | `--fix-dates {exif,file}` | Also fix dates. `exif`: set the file's created/modified date from the EXIF timestamp. `file`: write EXIF `DateTimeOriginal` from the file's created date. Runs standalone (no GPS source required). See [Fixing dates](#fixing-dates---fix-dates). |
+| `--map PNG` | **Read-only.** Render a heatmap PNG of where the photos were taken (from GPS already in the photos) and exit — no tagging. See [Heatmap](#heatmap---map). |
+| `--map-dpi DPI` | Resolution of the `--map` PNG. Default `200`. |
+| `--map-clusters SEL` | When photos span multiple locations, which to include: `all`, or comma-separated cluster numbers (e.g. `1,2`). If omitted you're prompted interactively. |
 | `--max-time-diff SECONDS` | Max gap between photo time and GPS point(s). Default `300`. |
 | `--timezone TZ` | IANA tz used when EXIF lacks `OffsetTimeOriginal`. Default: system local. |
 | `--dry-run` | Locate + report only; write nothing. |
@@ -137,6 +140,36 @@ Notes:
   a note, since a capture date can't go into an XMP sidecar.
 - Combine freely with GPS tagging — the row shows the GPS status plus a
   date note; standalone date runs report the `dates_fixed` status.
+
+## Heatmap (`--map`)
+
+Render a modern density heatmap of *where* your photos were taken — a
+Google-Photos-style warm glow over a clean light basemap. It's **read-only**:
+it reads the GPS already in the photos and writes a single PNG; it never tags.
+
+```bash
+# Heatmap of an already-tagged trip, high resolution:
+gpsphototag --photo ~/Pictures/Trip/ --map trip.png --map-dpi 300
+```
+
+- **Auto-zoom.** The map fits the bounding box of the photos — tight for a
+  single neighbourhood, wide for a road trip.
+- **Multiple locations.** If your photos fall into geographically distinct
+  groups (e.g. a trip plus a stray shot from the departure airport), the tool
+  lists the clusters — reverse-geocoded to place names — and asks which to
+  include. Pass `--map-clusters all` or `--map-clusters 1,2` to choose
+  non-interactively.
+- **Install.** Map rendering needs the optional extra:
+  `pip install 'gpsphototag[map]'` (adds `matplotlib`, `contextily`, `geopy`).
+  Basemap tiles are fetched from CARTO, so an internet connection is required
+  when generating.
+
+```text
+Photos span 2 distinct locations:
+  [1] Tirana, Albania — 70 photo(s)
+  [2] Tårnby Municipality, Denmark — 1 photo(s)
+Which location(s) to map? [number(s) e.g. 1,2 — or 'all']:
+```
 
 ## Getting Google location data
 
