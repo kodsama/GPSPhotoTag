@@ -144,8 +144,10 @@ Notes:
 ## Heatmap (`--map`)
 
 Render a modern density heatmap of *where* your photos were taken — a
-Google-Photos-style warm glow over a clean light basemap. It's **read-only**:
-it reads the GPS already in the photos and writes a single PNG; it never tags.
+Google-Photos-style warm glow over a clean light basemap, with a crisp dot per
+photo on top so every individual location stays visible (even a single shot far
+from any cluster). It's **read-only**: it reads the GPS already in the photos
+and writes a single PNG; it never tags.
 
 ```bash
 # Heatmap of an already-tagged trip, high resolution:

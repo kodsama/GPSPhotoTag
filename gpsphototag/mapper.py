@@ -26,7 +26,11 @@ _PAD_FRACTION = 0.15
 _MIN_SPAN_DEG = 0.01
 # Density grid resolution and the Gaussian splat radius (in grid cells).
 _GRID_SIZE = 800
-_SIGMA_PX = 12.0
+_SIGMA_PX = 7.0
+# Per-photo marker styling (drawn on top of the glow so every location shows).
+_MARKER_SIZE = 44
+_MARKER_FILL = (0.85, 0.08, 0.40)  # magenta-red
+_MARKER_ALPHA = 0.7
 # Bounds on the displayed window's height/width ratio so the PNG isn't absurdly
 # elongated; the deficient axis is widened (never squashed) to land in range.
 _MIN_ASPECT = 0.5
@@ -299,6 +303,12 @@ def render_heatmap(coords, out_path: Path, *, dpi: int = 200) -> None:
     ax.imshow(grid, origin="lower", extent=(x0, x1, y0, y1),
               cmap=_heatmap_cmap(LinearSegmentedColormap), zorder=3,
               interpolation="bilinear")
+
+    # A crisp dot per photo on top of the glow, so individual locations (even a
+    # single shot far from any cluster) are always visible. Overlapping dots in
+    # busy spots darken naturally, reinforcing the density read.
+    ax.scatter(xs, ys, s=_MARKER_SIZE, c=[_MARKER_FILL], alpha=_MARKER_ALPHA,
+               edgecolors="white", linewidths=0.4, zorder=4)
 
     # Re-assert the window: add_basemap / imshow can nudge the limits.
     ax.set_xlim(x0, x1)

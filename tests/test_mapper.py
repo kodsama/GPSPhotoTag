@@ -117,6 +117,37 @@ def test_render_heatmap_writes_png(monkeypatch, tmp_path):
         assert img.width == round(mapper.FIG_WIDTH_INCHES * 50)
 
 
+def _airport_pixel_intensity(out_path, coords, isolated):
+    """Return how far-from-white (0–255) the brightest pixel near ``isolated`` is."""
+    import numpy as np
+
+    im = np.asarray(Image.open(out_path).convert("RGB"))
+    h, w, _ = im.shape
+    min_lon, min_lat, max_lon, max_lat = mapper.compute_extent(coords)
+    (mx0, mx1), (my0, my1) = mapper._lonlat_to_mercator(
+        [min_lon, max_lon], [min_lat, max_lat])
+    x0, y0, x1, y1 = mapper._fit_aspect(float(mx0), float(my0), float(mx1), float(my1))
+    axp, ayp = mapper._lonlat_to_mercator([isolated[1]], [isolated[0]])
+    px = int((float(axp[0]) - x0) / (x1 - x0) * (w - 1))
+    py = int((1 - (float(ayp[0]) - y0) / (y1 - y0)) * (h - 1))
+    patch = im[max(0, py - 4):py + 5, max(0, px - 4):px + 5].reshape(-1, 3)
+    return int((255 - patch.min(axis=1)).max())
+
+
+def test_render_marks_isolated_photo_visibly(monkeypatch, tmp_path):
+    """A lone photo far from a busy cluster must still be clearly marked."""
+    import contextily as cx
+    monkeypatch.setattr(cx, "add_basemap", lambda *a, **k: None)
+
+    busy = [(41.327 + 0.0003 * i, 19.818 + 0.0003 * i) for i in range(8)]
+    isolated = (41.41, 19.71)
+    coords = busy + [isolated]
+    out = tmp_path / "m.png"
+    mapper.render_heatmap(coords, out, dpi=80)
+
+    assert _airport_pixel_intensity(out, coords, isolated) > 120
+
+
 def test_render_heatmap_no_coords_raises(tmp_path):
     with pytest.raises(ValueError, match="no GPS"):
         mapper.render_heatmap([], tmp_path / "x.png", dpi=50)
