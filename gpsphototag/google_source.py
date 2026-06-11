@@ -1,12 +1,15 @@
 """Parse Google location-history sources into TimedPoints.
 
-Three shapes are auto-detected:
+Four shapes are auto-detected:
 
 1. **Takeout `Records.json`** — ``{"locations": [...]}`` with ``latitudeE7`` /
    ``longitudeE7`` and ``timestamp`` (RFC3339) or ``timestampMs`` (epoch ms).
 2. **Timeline per-day JSON** — ``{"timelineObjects": [...]}`` with
    ``placeVisit``, ``activitySegment``, and optional ``simplifiedRawPath``.
-3. **Timeline KML** — ``<gx:Track>`` with paired ``<when>`` and ``<gx:coord>``.
+3. **Mobile Timeline export (2024+)** — ``{"semanticSegments": [...]}`` with
+   ``timelinePath`` points, ``visit`` place locations, and ``activity``
+   start/end locations; coordinates are ``"lat°, lon°"`` strings.
+4. **Timeline KML** — ``<gx:Track>`` with paired ``<when>`` and ``<gx:coord>``.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ import json
 import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from dateutil import parser as date_parser
@@ -25,6 +28,13 @@ from gpsphototag.types import TimedPoint
 logger = logging.getLogger(__name__)
 
 KML_NS = {"kml": "http://www.opengis.net/kml/2.2", "gx": "http://www.google.com/kml/ext/2.2"}
+
+# A Timeline ``visit`` is a stationary stay with one constant location across its
+# whole [startTime, endTime]. Emit that location periodically (not just at the
+# endpoints) so a photo taken mid-stay can be bracketed by the locator, which
+# requires two points within its time threshold. 120 s stays inside both the
+# default 300 s threshold and looser settings.
+_VISIT_SAMPLE_SECONDS = 120
 
 
 def _parse_ts(value: str | int) -> datetime:
@@ -41,12 +51,26 @@ def _e7(value: int | float) -> float:
 
 
 def _detect_json_shape(obj: dict) -> str:
-    """Return 'records' or 'timeline' for a parsed JSON object."""
+    """Return 'records', 'timeline', or 'semantic' for a parsed JSON object."""
     if "locations" in obj and isinstance(obj["locations"], list):
         return "records"
     if "timelineObjects" in obj and isinstance(obj["timelineObjects"], list):
         return "timeline"
-    raise ValueError("Unrecognized Google JSON shape (no 'locations' or 'timelineObjects')")
+    if "semanticSegments" in obj and isinstance(obj["semanticSegments"], list):
+        return "semantic"
+    raise ValueError(
+        "Unrecognized Google JSON shape "
+        "(no 'locations', 'timelineObjects', or 'semanticSegments')"
+    )
+
+
+def _parse_latlng(value: str) -> tuple[float, float]:
+    """Parse a Google ``"lat°, lon°"`` string into a (lat, lon) decimal pair."""
+    lat_s, lon_s = value.split(",")
+    return (
+        float(lat_s.replace("°", "").strip()),
+        float(lon_s.replace("°", "").strip()),
+    )
 
 
 def _parse_records(obj: dict) -> list[TimedPoint]:
@@ -111,6 +135,57 @@ def _parse_timeline(obj: dict) -> list[TimedPoint]:
     return points
 
 
+def _visit_times(start: datetime | None, end: datetime | None) -> list[datetime]:
+    """Sample timestamps across a visit's [start, end], inclusive, every
+    ``_VISIT_SAMPLE_SECONDS``. Falls back to whichever endpoint(s) exist."""
+    if start is None:
+        return [end] if end is not None else []
+    if end is None or end <= start:
+        return [start]
+    step = timedelta(seconds=_VISIT_SAMPLE_SECONDS)
+    times: list[datetime] = []
+    t = start
+    while t < end:
+        times.append(t)
+        t += step
+    times.append(end)
+    return times
+
+
+def _parse_semantic(obj: dict) -> list[TimedPoint]:
+    """Iterate ``semanticSegments[]`` from a 2024+ mobile Timeline export."""
+    points: list[TimedPoint] = []
+    for seg in obj.get("semanticSegments", []):
+        if "timelinePath" in seg:
+            for pt in seg["timelinePath"]:
+                try:
+                    lat, lon = _parse_latlng(pt["point"])
+                    points.append(TimedPoint(time=_parse_ts(pt["time"]), lat=lat, lon=lon))
+                except (KeyError, ValueError, TypeError):
+                    continue
+        elif "visit" in seg:
+            try:
+                lat, lon = _parse_latlng(
+                    seg["visit"]["topCandidate"]["placeLocation"]["latLng"]
+                )
+                start = _parse_ts(seg["startTime"]) if seg.get("startTime") else None
+                end = _parse_ts(seg["endTime"]) if seg.get("endTime") else None
+                for t in _visit_times(start, end):
+                    points.append(TimedPoint(time=t, lat=lat, lon=lon))
+            except (KeyError, ValueError, TypeError):
+                continue
+        elif "activity" in seg:
+            act = seg["activity"]
+            for end_key, ts_key in (("start", "startTime"), ("end", "endTime")):
+                try:
+                    lat, lon = _parse_latlng(act[end_key]["latLng"])
+                    if seg.get(ts_key):
+                        points.append(TimedPoint(time=_parse_ts(seg[ts_key]), lat=lat, lon=lon))
+                except (KeyError, ValueError, TypeError):
+                    continue
+    return points
+
+
 def _parse_kml(path: Path) -> list[TimedPoint]:
     """Parse a Timeline KML by pairing ``<when>`` and ``<gx:coord>`` siblings."""
     try:
@@ -162,7 +237,11 @@ def _load_one(path: Path) -> list[TimedPoint]:
             logger.error("Failed to parse JSON %s: %s", path, e)
             return []
         shape = _detect_json_shape(obj)
-        return _parse_records(obj) if shape == "records" else _parse_timeline(obj)
+        if shape == "records":
+            return _parse_records(obj)
+        if shape == "semantic":
+            return _parse_semantic(obj)
+        return _parse_timeline(obj)
     logger.warning("Unknown maps-history extension %s for %s", suffix, path)
     return []
 

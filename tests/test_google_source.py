@@ -25,6 +25,30 @@ def test_timeline_json_parsing(sample_timeline_json):
     assert times == sorted(times)
 
 
+def test_semantic_timeline_json_parsing(sample_semantic_timeline_json):
+    pts = google_source.load([sample_semantic_timeline_json])
+    # 2 timelinePath points + visit densified @120s over 4min (10:00/10:02/10:04)
+    # + activity (start+end) = 2 + 3 + 2
+    assert len(pts) == 7
+    times = [p.time for p in pts]
+    assert times == sorted(times)
+    assert pts[0].time == datetime(2024, 8, 15, 9, 1, 0, tzinfo=timezone.utc)
+    assert pts[0].lat == pytest.approx(48.8566)
+    assert pts[0].lon == pytest.approx(2.3522)
+
+
+def test_semantic_visit_densified_to_cover_whole_stay(sample_semantic_timeline_json):
+    """A visit emits its constant location periodically so a mid-visit
+    timestamp can be bracketed (not just at start/end)."""
+    pts = google_source.load([sample_semantic_timeline_json])
+    visit_pts = [p for p in pts if p.lat == pytest.approx(48.8700)]
+    assert [p.time for p in visit_pts] == [
+        datetime(2024, 8, 15, 10, 0, 0, tzinfo=timezone.utc),
+        datetime(2024, 8, 15, 10, 2, 0, tzinfo=timezone.utc),
+        datetime(2024, 8, 15, 10, 4, 0, tzinfo=timezone.utc),
+    ]
+
+
 def test_timeline_kml_parsing(sample_timeline_kml):
     pts = google_source.load([sample_timeline_kml])
     assert len(pts) == 2
