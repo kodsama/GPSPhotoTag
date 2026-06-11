@@ -90,3 +90,18 @@ def test_set_file_dates_darwin_setfile_failure_warns(tmp_path, monkeypatch, capl
 
 def test_setfile_available_returns_bool():
     assert isinstance(dates.setfile_available(), bool)
+
+
+def test_parse_exif_offset_variants():
+    assert dates.parse_exif_offset("Z") is timezone.utc
+    assert dates.parse_exif_offset("+02:00").utcoffset(None).total_seconds() == 2 * 3600
+    assert dates.parse_exif_offset("-05:30").utcoffset(None).total_seconds() == -(5.5 * 3600)
+    assert dates.parse_exif_offset("garbage") is None
+
+
+def test_parse_exif_datetime_offset_and_fallback():
+    dt = dates.parse_exif_datetime("2024:08:15 10:00:00", "+02:00", timezone.utc)
+    assert dt.utcoffset().total_seconds() == 2 * 3600
+    dt = dates.parse_exif_datetime("2024:08:15 10:00:00", None, timezone.utc)
+    assert dt.tzinfo is timezone.utc
+    assert dates.parse_exif_datetime("not a date", None, timezone.utc) is None

@@ -73,3 +73,15 @@ def test_naive_datetime_raises():
 
 def test_empty_sources_return_none():
     assert Locator([], [], 60).locate(datetime(2024, 1, 1, tzinfo=UTC)) is None
+
+
+def test_unsorted_input_points_still_locate():
+    """Locator must not silently mis-bisect when callers pass unsorted points."""
+    pts = [_p(4, 9.0, 9.0), _p(0, 1.0, 2.0), _p(2, 5.0, 6.0)]
+    loc = Locator(pts, [], max_time_diff_seconds=300)
+    # Exact hit on the chronologically-last point: bisect on the unsorted list
+    # lands past the end and finds nothing.
+    r = loc.locate(datetime(2024, 1, 1, 10, 4, 0, tzinfo=UTC))
+    assert r is not None
+    assert r.method == "exact"
+    assert r.lat == 9.0

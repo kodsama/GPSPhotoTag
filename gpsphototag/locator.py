@@ -28,8 +28,11 @@ class Locator:
         google_points: Sequence[TimedPoint],
         max_time_diff_seconds: float = 300.0,
     ) -> None:
-        self._gpx = list(gpx_points)
-        self._google = list(google_points)
+        # Sorted defensively: the bisect-based search silently returns wrong
+        # results on unsorted input, and library callers (unlike the CLI's
+        # sources) carry no sortedness guarantee. O(n) on already-sorted lists.
+        self._gpx = sorted(gpx_points, key=lambda p: p.time)
+        self._google = sorted(google_points, key=lambda p: p.time)
         self._gpx_times = [p.time for p in self._gpx]
         self._google_times = [p.time for p in self._google]
         self._max = float(max_time_diff_seconds)

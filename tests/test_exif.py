@@ -92,3 +92,62 @@ def test_write_gps_unsupported_extension(tmp_path):
     f.write_text("hello")
     with pytest.raises(ValueError):
         exif_mod.write_gps(f, f, lat=0.0, lon=0.0)
+
+
+def test_read_gps_round_trip(jpeg_factory):
+    p = jpeg_factory("gps.jpg", datetime(2024, 8, 15, tzinfo=UTC))
+    exif_mod.write_gps(p, p, lat=41.3275, lon=19.8187)
+    got = exif_mod.read_gps(p)
+    assert got is not None
+    lat, lon = got
+    assert lat == pytest.approx(41.3275, abs=1e-4)
+    assert lon == pytest.approx(19.8187, abs=1e-4)
+
+
+def test_read_gps_negative_coords(jpeg_factory):
+    p = jpeg_factory("gps_neg.jpg", datetime(2024, 8, 15, tzinfo=UTC))
+    exif_mod.write_gps(p, p, lat=-33.8688, lon=-151.2093)
+    got = exif_mod.read_gps(p)
+    assert got is not None
+    lat, lon = got
+    assert lat == pytest.approx(-33.8688, abs=1e-4)
+    assert lon == pytest.approx(-151.2093, abs=1e-4)
+
+
+def test_read_gps_returns_none_without_gps(jpeg_factory):
+    p = jpeg_factory("no_gps_read.jpg", datetime(2024, 8, 15, tzinfo=UTC))
+    assert exif_mod.read_gps(p) is None
+
+
+def test_read_gps_rejects_out_of_range_coords(tmp_path):
+    """Corrupt EXIF claiming lat=99° must read as 'no GPS', not poison the map."""
+    from PIL import Image
+
+    exif_dict = {"0th": {}, "Exif": {}, "GPS": {
+        piexif.GPSIFD.GPSVersionID: (2, 0, 0, 0),
+        piexif.GPSIFD.GPSLatitudeRef: b"N",
+        piexif.GPSIFD.GPSLatitude: ((99, 1), (0, 1), (0, 1)),
+        piexif.GPSIFD.GPSLongitudeRef: b"E",
+        piexif.GPSIFD.GPSLongitude: ((10, 1), (0, 1), (0, 1)),
+    }, "1st": {}, "thumbnail": None}
+    p = tmp_path / "corrupt_gps.jpg"
+    Image.new("RGB", (8, 8)).save(p, format="JPEG", exif=piexif.dump(exif_dict))
+
+    assert exif_mod.read_gps(p) is None
+
+
+def test_read_gps_returns_none_on_unreadable_file(tmp_path):
+    bogus = tmp_path / "broken.jpg"
+    bogus.write_text("not actually a jpeg")
+    assert exif_mod.read_gps(bogus) is None
+
+
+def test_read_gps_reads_raw_sidecar(dng_factory):
+    raw = dng_factory("shot.dng", datetime(2024, 8, 15, tzinfo=UTC))
+    from gpsphototag import raw_writer
+    raw_writer.write_sidecar(raw, raw, 41.3275, -19.8187)
+    got = exif_mod.read_gps(raw)
+    assert got is not None
+    lat, lon = got
+    assert lat == pytest.approx(41.3275, abs=1e-4)
+    assert lon == pytest.approx(-19.8187, abs=1e-4)
