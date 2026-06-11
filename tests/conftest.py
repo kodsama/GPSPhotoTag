@@ -197,6 +197,43 @@ def sample_timeline_json(tmp_path):
 
 
 @pytest.fixture
+def sample_semantic_timeline_json(tmp_path):
+    """Google's 2024+ mobile Timeline export (semanticSegments)."""
+    path = tmp_path / "Timeline.json"
+    data = {
+        "semanticSegments": [
+            {
+                "startTime": "2024-08-15T09:00:00.000Z",
+                "endTime": "2024-08-15T09:10:00.000Z",
+                "timelinePath": [
+                    {"point": "48.8566°, 2.3522°", "time": "2024-08-15T09:01:00.000Z"},
+                    {"point": "48.8600°, 2.3550°", "time": "2024-08-15T09:05:00.000Z"},
+                ],
+            },
+            {
+                "startTime": "2024-08-15T10:00:00.000Z",
+                "endTime": "2024-08-15T10:04:00.000Z",
+                "visit": {
+                    "topCandidate": {"placeLocation": {"latLng": "48.8700°, 2.3700°"}},
+                },
+            },
+            {
+                "startTime": "2024-08-15T12:00:00.000Z",
+                "endTime": "2024-08-15T12:30:00.000Z",
+                "activity": {
+                    "start": {"latLng": "48.8566°, 2.3522°"},
+                    "end": {"latLng": "48.8900°, 2.4000°"},
+                },
+            },
+        ],
+        "rawSignals": [],
+        "userLocationProfile": {},
+    }
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+@pytest.fixture
 def sample_timeline_kml(tmp_path):
     """A Timeline KML export with one gx:Track."""
     path = tmp_path / "timeline-2024-08-15.kml"
