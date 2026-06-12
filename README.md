@@ -83,6 +83,7 @@ gpsphototag --photo ~/Pictures/Trip/ --gps trip.gpx --dry-run
 | `--map-dpi DPI` | Resolution of the `--map` PNG (30–1200). Default `200`. |
 | `--map-clusters SEL` | When photos span multiple locations, which to include: `all`, or comma-separated cluster numbers (e.g. `1,2`). If omitted you're prompted interactively. |
 | `--map-names` | Label each area on the map with its filename range (e.g. `DSCF0795-0801`). |
+| `--prune-raw` | **Standalone.** Delete RAW files that have no same-name JPG/HEIC next to them (and their `.xmp` sidecars), then exit — no tagging. For RAW+JPEG shooters: cull the JPGs in a viewer, then prune the leftover RAWs. Combine with `--dry-run` to preview. |
 | `--max-time-diff SECONDS` | Max gap between photo time and GPS point(s). Default `300`. |
 | `--timezone TZ` | IANA tz used when EXIF lacks `OffsetTimeOriginal`. Default: system local. |
 | `--dry-run` | Locate + report only; write nothing. |
@@ -259,6 +260,7 @@ gpsphototag/
   collectors.py     resolve --photo / --gps / --maps-history paths
   exif.py           read DateTimeOriginal, write GPS + datetime (JPEG/HEIC/PNG; dispatches RAW)
   raw_writer.py     RAW: exifread reads, XMP sidecar writes, exiftool subprocess
+  pruner.py         --prune-raw: delete RAWs lacking a same-name JPG/HEIC
   dates.py          --fix-dates: read/set filesystem timestamps (SetFile on macOS)
   gpx_source.py     gpxpy → TimedPoint list (sorted, UTC)
   google_source.py  Records.json / Timeline JSON / KML → TimedPoints

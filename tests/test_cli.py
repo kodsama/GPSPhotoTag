@@ -242,3 +242,44 @@ def test_invalid_timezone_friendly_error(jpeg_factory, capsys):
     with pytest.raises(SystemExit):
         cli.main(["--photo", str(photo), "--overwrite", "--timezone", "Not/AZone"])
     assert "timezone" in capsys.readouterr().err.lower()
+
+
+def _make_raw_pair_dir(tmp_path):
+    """A dir with one paired RAW+JPG and one orphan RAW (plus its sidecar)."""
+    (tmp_path / "pair.raf").write_bytes(b"x")
+    (tmp_path / "pair.jpg").write_bytes(b"x")
+    (tmp_path / "orphan.raf").write_bytes(b"x")
+    (tmp_path / "orphan.raf.xmp").write_bytes(b"x")
+    return tmp_path
+
+
+def test_prune_raw_deletes_orphans_keeps_pairs(tmp_path):
+    d = _make_raw_pair_dir(tmp_path)
+    rc = cli.main(["--photo", str(d), "--prune-raw"])
+    assert rc == 0
+    assert not (d / "orphan.raf").exists()
+    assert not (d / "orphan.raf.xmp").exists()
+    assert (d / "pair.raf").exists()
+    assert (d / "pair.jpg").exists()
+
+
+def test_prune_raw_dry_run_deletes_nothing(tmp_path):
+    d = _make_raw_pair_dir(tmp_path)
+    rc = cli.main(["--photo", str(d), "--prune-raw", "--dry-run"])
+    assert rc == 0
+    assert (d / "orphan.raf").exists()
+    assert (d / "orphan.raf.xmp").exists()
+
+
+def test_prune_raw_no_orphans_succeeds(tmp_path):
+    (tmp_path / "pair.raf").write_bytes(b"x")
+    (tmp_path / "pair.jpg").write_bytes(b"x")
+    assert cli.main(["--photo", str(tmp_path), "--prune-raw"]) == 0
+
+
+@pytest.mark.parametrize("extra", [["--overwrite"], ["--map", "m.png"],
+                                   ["--gps", "track.gpx"]])
+def test_prune_raw_rejects_conflicting_flags(tmp_path, extra):
+    (tmp_path / "orphan.raf").write_bytes(b"x")
+    with pytest.raises(SystemExit):
+        cli.main(["--photo", str(tmp_path), "--prune-raw", *extra])

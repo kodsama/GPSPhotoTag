@@ -26,8 +26,8 @@ from pathlib import Path
 from rich.console import Console
 from rich.logging import RichHandler
 
-from gpsphototag import __version__, google_source, gpx_source, mapper
-from gpsphototag.collectors import GPX_EXTS, MAPS_EXTS, PHOTO_EXTS, collect_paths
+from gpsphototag import __version__, google_source, gpx_source, mapper, pruner
+from gpsphototag.collectors import GPX_EXTS, MAPS_EXTS, PHOTO_EXTS, RAW_EXTS, collect_paths
 from gpsphototag.display import StatusDisplay
 from gpsphototag.locator import Locator
 from gpsphototag.tagger import Tagger, TaggerOptions, copy_unmodified_to_out
@@ -93,6 +93,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--map-names", action="store_true",
                    help="label each area on the map with its filename range "
                         "(e.g. 'DSCF0795-0801')")
+    p.add_argument("--prune-raw", action="store_true",
+                   help="delete RAW files that have no same-name JPG/HEIC next to "
+                        "them (and their .xmp sidecars), then exit; no tagging — "
+                        "combine with --dry-run to preview")
     p.add_argument("--dry-run", action="store_true",
                    help="locate + report only; write nothing")
     p.add_argument("--verbose", "-v", action="store_true",
@@ -148,6 +152,40 @@ def validate_map_mode(args: argparse.Namespace) -> str | None:
     if used:
         return f"--map is read-only; remove writing flags: {', '.join(used)}"
     return None
+
+
+def validate_prune_mode(args: argparse.Namespace) -> str | None:
+    """Return an error string if --prune-raw is combined with another mode."""
+    if not args.prune_raw:
+        return None
+    conflicts = {
+        "--out": args.out is not None,
+        "--overwrite": args.overwrite,
+        "--replace": args.replace,
+        "--gps": args.gps is not None,
+        "--maps-history": args.maps_history is not None,
+        "--fix-dates": args.fix_dates is not None,
+        "--map": args.map is not None,
+    }
+    used = [flag for flag, present in conflicts.items() if present]
+    if used:
+        return f"--prune-raw works alone; remove conflicting flags: {', '.join(used)}"
+    return None
+
+
+def run_prune_raw(photos: list[Path], dry_run: bool) -> int:
+    """Delete RAWs from ``photos`` lacking a JPG/HEIC companion. Exit code."""
+    n_raw = sum(1 for p in photos if p.suffix.lower() in RAW_EXTS)
+    orphans = pruner.find_orphan_raws(photos)
+    logger.info("%d of %d RAW file(s) have no same-name JPG/HEIC companion",
+                len(orphans), n_raw)
+    for raw in orphans:
+        if dry_run:
+            logger.info("Would delete %s", raw)
+        else:
+            for path in pruner.delete_raw(raw):
+                logger.info("Deleted %s", path)
+    return 0
 
 
 def _describe_clusters(clusters) -> list[str]:
@@ -249,25 +287,30 @@ def _build_locator(args: argparse.Namespace) -> Locator:
     return Locator(gpx_points, google_points, max_time_diff_seconds=args.max_time_diff)
 
 
+def _validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """parser.error() (exits) on invalid mode or destination combinations."""
+    err = validate_map_mode(args) or validate_prune_mode(args)
+    if err is None and args.map is None and not args.prune_raw:
+        err = validate_destination(args)
+    if err:
+        parser.error(err)
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
     setup_logging(args.verbose, args.log_file)
-
-    map_err = validate_map_mode(args)
-    if map_err:
-        parser.error(map_err)
-    if args.map is None:
-        err = validate_destination(args)
-        if err:
-            parser.error(err)
+    _validate_args(parser, args)
 
     photos = collect_paths(args.photo, PHOTO_EXTS)
     if not photos:
         logger.error("No photos matched --photo arguments.")
         return 1
     logger.info("Resolved %d photo(s)", len(photos))
+
+    if args.prune_raw:
+        return run_prune_raw(photos, args.dry_run)
 
     if args.map is not None:
         return run_map(photos, args.map, args.map_dpi, args.map_clusters,

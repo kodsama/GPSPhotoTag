@@ -31,10 +31,28 @@ from datetime import datetime, timezone
 
 import pytest
 
-from gpsphototag import cli, collectors, dates, google_source, gpx_source, locator, tagger
+from gpsphototag import (
+    cli,
+    collectors,
+    dates,
+    display,
+    google_source,
+    gpx_source,
+    locator,
+    mapper,
+    pruner,
+    raw_writer,
+    tagger,
+    types,
+)
 from gpsphototag import exif as exif_mod
 
 UTC = timezone.utc
+
+ALL_MODULES = (
+    cli, collectors, dates, display, exif_mod, google_source, gpx_source,
+    locator, mapper, pruner, raw_writer, tagger, types,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -235,9 +253,7 @@ def test_AC_R11_cli_uses_argparse():
 # ---------------------------------------------------------------------------
 # R12 — Functions are short and documented (docstring + length sanity)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("module", [
-    collectors, exif_mod, gpx_source, google_source, locator, tagger, cli, dates,
-])
+@pytest.mark.parametrize("module", ALL_MODULES)
 def test_AC_R12_public_functions_have_docstrings(module):
     """Every public (non-underscore) function/class carries a docstring."""
     missing = []
@@ -262,7 +278,7 @@ def test_AC_R12_no_function_exceeds_reasonable_line_count():
     """
     LIMIT = 60
     violations: list[str] = []
-    for module in (collectors, exif_mod, gpx_source, google_source, locator, tagger, cli, dates):
+    for module in ALL_MODULES:
         for name, obj in inspect.getmembers(module):
             if not inspect.isfunction(obj):
                 continue

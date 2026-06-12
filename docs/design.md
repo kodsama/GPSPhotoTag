@@ -1,7 +1,12 @@
 # GPSPhotoTag — Design Spec
 
 **Date:** 2026-05-28
-**Status:** Draft, awaiting user approval
+**Status:** Implemented — kept as the historical v0 design. Features shipped
+since this spec was written: RAW read/write support (`--raw-mode`, XMP
+sidecars / exiftool embedding), date fixing (`--fix-dates`), heatmap
+rendering (`--map`, `--map-dpi`, `--map-clusters`, `--map-names`), Google's
+2024+ semanticSegments Timeline format, and orphan-RAW pruning
+(`--prune-raw`). The [README](../README.md) is the up-to-date reference.
 **Author:** Kodsama (Alexandre Martins)
 
 ## 1. Purpose

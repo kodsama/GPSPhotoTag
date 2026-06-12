@@ -409,6 +409,31 @@ def render_maps(coords, out_path: Path, *, dpi: int = 200, names=None) -> list[P
     return written
 
 
+def _add_basemap(cx, plt, fig, ax) -> None:
+    """Draw the CARTO Positron basemap; MapDependencyError on tile failure."""
+    try:
+        cx.add_basemap(ax, crs="EPSG:3857", source=cx.providers.CartoDB.Positron,
+                       attribution=False)
+    except Exception as e:  # network/tile failure
+        plt.close(fig)
+        raise MapDependencyError(
+            "Could not download map tiles — check your internet connection."
+        ) from e
+
+
+def _annotate_areas(ax, coords, names) -> None:
+    """Add one filename-range label per spot of nearby photos."""
+    for lat, lon, text in area_labels(coords, names, threshold_km=_LABEL_SPOT_KM):
+        (lx,), (ly,) = _lonlat_to_mercator([lon], [lat])
+        ax.annotate(
+            text, (float(lx), float(ly)), xytext=(0, 7),
+            textcoords="offset points", ha="center", va="bottom",
+            fontsize=6.5, color="#222222", zorder=5,
+            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white",
+                  "edgecolor": "none", "alpha": 0.65},
+        )
+
+
 def render_heatmap(coords, out_path: Path, *, dpi: int = 200, names=None) -> None:
     """Render ``coords`` (``[(lat, lon), ...]``) to a heatmap PNG at ``out_path``.
 
@@ -441,14 +466,7 @@ def render_heatmap(coords, out_path: Path, *, dpi: int = 200, names=None) -> Non
     ax.set_aspect("equal")
     ax.set_axis_off()
 
-    try:
-        cx.add_basemap(ax, crs="EPSG:3857", source=cx.providers.CartoDB.Positron,
-                       attribution=False)
-    except Exception as e:  # network/tile failure
-        plt.close(fig)
-        raise MapDependencyError(
-            "Could not download map tiles — check your internet connection."
-        ) from e
+    _add_basemap(cx, plt, fig, ax)
 
     xs, ys = _lonlat_to_mercator(lons, lats)
     grid = _density_grid(xs, ys, window, size=_GRID_SIZE, sigma_px=_SIGMA_PX)
@@ -464,17 +482,8 @@ def render_heatmap(coords, out_path: Path, *, dpi: int = 200, names=None) -> Non
     ax.scatter(xs, ys, s=_MARKER_SIZE, c=[_MARKER_FILL], alpha=_MARKER_ALPHA,
                edgecolors="white", linewidths=0.4, zorder=4)
 
-    # Optional per-area filename-range labels (one per spot of nearby photos).
     if names is not None:
-        for lat, lon, text in area_labels(coords, names, threshold_km=_LABEL_SPOT_KM):
-            (lx,), (ly,) = _lonlat_to_mercator([lon], [lat])
-            ax.annotate(
-                text, (float(lx), float(ly)), xytext=(0, 7),
-                textcoords="offset points", ha="center", va="bottom",
-                fontsize=6.5, color="#222222", zorder=5,
-                bbox={"boxstyle": "round,pad=0.2", "facecolor": "white",
-                      "edgecolor": "none", "alpha": 0.65},
-            )
+        _annotate_areas(ax, coords, names)
 
     # Re-assert the window: add_basemap / imshow can nudge the limits.
     ax.set_xlim(x0, x1)
