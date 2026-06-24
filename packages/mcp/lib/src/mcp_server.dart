@@ -35,7 +35,8 @@ class McpServer {
   Future<Map<String, Object?>?> handle(Map<String, Object?> request) async {
     final id = request['id'];
     final method = request['method'];
-    final params = (request['params'] as Map?)?.cast<String, Object?>() ?? const {};
+    final params =
+        (request['params'] as Map?)?.cast<String, Object?>() ?? const {};
 
     // Notifications carry no id and never get a response.
     if (id == null) return null;
@@ -90,7 +91,10 @@ class McpServer {
       final isError = result['ok'] == false;
       return _ok(id, {
         'content': [
-          {'type': 'text', 'text': const JsonEncoder.withIndent('  ').convert(result)},
+          {
+            'type': 'text',
+            'text': const JsonEncoder.withIndent('  ').convert(result),
+          },
         ],
         'structuredContent': result,
         'isError': isError,
@@ -107,9 +111,15 @@ class McpServer {
     }
   }
 
-  Map<String, Object?> _ok(Object id, Map<String, Object?> result) =>
-      {'jsonrpc': '2.0', 'id': id, 'result': result};
+  Map<String, Object?> _ok(Object id, Map<String, Object?> result) => {
+    'jsonrpc': '2.0',
+    'id': id,
+    'result': result,
+  };
 
-  Map<String, Object?> _err(Object id, int code, String message) =>
-      {'jsonrpc': '2.0', 'id': id, 'error': {'code': code, 'message': message}};
+  Map<String, Object?> _err(Object id, int code, String message) => {
+    'jsonrpc': '2.0',
+    'id': id,
+    'error': {'code': code, 'message': message},
+  };
 }

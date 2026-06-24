@@ -69,8 +69,9 @@ List<TimedPoint> parseGoogleKml(String kmlText) {
   }
 
   final points = <TimedPoint>[];
-  for (final track
-      in doc.descendantElements.where((e) => e.localName == 'Track')) {
+  for (final track in doc.descendantElements.where(
+    (e) => e.localName == 'Track',
+  )) {
     _addGxTrack(track, points);
   }
   for (final placemark in doc.findAllElements('Placemark')) {
@@ -140,10 +141,7 @@ DateTime? _timeFromEpochMs(Object? value) {
 
 // --- Timeline (semanticSegments) helpers ----------------------------------
 
-void _addSemanticSegment(
-  Map<dynamic, dynamic> segment,
-  List<TimedPoint> out,
-) {
+void _addSemanticSegment(Map<dynamic, dynamic> segment, List<TimedPoint> out) {
   final path = segment['timelinePath'];
   if (path is List) {
     for (final entry in path) {
@@ -245,8 +243,9 @@ void _addGxTrack(XmlElement track, List<TimedPoint> out) {
     whens.add(_parseTime(when.innerText));
   }
   final coords = <({double lat, double lng})?>[];
-  for (final coord
-      in track.childElements.where((e) => e.localName == 'coord')) {
+  for (final coord in track.childElements.where(
+    (e) => e.localName == 'coord',
+  )) {
     coords.add(_parseCoordTriplet(coord.innerText, separator: ' '));
   }
   final count = whens.length < coords.length ? whens.length : coords.length;
@@ -258,8 +257,9 @@ void _addGxTrack(XmlElement track, List<TimedPoint> out) {
 void _addPlacemark(XmlElement placemark, List<TimedPoint> out) {
   final point = placemark.getElement('Point');
   final coordsText = point?.getElement('coordinates')?.innerText;
-  final coords =
-      coordsText == null ? null : _parseCoordTriplet(coordsText, separator: ',');
+  final coords = coordsText == null
+      ? null
+      : _parseCoordTriplet(coordsText, separator: ',');
 
   final timeStamp = placemark.getElement('TimeStamp');
   final time = _parseTime(timeStamp?.getElement('when')?.innerText);

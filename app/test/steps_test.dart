@@ -17,12 +17,12 @@ import 'package:gpsphototag_gui/src/widgets/status_pill.dart';
 import 'support/fakes.dart';
 
 ToolStatus _tool(String id, {bool present = true}) => ToolStatus(
-      id: id,
-      name: id,
-      present: present,
-      purpose: 'test',
-      required: false,
-    );
+  id: id,
+  name: id,
+  present: present,
+  purpose: 'test',
+  required: false,
+);
 
 InputSummary _summaryWith(Directory dir, List<String> photos) =>
     InputSummary.from(
@@ -51,15 +51,18 @@ void main() {
   });
 
   group('input step', () {
-    testWidgets('choosing a folder scans it and shows the summary',
-        (tester) async {
+    testWidgets('choosing a folder scans it and shows the summary', (
+      tester,
+    ) async {
       final jpg = await writeJpegWithDate(tmp, 'a.jpg');
       final controller = AppController(
         runner: FakeEngineRunner(),
         pickFolder: () async => tmp.path,
       )..debugSetToolkit([_tool('exiftool')]);
-      controller.debugSetStep(WizardStep.input,
-          completed: {WizardStep.toolkit});
+      controller.debugSetStep(
+        WizardStep.input,
+        completed: {WizardStep.toolkit},
+      );
       await _pump(tester, controller);
 
       expect(find.byType(InputStep), findsOneWidget);
@@ -75,55 +78,61 @@ void main() {
   });
 
   group('options step', () {
-    Future<AppController> optionsController(WidgetTester tester,
-        {bool exiftool = true}) async {
+    Future<AppController> optionsController(
+      WidgetTester tester, {
+      bool exiftool = true,
+    }) async {
       final controller = AppController(runner: FakeEngineRunner())
         ..debugSetToolkit([_tool('exiftool', present: exiftool)]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
-      controller.debugSetStep(WizardStep.options, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-      });
+      controller.debugSetStep(
+        WizardStep.options,
+        completed: {WizardStep.toolkit, WizardStep.input, WizardStep.review},
+      );
       await _pump(tester, controller);
       return controller;
     }
 
-    testWidgets('toggles, raw mode, time-diff and timezone drive the controller',
-        (tester) async {
-      final controller = await optionsController(tester);
-      expect(find.byType(OptionsStep), findsOneWidget);
+    testWidgets(
+      'toggles, raw mode, time-diff and timezone drive the controller',
+      (tester) async {
+        final controller = await optionsController(tester);
+        expect(find.byType(OptionsStep), findsOneWidget);
 
-      // Toggle the three switches (copy-to-folder, replace, dry-run).
-      final switches = find.byType(Switch);
-      expect(switches, findsNWidgets(3));
-      await tester.tap(switches.at(0)); // copy to folder
-      await tester.pump();
-      expect(controller.copyToFolder, isTrue);
-      await tester.tap(switches.at(1)); // replace
-      await tester.pump();
-      expect(controller.replace, isTrue);
-      await tester.tap(switches.at(2)); // dry run
-      await tester.pump();
-      expect(controller.dryRun, isTrue);
+        // Toggle the three switches (copy-to-folder, replace, dry-run).
+        final switches = find.byType(Switch);
+        expect(switches, findsNWidgets(3));
+        await tester.tap(switches.at(0)); // copy to folder
+        await tester.pump();
+        expect(controller.copyToFolder, isTrue);
+        await tester.tap(switches.at(1)); // replace
+        await tester.pump();
+        expect(controller.replace, isTrue);
+        await tester.tap(switches.at(2)); // dry run
+        await tester.pump();
+        expect(controller.dryRun, isTrue);
 
-      // RAW mode: pick Sidecar.
-      await tester.tap(find.text('Sidecar'));
-      await tester.pump();
-      expect(controller.rawMode, RawMode.sidecar);
+        // RAW mode: pick Sidecar.
+        await tester.tap(find.text('Sidecar'));
+        await tester.pump();
+        expect(controller.rawMode, RawMode.sidecar);
 
-      // Max time diff + timezone fields.
-      await tester.enterText(find.byType(TextFormField).at(0), '45');
-      await tester.pump();
-      expect(controller.maxTimeDiffSeconds, 45);
-      await tester.enterText(
-          find.byType(TextFormField).at(1), 'Europe/Paris');
-      await tester.pump();
-      expect(controller.timezone, 'Europe/Paris');
-    });
+        // Max time diff + timezone fields.
+        await tester.enterText(find.byType(TextFormField).at(0), '45');
+        await tester.pump();
+        expect(controller.maxTimeDiffSeconds, 45);
+        await tester.enterText(
+          find.byType(TextFormField).at(1),
+          'Europe/Paris',
+        );
+        await tester.pump();
+        expect(controller.timezone, 'Europe/Paris');
+      },
+    );
 
-    testWidgets('embed RAW mode is disabled and noted without exiftool',
-        (tester) async {
+    testWidgets('embed RAW mode is disabled and noted without exiftool', (
+      tester,
+    ) async {
       final controller = await optionsController(tester, exiftool: false);
       expect(find.textContaining('Embed needs ExifTool'), findsOneWidget);
 
@@ -138,30 +147,39 @@ void main() {
     testWidgets('in-place mode shows the warning banner', (tester) async {
       final controller = AppController(runner: FakeEngineRunner())
         ..debugSetToolkit([_tool('exiftool')]);
-      controller.debugSetStep(WizardStep.output, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-      });
+      controller.debugSetStep(
+        WizardStep.output,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+        },
+      );
       await _pump(tester, controller);
 
       expect(find.byType(OutputStep), findsOneWidget);
-      expect(find.textContaining('Originals will be modified in place'),
-          findsOneWidget);
+      expect(
+        find.textContaining('Originals will be modified in place'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('copy mode prompts for a destination, then shows it',
-        (tester) async {
+    testWidgets('copy mode prompts for a destination, then shows it', (
+      tester,
+    ) async {
       final controller = AppController(runner: FakeEngineRunner())
         ..debugSetToolkit([_tool('exiftool')]);
       controller.setCopyToFolder(true);
-      controller.debugSetStep(WizardStep.output, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-      });
+      controller.debugSetStep(
+        WizardStep.output,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+        },
+      );
       await _pump(tester, controller);
 
       expect(find.text('Choose destination folder'), findsOneWidget);
@@ -176,18 +194,22 @@ void main() {
   });
 
   group('run step', () {
-    testWidgets('Start streams progress, items and pills, then advances',
-        (tester) async {
+    testWidgets('Start streams progress, items and pills, then advances', (
+      tester,
+    ) async {
       final controller = AppController(runner: FakeEngineRunner())
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
-      controller.debugSetStep(WizardStep.run, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-      });
+      controller.debugSetStep(
+        WizardStep.run,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+        },
+      );
       await _pump(tester, controller);
 
       expect(find.byType(RunStep), findsOneWidget);
@@ -199,42 +221,50 @@ void main() {
       expect(controller.step, WizardStep.result);
     });
 
-    testWidgets('progress UI, item rows and a status pill render mid-run',
-        (tester) async {
+    testWidgets('progress UI, item rows and a status pill render mid-run', (
+      tester,
+    ) async {
       // A fake that emits progress + an item then holds the stream open, so the
       // live run UI (still `running`) stays on screen for assertions.
       final fake = FakeEngineRunner(
         keepOpen: true,
         events: const [
           ProgressEvent(done: 1, total: 2),
-          ItemEvent(PhotoRow(
-            path: '/photos/a.jpg',
-            status: PhotoStatus.tagged,
-            location: LocationResult(
-              latitude: 42.5,
-              longitude: 18.1,
-              source: GpsSource.gpx,
-              method: GpsMethod.exact,
+          ItemEvent(
+            PhotoRow(
+              path: '/photos/a.jpg',
+              status: PhotoStatus.tagged,
+              location: LocationResult(
+                latitude: 42.5,
+                longitude: 18.1,
+                source: GpsSource.gpx,
+                method: GpsMethod.exact,
+              ),
             ),
-          )),
+          ),
         ],
       );
       addTearDown(fake.release);
       final controller = AppController(runner: fake)
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(
-          _summaryWith(tmp, ['${tmp.path}/a.jpg', '${tmp.path}/b.jpg']));
-      controller.debugSetStep(WizardStep.run, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-      });
+        _summaryWith(tmp, ['${tmp.path}/a.jpg', '${tmp.path}/b.jpg']),
+      );
+      controller.debugSetStep(
+        WizardStep.run,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+        },
+      );
       await _pump(tester, controller);
 
       await tester.tap(find.textContaining('Tag 2 photo(s)'));
-      await tester.pump(); // let the scripted events fold in (stream stays open)
+      await tester
+          .pump(); // let the scripted events fold in (stream stays open)
       await tester.pump();
 
       expect(controller.running, isTrue);
@@ -251,18 +281,21 @@ void main() {
 
     testWidgets('an error event surfaces in the run UI', (tester) async {
       final controller = AppController(
-        runner: FakeEngineRunner(events: const [
-          ErrorEvent('boom while tagging'),
-        ]),
+        runner: FakeEngineRunner(
+          events: const [ErrorEvent('boom while tagging')],
+        ),
       )..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
-      controller.debugSetStep(WizardStep.run, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-      });
+      controller.debugSetStep(
+        WizardStep.run,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+        },
+      );
       await _pump(tester, controller);
 
       await tester.tap(find.textContaining('Tag 1 photo(s)'));
@@ -287,19 +320,23 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
       controller.debugAddLog('seed'); // touch log path
-      controller.debugSetStep(WizardStep.result, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-        WizardStep.run,
-      });
+      controller.debugSetStep(
+        WizardStep.result,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+          WizardStep.run,
+        },
+      );
       return controller;
     }
 
-    testWidgets('renders the summary table and follow-up actions',
-        (tester) async {
+    testWidgets('renders the summary table and follow-up actions', (
+      tester,
+    ) async {
       final controller = resultController();
       // Seed a done summary via a no-op run.
       await controller.runTag();
@@ -312,20 +349,24 @@ void main() {
       expect(find.text('Tag another'), findsOneWidget);
     });
 
-    testWidgets('Render heatmap calls the runner and shows the image',
-        (tester) async {
+    testWidgets('Render heatmap calls the runner and shows the image', (
+      tester,
+    ) async {
       final fake = FakeEngineRunner();
       final controller = AppController(runner: fake)
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
-      controller.debugSetStep(WizardStep.result, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-        WizardStep.run,
-      });
+      controller.debugSetStep(
+        WizardStep.result,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+          WizardStep.run,
+        },
+      );
       await controller.runTag();
       await _pump(tester, controller);
 
@@ -337,10 +378,7 @@ void main() {
       // framework-internal and async, so we assert the deterministic effects.)
       expect(fake.calls, contains('map'));
       expect(controller.errorMessage, isNull);
-      expect(
-        File('${tmp.path}/gpsphototag-heatmap.png').existsSync(),
-        isTrue,
-      );
+      expect(File('${tmp.path}/gpsphototag-heatmap.png').existsSync(), isTrue);
     });
 
     testWidgets('Prune confirm dialog runs the runner', (tester) async {
@@ -348,14 +386,17 @@ void main() {
       final controller = AppController(runner: fake)
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
-      controller.debugSetStep(WizardStep.result, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-        WizardStep.run,
-      });
+      controller.debugSetStep(
+        WizardStep.result,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+          WizardStep.run,
+        },
+      );
       await controller.runTag();
       await _pump(tester, controller);
 
@@ -372,14 +413,17 @@ void main() {
       final controller = AppController(runner: fake)
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
-      controller.debugSetStep(WizardStep.result, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-        WizardStep.review,
-        WizardStep.options,
-        WizardStep.output,
-        WizardStep.run,
-      });
+      controller.debugSetStep(
+        WizardStep.result,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+          WizardStep.run,
+        },
+      );
       await controller.runTag();
       await _pump(tester, controller);
 

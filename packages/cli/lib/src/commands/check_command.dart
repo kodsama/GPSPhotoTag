@@ -22,7 +22,11 @@ class CheckCommand extends Command<int> {
   Future<int> run() async {
     final tools = await ToolkitChecker(const SystemProcessRunner()).check();
     if (globalResults!.flag('json')) {
-      _out.writeln(jsonEncode({'tools': [for (final t in tools) t.toJson()]}));
+      _out.writeln(
+        jsonEncode({
+          'tools': [for (final t in tools) t.toJson()],
+        }),
+      );
     } else {
       for (final t in tools) {
         final mark = t.present ? '✓' : '✗';

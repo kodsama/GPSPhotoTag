@@ -45,17 +45,19 @@ void main() {
       expect(img.decodeJpg(File(path).readAsBytesSync()), isNotNull);
     });
 
-    test('writeGps round-trips coordinates within rounding tolerance',
-        () async {
-      final path = makeJpeg('coords.jpg');
-      const lat = 42.7077;
-      const lon = 18.3441;
-      await backend.writeGps(path, latitude: lat, longitude: lon);
+    test(
+      'writeGps round-trips coordinates within rounding tolerance',
+      () async {
+        final path = makeJpeg('coords.jpg');
+        const lat = 42.7077;
+        const lon = 18.3441;
+        await backend.writeGps(path, latitude: lat, longitude: lon);
 
-      final (rlat, rlon) = _readGps(path);
-      expect(rlat, closeTo(lat, 1e-3));
-      expect(rlon, closeTo(lon, 1e-3));
-    });
+        final (rlat, rlon) = _readGps(path);
+        expect(rlat, closeTo(lat, 1e-3));
+        expect(rlon, closeTo(lon, 1e-3));
+      },
+    );
 
     test('negative coordinates get S/W refs and round-trip sign', () async {
       final path = makeJpeg('neg.jpg');
@@ -93,23 +95,25 @@ void main() {
       expect(meta.offset, isNull);
     });
 
-    test('a second write preserves the previously written DateTimeOriginal',
-        () async {
-      final path = makeJpeg('preserve.jpg');
-      final dt = DateTime(2025, 1, 2, 3, 4, 5);
-      await backend.writeGps(
-        path,
-        latitude: 10.0,
-        longitude: 20.0,
-        dateTimeOriginal: dt,
-      );
-      // Second write without a date must keep the existing one.
-      await backend.writeGps(path, latitude: -1.0, longitude: -2.0);
+    test(
+      'a second write preserves the previously written DateTimeOriginal',
+      () async {
+        final path = makeJpeg('preserve.jpg');
+        final dt = DateTime(2025, 1, 2, 3, 4, 5);
+        await backend.writeGps(
+          path,
+          latitude: 10.0,
+          longitude: 20.0,
+          dateTimeOriginal: dt,
+        );
+        // Second write without a date must keep the existing one.
+        await backend.writeGps(path, latitude: -1.0, longitude: -2.0);
 
-      final meta = await backend.read(path);
-      expect(meta.captureNaive, dt);
-      expect(img.decodeJpg(File(path).readAsBytesSync()), isNotNull);
-    });
+        final meta = await backend.read(path);
+        expect(meta.captureNaive, dt);
+        expect(img.decodeJpg(File(path).readAsBytesSync()), isNotNull);
+      },
+    );
   });
 
   // Integration regression for the external-data offset bug: when the source
@@ -128,8 +132,9 @@ void main() {
     setUp(() {
       tmp = Directory.systemTemp.createTempSync('jpeg_exif_exiftool');
       fixture = '${tmp.path}/fuji.jpg';
-      File(fixture)
-          .writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+      File(
+        fixture,
+      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
       // Inject rich EXIF including external-data (S)RATIONAL tags.
       Process.runSync('exiftool', <String>[
         '-overwrite_original',
@@ -148,38 +153,54 @@ void main() {
       if (tmp.existsSync()) tmp.deleteSync(recursive: true);
     });
 
-    test('writeGps preserves external-data EXIF tags with valid offsets',
-        () async {
-      await backend.writeGps(fixture, latitude: 42.7077, longitude: 18.3441);
+    test(
+      'writeGps preserves external-data EXIF tags with valid offsets',
+      () async {
+        await backend.writeGps(fixture, latitude: 42.7077, longitude: 18.3441);
 
-      // 1. The written TIFF must have valid value-offsets for every entry.
-      final validate =
-          Process.runSync('exiftool', <String>['-warning', '-validate', fixture]);
-      final validateOut = '${validate.stdout}${validate.stderr}';
-      expect(validateOut, isNot(contains('Invalid offset')),
-          reason: 'preserved Exif sub-IFD entries have corrupt value-offsets');
-      expect(validateOut, isNot(contains('Suspicious')),
-          reason: 'preserved Exif sub-IFD entries have suspicious offsets');
+        // 1. The written TIFF must have valid value-offsets for every entry.
+        final validate = Process.runSync('exiftool', <String>[
+          '-warning',
+          '-validate',
+          fixture,
+        ]);
+        final validateOut = '${validate.stdout}${validate.stderr}';
+        expect(
+          validateOut,
+          isNot(contains('Invalid offset')),
+          reason: 'preserved Exif sub-IFD entries have corrupt value-offsets',
+        );
+        expect(
+          validateOut,
+          isNot(contains('Suspicious')),
+          reason: 'preserved Exif sub-IFD entries have suspicious offsets',
+        );
 
-      // 2. exiftool must be able to write GPS into our file (exit code 0).
-      final edit = Process.runSync('exiftool', <String>[
-        '-overwrite_original',
-        '-GPSLatitude=1',
-        '-GPSLongitude=1',
-        '-GPSLatitudeRef=N',
-        '-GPSLongitudeRef=E',
-        fixture,
-      ]);
-      expect(edit.exitCode, 0,
-          reason: 'exiftool refused to edit our file: '
-              '${edit.stdout}${edit.stderr}');
+        // 2. exiftool must be able to write GPS into our file (exit code 0).
+        final edit = Process.runSync('exiftool', <String>[
+          '-overwrite_original',
+          '-GPSLatitude=1',
+          '-GPSLongitude=1',
+          '-GPSLatitudeRef=N',
+          '-GPSLongitudeRef=E',
+          fixture,
+        ]);
+        expect(
+          edit.exitCode,
+          0,
+          reason:
+              'exiftool refused to edit our file: '
+              '${edit.stdout}${edit.stderr}',
+        );
 
-      // 3. Our own reader still sees the preserved capture time and GPS.
-      // (Re-read after exiftool's edit, which only touches GPS.)
-      final meta = await backend.read(fixture);
-      expect(meta.captureNaive, DateTime(2026, 6, 22, 12, 43, 38));
-      expect(meta.hasGps, isTrue);
-    }, skip: _exiftoolAvailable() ? false : 'exiftool not on PATH');
+        // 3. Our own reader still sees the preserved capture time and GPS.
+        // (Re-read after exiftool's edit, which only touches GPS.)
+        final meta = await backend.read(fixture);
+        expect(meta.captureNaive, DateTime(2026, 6, 22, 12, 43, 38));
+        expect(meta.hasGps, isTrue);
+      },
+      skip: _exiftoolAvailable() ? false : 'exiftool not on PATH',
+    );
   });
 }
 

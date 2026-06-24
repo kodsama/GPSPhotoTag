@@ -28,13 +28,15 @@ class FakeExifBackend implements ExifBackend {
     required double latitude,
     required double longitude,
     DateTime? dateTimeOriginal,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
 }
 
 /// Records every invocation and returns a canned result (or throws).
 class FakeProcessRunner implements ProcessRunner {
-  FakeProcessRunner({this.result = const ProcResult(0, '', ''), this.throws = false});
+  FakeProcessRunner({
+    this.result = const ProcResult(0, '', ''),
+    this.throws = false,
+  });
 
   final ProcResult result;
   final bool throws;
@@ -84,20 +86,19 @@ void main() {
     expect(done.summary[PhotoStatus.datesFixed.wire], 1);
   });
 
-  test('exif direction with no capture time emits noTimestamp and leaves mtime',
-      () async {
-    final before = await File(photo).lastModified();
-    final dater = Dater(
-      exif: FakeExifBackend(),
-      runner: FakeProcessRunner(),
-    );
+  test(
+    'exif direction with no capture time emits noTimestamp and leaves mtime',
+    () async {
+      final before = await File(photo).lastModified();
+      final dater = Dater(exif: FakeExifBackend(), runner: FakeProcessRunner());
 
-    final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
+      final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
 
-    final item = events.whereType<ItemEvent>().single;
-    expect(item.row.status, PhotoStatus.noTimestamp);
-    expect(await File(photo).lastModified(), before);
-  });
+      final item = events.whereType<ItemEvent>().single;
+      expect(item.row.status, PhotoStatus.noTimestamp);
+      expect(await File(photo).lastModified(), before);
+    },
+  );
 
   test('file direction writes EXIF via exiftool with the file mtime', () async {
     final mtime = DateTime(2019, 1, 2, 3, 4, 5);
@@ -137,27 +138,35 @@ void main() {
     expect(item.row.status, PhotoStatus.error);
   });
 
-  test('dry run changes no mtime and runs no destructive exiftool call',
-      () async {
-    final before = await File(photo).lastModified();
-    final runner = FakeProcessRunner();
-    final dater = Dater(
-      exif: FakeExifBackend(captureNaive: DateTime(2000, 1, 1, 0, 0, 0)),
-      runner: runner,
-    );
+  test(
+    'dry run changes no mtime and runs no destructive exiftool call',
+    () async {
+      final before = await File(photo).lastModified();
+      final runner = FakeProcessRunner();
+      final dater = Dater(
+        exif: FakeExifBackend(captureNaive: DateTime(2000, 1, 1, 0, 0, 0)),
+        runner: runner,
+      );
 
-    final exifEvents =
-        await dater.fixDates([photo], FixDatesMode.exif, dryRun: true).toList();
-    expect(await File(photo).lastModified(), before);
-    expect(exifEvents.whereType<ItemEvent>().single.row.status,
-        PhotoStatus.dryRun);
+      final exifEvents = await dater
+          .fixDates([photo], FixDatesMode.exif, dryRun: true)
+          .toList();
+      expect(await File(photo).lastModified(), before);
+      expect(
+        exifEvents.whereType<ItemEvent>().single.row.status,
+        PhotoStatus.dryRun,
+      );
 
-    final fileEvents =
-        await dater.fixDates([photo], FixDatesMode.file, dryRun: true).toList();
-    expect(runner.calls, isEmpty);
-    expect(fileEvents.whereType<ItemEvent>().single.row.status,
-        PhotoStatus.dryRun);
-  });
+      final fileEvents = await dater
+          .fixDates([photo], FixDatesMode.file, dryRun: true)
+          .toList();
+      expect(runner.calls, isEmpty);
+      expect(
+        fileEvents.whereType<ItemEvent>().single.row.status,
+        PhotoStatus.dryRun,
+      );
+    },
+  );
 
   test('none mode yields a single empty DoneEvent', () async {
     final dater = Dater(exif: FakeExifBackend(), runner: FakeProcessRunner());

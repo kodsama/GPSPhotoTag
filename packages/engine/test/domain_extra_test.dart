@@ -15,10 +15,7 @@ void main() {
   });
 
   group('PhotoRow.copyWith', () {
-    const base = PhotoRow(
-      path: '/a/b.jpg',
-      status: PhotoStatus.noGps,
-    );
+    const base = PhotoRow(path: '/a/b.jpg', status: PhotoStatus.noGps);
 
     test('replaces only the provided fields, keeps path', () {
       final ts = DateTime.utc(2026, 1, 2, 3);
@@ -71,10 +68,11 @@ void main() {
 
   group('EngineEvent toJson coverage', () {
     test('LogEvent serialises level and message', () {
-      expect(
-        const LogEvent('careful', level: LogLevel.warning).toJson(),
-        {'event': 'log', 'level': 'warning', 'message': 'careful'},
-      );
+      expect(const LogEvent('careful', level: LogLevel.warning).toJson(), {
+        'event': 'log',
+        'level': 'warning',
+        'message': 'careful',
+      });
     });
 
     test('ProgressEvent.fraction is 0 when total is 0', () {
@@ -102,10 +100,11 @@ void main() {
     });
 
     test('ErrorEvent carries code and message', () {
-      expect(
-        const ErrorEvent('boom', code: 'bad_input').toJson(),
-        {'event': 'error', 'code': 'bad_input', 'message': 'boom'},
-      );
+      expect(const ErrorEvent('boom', code: 'bad_input').toJson(), {
+        'event': 'error',
+        'code': 'bad_input',
+        'message': 'boom',
+      });
       expect(const ErrorEvent('x').toJson()['code'], 'internal');
     });
   });
@@ -115,10 +114,7 @@ void main() {
     final a = TimedPoint(latitude: 1, longitude: 2, time: t);
 
     test('toString shows coordinates and ISO time', () {
-      expect(
-        a.toString(),
-        'TimedPoint(1.0, 2.0 @ ${t.toIso8601String()})',
-      );
+      expect(a.toString(), 'TimedPoint(1.0, 2.0 @ ${t.toIso8601String()})');
     });
 
     test('equal points share a hashCode', () {
@@ -128,10 +124,7 @@ void main() {
     });
 
     test('differing fields are unequal', () {
-      expect(
-        a == TimedPoint(latitude: 9, longitude: 2, time: t),
-        isFalse,
-      );
+      expect(a == TimedPoint(latitude: 9, longitude: 2, time: t), isFalse);
       expect(a == Object(), isFalse);
     });
   });

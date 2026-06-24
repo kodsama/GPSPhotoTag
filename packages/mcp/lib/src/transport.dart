@@ -37,24 +37,26 @@ Future<ServerSocket> serveTcp(
     onLog?.call('client connected: ${client.remoteAddress.address}');
     const splitter = LineSplitter();
     var buffer = '';
-    utf8.decoder.bind(client).listen(
-      (chunk) async {
-        buffer += chunk;
-        // Process every complete line; keep the trailing partial in the buffer.
-        final parts = buffer.split('\n');
-        buffer = parts.removeLast();
-        for (final raw in parts) {
-          for (final line in splitter.convert(raw)) {
-            if (line.trim().isEmpty) continue;
-            final response = await processLine(server, line);
-            if (response != null) client.writeln(jsonEncode(response));
-          }
-        }
-      },
-      onDone: () => onLog?.call('client disconnected'),
-      onError: (Object _) => client.destroy(),
-      cancelOnError: true,
-    );
+    utf8.decoder
+        .bind(client)
+        .listen(
+          (chunk) async {
+            buffer += chunk;
+            // Process every complete line; keep the trailing partial in the buffer.
+            final parts = buffer.split('\n');
+            buffer = parts.removeLast();
+            for (final raw in parts) {
+              for (final line in splitter.convert(raw)) {
+                if (line.trim().isEmpty) continue;
+                final response = await processLine(server, line);
+                if (response != null) client.writeln(jsonEncode(response));
+              }
+            }
+          },
+          onDone: () => onLog?.call('client disconnected'),
+          onError: (Object _) => client.destroy(),
+          cancelOnError: true,
+        );
   });
   return socket;
 }

@@ -36,16 +36,16 @@ class PhotoRow {
 
   /// JSON form for the CLI `item` event and logging.
   Map<String, Object?> toJson() => {
-        'path': path,
-        'status': status.wire,
-        if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
-        if (location != null) ...{
-          'lat': location!.latitude,
-          'lon': location!.longitude,
-          'source': location!.provenance,
-        },
-        if (note != null) 'note': note,
-      };
+    'path': path,
+    'status': status.wire,
+    if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
+    if (location != null) ...{
+      'lat': location!.latitude,
+      'lon': location!.longitude,
+      'source': location!.provenance,
+    },
+    if (note != null) 'note': note,
+  };
 
   /// Returns a copy with selected fields replaced.
   PhotoRow copyWith({
@@ -53,12 +53,11 @@ class PhotoRow {
     DateTime? timestamp,
     LocationResult? location,
     String? note,
-  }) =>
-      PhotoRow(
-        path: path,
-        status: status ?? this.status,
-        timestamp: timestamp ?? this.timestamp,
-        location: location ?? this.location,
-        note: note ?? this.note,
-      );
+  }) => PhotoRow(
+    path: path,
+    status: status ?? this.status,
+    timestamp: timestamp ?? this.timestamp,
+    location: location ?? this.location,
+    note: note ?? this.note,
+  );
 }

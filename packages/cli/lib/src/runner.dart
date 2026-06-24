@@ -19,21 +19,22 @@ import 'commands/tag_command.dart';
 /// [sink] overrides where commands write their output (defaults to stdout);
 /// tests pass a buffer-backed sink to capture output in-process.
 CommandRunner<int> buildRunner({IOSink? sink}) {
-  final runner = CommandRunner<int>(
-    'gpsphototag',
-    'Tag photos with GPS from GPX tracks or Google location history.',
-  )
-    ..argParser.addFlag(
-      'json',
-      negatable: false,
-      help: 'Emit one JSON event per line on stdout (machine/LLM mode).',
-    )
-    ..argParser.addFlag(
-      'verbose',
-      abbr: 'v',
-      negatable: false,
-      help: 'Include debug-level log events.',
-    );
+  final runner =
+      CommandRunner<int>(
+          'gpsphototag',
+          'Tag photos with GPS from GPX tracks or Google location history.',
+        )
+        ..argParser.addFlag(
+          'json',
+          negatable: false,
+          help: 'Emit one JSON event per line on stdout (machine/LLM mode).',
+        )
+        ..argParser.addFlag(
+          'verbose',
+          abbr: 'v',
+          negatable: false,
+          help: 'Include debug-level log events.',
+        );
 
   runner
     ..addCommand(TagCommand(sink: sink))

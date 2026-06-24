@@ -33,10 +33,7 @@ class PngExifBackend implements ExifBackend {
       exif.exifIfd['DateTimeOriginal']?.toString() ??
           exif.imageIfd['DateTimeOriginal']?.toString(),
     );
-    return PhotoMeta(
-      captureNaive: capture,
-      hasGps: exif.gpsIfd.hasGPSLatitude,
-    );
+    return PhotoMeta(captureNaive: capture, hasGps: exif.gpsIfd.hasGPSLatitude);
   }
 
   @override

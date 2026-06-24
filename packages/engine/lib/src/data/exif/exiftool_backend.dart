@@ -5,8 +5,27 @@ import 'exif_backend.dart';
 
 /// File extensions (without dot) for RAW formats handled by exiftool.
 const Set<String> kRawExtensions = {
-  'raf', 'nef', 'nrw', 'cr2', 'cr3', 'crw', 'arw', 'sr2', 'srf', 'dng',
-  'rw2', 'orf', 'pef', 'ptx', 'raw', 'rwl', 'srw', 'x3f', 'iiq', '3fr', 'erf',
+  'raf',
+  'nef',
+  'nrw',
+  'cr2',
+  'cr3',
+  'crw',
+  'arw',
+  'sr2',
+  'srf',
+  'dng',
+  'rw2',
+  'orf',
+  'pef',
+  'ptx',
+  'raw',
+  'rwl',
+  'srw',
+  'x3f',
+  'iiq',
+  '3fr',
+  'erf',
 };
 
 /// An [ExifBackend] that shells out to `exiftool` for RAW, HEIC/HEIF, and
@@ -20,7 +39,7 @@ class ExiftoolBackend implements ExifBackend {
   /// [extensions] overrides the default supported set (RAW + HEIC/HEIF); pass
   /// it lower-cased and without leading dots.
   ExiftoolBackend(this._runner, {Set<String>? extensions})
-      : _extensions = extensions ?? {...kRawExtensions, 'heic', 'heif'};
+    : _extensions = extensions ?? {...kRawExtensions, 'heic', 'heif'};
 
   final ProcessRunner _runner;
   final Set<String> _extensions;
@@ -50,7 +69,8 @@ class ExiftoolBackend implements ExifBackend {
     final obj = decoded.first;
     if (obj is! Map) return const PhotoMeta();
 
-    final capture = _parseCaptureNaive(obj['DateTimeOriginal']) ??
+    final capture =
+        _parseCaptureNaive(obj['DateTimeOriginal']) ??
         _parseCaptureNaive(obj['CreateDate']);
     final offset = _parseOffset(obj['OffsetTimeOriginal']);
     final lat = obj['GPSLatitude'];
@@ -84,7 +104,9 @@ class ExiftoolBackend implements ExifBackend {
 
     final result = await _runner.run('exiftool', args);
     if (!result.ok) {
-      throw StateError('exiftool failed (${result.exitCode}): ${result.stderr}');
+      throw StateError(
+        'exiftool failed (${result.exitCode}): ${result.stderr}',
+      );
     }
   }
 

@@ -14,8 +14,7 @@ class ControllerScope extends InheritedNotifier<AppController> {
 
   /// The nearest [AppController]; throws if none is in scope.
   static AppController of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<ControllerScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<ControllerScope>();
     assert(scope != null, 'No ControllerScope found in context');
     return scope!.notifier!;
   }

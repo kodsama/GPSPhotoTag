@@ -9,35 +9,37 @@ import 'package:gpsphototag_gui/src/state/wizard_step.dart';
 import 'support/fakes.dart';
 
 ToolStatus _tool(String id, {bool present = true}) => ToolStatus(
-      id: id,
-      name: id,
-      present: present,
-      purpose: 'test',
-      required: false,
-    );
+  id: id,
+  name: id,
+  present: present,
+  purpose: 'test',
+  required: false,
+);
 
 InputSummary _summaryWith(List<String> photos) => InputSummary.from(
-      folder: '/photos',
-      photos: photos,
-      gpxFiles: const [],
-      googleFiles: const [],
-    );
+  folder: '/photos',
+  photos: photos,
+  gpxFiles: const [],
+  googleFiles: const [],
+);
 
 void main() {
   group('step-advance logic', () {
-    test('toolkit is unsatisfied until results arrive, then advances to input',
-        () {
-      final c = AppController();
-      expect(c.step, WizardStep.toolkit);
-      expect(c.isStepSatisfied(WizardStep.toolkit), isFalse);
+    test(
+      'toolkit is unsatisfied until results arrive, then advances to input',
+      () {
+        final c = AppController();
+        expect(c.step, WizardStep.toolkit);
+        expect(c.isStepSatisfied(WizardStep.toolkit), isFalse);
 
-      c.debugSetToolkit([_tool('exiftool')]);
-      expect(c.isStepSatisfied(WizardStep.toolkit), isTrue);
+        c.debugSetToolkit([_tool('exiftool')]);
+        expect(c.isStepSatisfied(WizardStep.toolkit), isTrue);
 
-      c.completeAndAdvance();
-      expect(c.isCompleted(WizardStep.toolkit), isTrue);
-      expect(c.step, WizardStep.input);
-    });
+        c.completeAndAdvance();
+        expect(c.isCompleted(WizardStep.toolkit), isTrue);
+        expect(c.step, WizardStep.input);
+      },
+    );
 
     test('completeAndAdvance is a no-op when the step is unsatisfied', () {
       final c = AppController();
@@ -65,8 +67,10 @@ void main() {
 
     test('goTo only revisits completed or earlier steps', () {
       final c = AppController()
-        ..debugSetStep(WizardStep.review,
-            completed: {WizardStep.toolkit, WizardStep.input});
+        ..debugSetStep(
+          WizardStep.review,
+          completed: {WizardStep.toolkit, WizardStep.input},
+        );
       c.goTo(WizardStep.run); // not completed, later -> ignored
       expect(c.step, WizardStep.review);
       c.goTo(WizardStep.toolkit); // completed -> allowed
@@ -108,16 +112,18 @@ void main() {
   });
 
   group('activity log', () {
-    test('debug log entries raise the unread count and markLogRead clears it',
-        () {
-      final c = AppController();
-      c.debugAddLog('hello');
-      c.debugAddLog('world', level: LogLevel.error);
-      expect(c.unreadCount, 2);
-      expect(c.logEntries.length, 2);
-      c.markLogRead();
-      expect(c.unreadCount, 0);
-    });
+    test(
+      'debug log entries raise the unread count and markLogRead clears it',
+      () {
+        final c = AppController();
+        c.debugAddLog('hello');
+        c.debugAddLog('world', level: LogLevel.error);
+        expect(c.unreadCount, 2);
+        expect(c.logEntries.length, 2);
+        c.markLogRead();
+        expect(c.unreadCount, 0);
+      },
+    );
   });
 
   group('operations', () {
@@ -152,12 +158,14 @@ void main() {
       addTearDown(() => tmp.deleteSync(recursive: true));
       final fake = FakeEngineRunner();
       final c = AppController(runner: fake)
-        ..debugSetSummary(InputSummary.from(
-          folder: tmp.path,
-          photos: ['${tmp.path}/a.jpg'],
-          gpxFiles: const [],
-          googleFiles: const [],
-        ));
+        ..debugSetSummary(
+          InputSummary.from(
+            folder: tmp.path,
+            photos: ['${tmp.path}/a.jpg'],
+            gpxFiles: const [],
+            googleFiles: const [],
+          ),
+        );
       final path = await c.renderMap();
       expect(fake.calls, contains('map'));
       expect(path, endsWith('gpsphototag-heatmap.png'));

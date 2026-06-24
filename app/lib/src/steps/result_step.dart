@@ -38,14 +38,30 @@ class _ResultStepState extends State<ResultStep> {
           spacing: 12,
           runSpacing: 12,
           children: [
-            _action(context, Icons.map, 'Render heatmap',
-                controller.running ? null : () => _renderMap(controller)),
-            _action(context, Icons.delete_sweep, 'Prune orphan RAWs',
-                controller.running ? null : () => _confirmPrune(controller)),
-            _action(context, Icons.event, 'Fix dates',
-                controller.running ? null : () => _chooseFixDates(controller)),
-            _action(context, Icons.refresh, 'Tag another',
-                controller.running ? null : () => _tagAnother(controller)),
+            _action(
+              context,
+              Icons.map,
+              'Render heatmap',
+              controller.running ? null : () => _renderMap(controller),
+            ),
+            _action(
+              context,
+              Icons.delete_sweep,
+              'Prune orphan RAWs',
+              controller.running ? null : () => _confirmPrune(controller),
+            ),
+            _action(
+              context,
+              Icons.event,
+              'Fix dates',
+              controller.running ? null : () => _chooseFixDates(controller),
+            ),
+            _action(
+              context,
+              Icons.refresh,
+              'Tag another',
+              controller.running ? null : () => _tagAnother(controller),
+            ),
           ],
         ),
         if (_heatmapPath != null) ...[
@@ -66,12 +82,11 @@ class _ResultStepState extends State<ResultStep> {
     IconData icon,
     String label,
     VoidCallback? onTap,
-  ) =>
-      OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-      );
+  ) => OutlinedButton.icon(
+    onPressed: onTap,
+    icon: Icon(icon, size: 18),
+    label: Text(label),
+  );
 
   Future<void> _renderMap(AppController controller) async {
     final path = await controller.renderMap();
@@ -89,11 +104,13 @@ class _ResultStepState extends State<ResultStep> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Prune')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Prune'),
+          ),
         ],
       ),
     );
@@ -160,9 +177,12 @@ class _SummaryTable extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: style)),
-          Text(value,
-              style: (bold ? text.titleMedium : text.bodyMedium)
-                  ?.copyWith(fontFeatures: AppTheme.tabular)),
+          Text(
+            value,
+            style: (bold ? text.titleMedium : text.bodyMedium)?.copyWith(
+              fontFeatures: AppTheme.tabular,
+            ),
+          ),
         ],
       ),
     );

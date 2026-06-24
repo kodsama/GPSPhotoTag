@@ -28,45 +28,42 @@ class IsolateRunner implements EngineRunner {
     required List<String> gpxFiles,
     required List<String> googleFiles,
     required TagOptions options,
-  }) =>
-      _spawn(
-        _tagEntry,
-        (port) => _TagRequest(
-          port: port,
-          photos: photos,
-          gpxFiles: gpxFiles,
-          googleFiles: googleFiles,
-          options: options,
-          exiftoolAvailable: exiftoolAvailable,
-        ),
-      );
+  }) => _spawn(
+    _tagEntry,
+    (port) => _TagRequest(
+      port: port,
+      photos: photos,
+      gpxFiles: gpxFiles,
+      googleFiles: googleFiles,
+      options: options,
+      exiftoolAvailable: exiftoolAvailable,
+    ),
+  );
 
   /// Renders a heatmap PNG from the GPS already embedded in [photos].
   @override
   Stream<EngineEvent> map({
     required List<String> photos,
     required MapOptions options,
-  }) =>
-      _spawn(
-        _mapEntry,
-        (port) => _MapRequest(
-          port: port,
-          photos: photos,
-          options: options,
-          exiftoolAvailable: exiftoolAvailable,
-        ),
-      );
+  }) => _spawn(
+    _mapEntry,
+    (port) => _MapRequest(
+      port: port,
+      photos: photos,
+      options: options,
+      exiftoolAvailable: exiftoolAvailable,
+    ),
+  );
 
   /// Prunes orphan RAW files under [roots].
   @override
   Stream<EngineEvent> prune({
     required List<String> roots,
     required PruneOptions options,
-  }) =>
-      _spawn(
-        _pruneEntry,
-        (port) => _PruneRequest(port: port, roots: roots, options: options),
-      );
+  }) => _spawn(
+    _pruneEntry,
+    (port) => _PruneRequest(port: port, roots: roots, options: options),
+  );
 
   /// Fixes capture/file dates for [files] in the given [mode].
   @override
@@ -74,17 +71,16 @@ class IsolateRunner implements EngineRunner {
     required List<String> files,
     required FixDatesMode mode,
     bool dryRun = false,
-  }) =>
-      _spawn(
-        _fixDatesEntry,
-        (port) => _FixDatesRequest(
-          port: port,
-          files: files,
-          mode: mode,
-          dryRun: dryRun,
-          exiftoolAvailable: exiftoolAvailable,
-        ),
-      );
+  }) => _spawn(
+    _fixDatesEntry,
+    (port) => _FixDatesRequest(
+      port: port,
+      files: files,
+      mode: mode,
+      dryRun: dryRun,
+      exiftoolAvailable: exiftoolAvailable,
+    ),
+  );
 
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
   /// by [makeRequest], and re-emits everything it sends until the null sentinel.
@@ -234,12 +230,9 @@ Future<void> _tagEntry(_TagRequest req) async {
     );
     final gpx = _loadGpx(req.gpxFiles);
     final google = _loadGoogle(req.googleFiles);
-    final stream = TagService(registry: registry).tag(
-      photos: req.photos,
-      gpx: gpx,
-      google: google,
-      options: req.options,
-    );
+    final stream = TagService(
+      registry: registry,
+    ).tag(photos: req.photos, gpx: gpx, google: google, options: req.options);
     await _pump(req.port, stream);
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));

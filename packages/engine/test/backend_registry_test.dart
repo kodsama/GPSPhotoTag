@@ -13,12 +13,11 @@ void main() {
   BackendRegistry registry({
     RawMode rawMode = RawMode.auto,
     bool exiftool = true,
-  }) =>
-      BackendRegistry(
-        runner: runner,
-        rawMode: rawMode,
-        exiftoolAvailable: exiftool,
-      );
+  }) => BackendRegistry(
+    runner: runner,
+    rawMode: rawMode,
+    exiftoolAvailable: exiftool,
+  );
 
   group('readerFor', () {
     test('jpeg and png have dedicated readers regardless of exiftool', () {
@@ -98,10 +97,7 @@ void main() {
 
   group('writesSidecar', () {
     test('true only for raw routed to a sidecar', () {
-      expect(
-        registry(rawMode: RawMode.sidecar).writesSidecar('a.raf'),
-        isTrue,
-      );
+      expect(registry(rawMode: RawMode.sidecar).writesSidecar('a.raf'), isTrue);
       expect(
         registry(rawMode: RawMode.auto, exiftool: false).writesSidecar('a.raf'),
         isTrue,

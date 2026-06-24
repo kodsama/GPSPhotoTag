@@ -12,15 +12,26 @@ class MapCommand extends Command<int> {
   // ignore: prefer_initializing_formals
   MapCommand({IOSink? sink}) : _sink = sink {
     argParser
-      ..addMultiOption('photo',
-          abbr: 'p', help: 'Photo file or directory (repeatable, recursive).')
+      ..addMultiOption(
+        'photo',
+        abbr: 'p',
+        help: 'Photo file or directory (repeatable, recursive).',
+      )
       ..addOption('out', abbr: 'o', help: 'Output PNG path.')
-      ..addOption('dpi',
-          defaultsTo: '200', help: 'Output resolution (clamped 30..1200).')
-      ..addFlag('names',
-          negatable: false, help: 'Label areas with collapsed filename ranges.')
-      ..addOption('clusters',
-          help: 'Cluster selection: "all" (default) or e.g. "1,2".');
+      ..addOption(
+        'dpi',
+        defaultsTo: '200',
+        help: 'Output resolution (clamped 30..1200).',
+      )
+      ..addFlag(
+        'names',
+        negatable: false,
+        help: 'Label areas with collapsed filename ranges.',
+      )
+      ..addOption(
+        'clusters',
+        help: 'Cluster selection: "all" (default) or e.g. "1,2".',
+      );
   }
 
   final IOSink? _sink;
@@ -35,11 +46,16 @@ class MapCommand extends Command<int> {
   @override
   Future<int> run() async {
     final out = CliOutput(
-        json: globalResults!.flag('json'), sink: _sink, errorSink: _sink);
+      json: globalResults!.flag('json'),
+      sink: _sink,
+      errorSink: _sink,
+    );
 
     final photos = Collectors.photos(argResults!.multiOption('photo'));
     if (photos.isEmpty) {
-      out.add(const ErrorEvent('no photos found for --photo', code: 'bad_input'));
+      out.add(
+        const ErrorEvent('no photos found for --photo', code: 'bad_input'),
+      );
       return out.exitCode;
     }
 
@@ -51,8 +67,9 @@ class MapCommand extends Command<int> {
 
     final dpi = int.tryParse(argResults!.option('dpi') ?? '200');
     if (dpi == null || dpi <= 0) {
-      out.add(const ErrorEvent('--dpi must be a positive integer',
-          code: 'bad_input'));
+      out.add(
+        const ErrorEvent('--dpi must be a positive integer', code: 'bad_input'),
+      );
       return out.exitCode;
     }
 

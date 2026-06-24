@@ -118,8 +118,11 @@ class _ToolRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(tool.present ? Icons.check_circle : Icons.cancel,
-              color: color, size: 20),
+          Icon(
+            tool.present ? Icons.check_circle : Icons.cancel,
+            color: color,
+            size: 20,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -134,9 +137,12 @@ class _ToolRow extends StatelessWidget {
                     ],
                     if (!tool.required) ...[
                       const SizedBox(width: 8),
-                      Text('optional',
-                          style: text.bodySmall
-                              ?.copyWith(fontStyle: FontStyle.italic)),
+                      Text(
+                        'optional',
+                        style: text.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                     ],
                   ],
                 ),

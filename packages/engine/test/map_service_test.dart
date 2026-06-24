@@ -62,67 +62,70 @@ void main() {
     setUp(() => tmp = Directory.systemTemp.createTempSync('map_service_test_'));
     tearDown(() => tmp.deleteSync(recursive: true));
 
-    test('renders a PNG offline and reports mapped count + basemap warning',
-        () async {
-      // Two tagged photos in Sarajevo, returned as exiftool -n JSON.
-      const json = '''
+    test(
+      'renders a PNG offline and reports mapped count + basemap warning',
+      () async {
+        // Two tagged photos in Sarajevo, returned as exiftool -n JSON.
+        const json = '''
 [
   {"SourceFile":"/photos/DSCF0795.jpg","GPSLatitude":43.8563,"GPSLongitude":18.4131},
   {"SourceFile":"/photos/DSCF0796.jpg","GPSLatitude":43.8580,"GPSLongitude":18.4150}
 ]''';
-      final runner = FakeRunner(const ProcResult(0, json, ''));
-      // Every tile fetch 404s -> basemap-less render, no hard fail.
-      final client = MockClient((_) async => http.Response('', 404));
+        final runner = FakeRunner(const ProcResult(0, json, ''));
+        // Every tile fetch 404s -> basemap-less render, no hard fail.
+        final client = MockClient((_) async => http.Response('', 404));
 
-      const dpi = 160;
-      final canvas = (dpi * 5).clamp(600, 2400);
-      final outPath = p.join(tmp.path, 'out.png');
-      final service = MapService(runner: runner, client: client);
+        const dpi = 160;
+        final canvas = (dpi * 5).clamp(600, 2400);
+        final outPath = p.join(tmp.path, 'out.png');
+        final service = MapService(runner: runner, client: client);
 
-      final events = await service
-          .render(['/photos/DSCF0795.jpg', '/photos/DSCF0796.jpg'],
-              MapOptions(outputPng: outPath, dpi: dpi))
-          .toList();
+        final events = await service.render([
+          '/photos/DSCF0795.jpg',
+          '/photos/DSCF0796.jpg',
+        ], MapOptions(outputPng: outPath, dpi: dpi)).toList();
 
-      final done = events.whereType<DoneEvent>().single;
-      expect(done.summary['mapped'], 2);
+        final done = events.whereType<DoneEvent>().single;
+        expect(done.summary['mapped'], 2);
 
-      final warned = events.whereType<LogEvent>().any((e) =>
-          e.level == LogLevel.warning && e.message.contains('basemap'));
-      expect(warned, isTrue, reason: 'expected the offline basemap warning');
+        final warned = events.whereType<LogEvent>().any(
+          (e) => e.level == LogLevel.warning && e.message.contains('basemap'),
+        );
+        expect(warned, isTrue, reason: 'expected the offline basemap warning');
 
-      final file = File(outPath);
-      expect(file.existsSync(), isTrue);
-      final decoded = img.decodePng(file.readAsBytesSync());
-      expect(decoded, isNotNull);
-      expect(decoded!.width, canvas);
-      expect(decoded.height, canvas);
-    });
+        final file = File(outPath);
+        expect(file.existsSync(), isTrue);
+        final decoded = img.decodePng(file.readAsBytesSync());
+        expect(decoded, isNotNull);
+        expect(decoded!.width, canvas);
+        expect(decoded.height, canvas);
+      },
+    );
 
     test('emits missing_toolkit when exiftool is unavailable', () async {
       final runner = FakeRunner(const ProcResult(0, '[]', ''));
-      final service =
-          MapService(runner: runner, exiftoolAvailable: false);
+      final service = MapService(runner: runner, exiftoolAvailable: false);
 
-      final events = await service
-          .render(['/photos/x.jpg'],
-              MapOptions(outputPng: p.join(tmp.path, 'x.png')))
-          .toList();
+      final events = await service.render([
+        '/photos/x.jpg',
+      ], MapOptions(outputPng: p.join(tmp.path, 'x.png'))).toList();
 
       final err = events.whereType<ErrorEvent>().single;
       expect(err.code, 'missing_toolkit');
     });
 
     test('emits bad_input when no photo has GPS', () async {
-      final runner = FakeRunner(const ProcResult(
-          0, '[{"SourceFile":"/photos/x.jpg"}]', ''));
+      final runner = FakeRunner(
+        const ProcResult(0, '[{"SourceFile":"/photos/x.jpg"}]', ''),
+      );
       final service = MapService(
-          runner: runner, client: MockClient((_) async => http.Response('', 404)));
+        runner: runner,
+        client: MockClient((_) async => http.Response('', 404)),
+      );
 
-      final events = await service
-          .render(['/photos/x.jpg'],
-              MapOptions(outputPng: p.join(tmp.path, 'x.png')))
-          .toList();
+      final events = await service.render([
+        '/photos/x.jpg',
+      ], MapOptions(outputPng: p.join(tmp.path, 'x.png'))).toList();
 
       final err = events.whereType<ErrorEvent>().single;
       expect(err.code, 'bad_input');

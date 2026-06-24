@@ -155,8 +155,14 @@ class TagService {
     if (n == null) return null;
     final offset = meta.offset;
     if (offset != null) {
-      return DateTime.utc(n.year, n.month, n.day, n.hour, n.minute, n.second)
-          .subtract(offset);
+      return DateTime.utc(
+        n.year,
+        n.month,
+        n.day,
+        n.hour,
+        n.minute,
+        n.second,
+      ).subtract(offset);
     }
     return DateTime(n.year, n.month, n.day, n.hour, n.minute, n.second).toUtc();
   }

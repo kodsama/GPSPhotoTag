@@ -64,8 +64,10 @@ class OutputStep extends StatelessWidget {
         ] else
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text('Pick a folder to continue.',
-                style: text.bodySmall?.copyWith(color: AppColors.warning)),
+            child: Text(
+              'Pick a folder to continue.',
+              style: text.bodySmall?.copyWith(color: AppColors.warning),
+            ),
           ),
       ],
     );

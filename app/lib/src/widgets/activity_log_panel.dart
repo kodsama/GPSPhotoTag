@@ -75,18 +75,14 @@ class _Panel extends StatelessWidget {
               children: [
                 Text('Activity log', style: text.titleMedium),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: onClose,
-                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: onClose),
               ],
             ),
           ),
           Container(height: 1, color: scheme.outline),
           Expanded(
             child: entries.isEmpty
-                ? Center(
-                    child: Text('No activity yet.', style: text.bodySmall))
+                ? Center(child: Text('No activity yet.', style: text.bodySmall))
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: entries.length,
@@ -113,14 +109,17 @@ class _LogRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(entry.clock,
-              style: text.bodySmall?.copyWith(fontFeatures: AppTheme.tabular)),
+          Text(
+            entry.clock,
+            style: text.bodySmall?.copyWith(fontFeatures: AppTheme.tabular),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               entry.message,
-              style:
-                  text.bodySmall?.copyWith(color: _color(context, entry.level)),
+              style: text.bodySmall?.copyWith(
+                color: _color(context, entry.level),
+              ),
             ),
           ),
         ],

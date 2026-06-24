@@ -22,10 +22,10 @@ class BackendRegistry {
     required ProcessRunner runner,
     this.rawMode = RawMode.auto,
     this.exiftoolAvailable = true,
-  })  : _exiftool = ExiftoolBackend(runner),
-        _jpeg = const JpegExifBackend(),
-        _png = const PngExifBackend(),
-        _sidecar = XmpSidecarBackend();
+  }) : _exiftool = ExiftoolBackend(runner),
+       _jpeg = const JpegExifBackend(),
+       _png = const PngExifBackend(),
+       _sidecar = XmpSidecarBackend();
 
   /// How RAW GPS is written.
   final RawMode rawMode;

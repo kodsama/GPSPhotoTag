@@ -94,5 +94,7 @@ Future<void> _serverEntry(_Config cfg) async {
       continue; // port busy — try the next.
     }
   }
-  cfg.send.send({'error': 'no free port in ${cfg.basePort}..${cfg.basePort + 9}'});
+  cfg.send.send({
+    'error': 'no free port in ${cfg.basePort}..${cfg.basePort + 9}',
+  });
 }

@@ -15,8 +15,27 @@ abstract final class PhotoFormats {
 
   /// RAW containers (XMP sidecar by default, or exiftool embed).
   static const raw = {
-    'raf', 'nef', 'nrw', 'cr2', 'cr3', 'crw', 'arw', 'sr2', 'srf', 'dng',
-    'rw2', 'orf', 'pef', 'ptx', 'raw', 'rwl', 'srw', 'x3f', 'iiq', '3fr', 'erf',
+    'raf',
+    'nef',
+    'nrw',
+    'cr2',
+    'cr3',
+    'crw',
+    'arw',
+    'sr2',
+    'srf',
+    'dng',
+    'rw2',
+    'orf',
+    'pef',
+    'ptx',
+    'raw',
+    'rwl',
+    'srw',
+    'x3f',
+    'iiq',
+    '3fr',
+    'erf',
   };
 
   /// Extensions treated as JPG/HEIC "companions" when pruning RAW orphans.

@@ -34,18 +34,13 @@ class StatusPill extends StatelessWidget {
   }
 
   static Color _colorFor(PhotoStatus status) => switch (status) {
-        PhotoStatus.tagged ||
-        PhotoStatus.interpolated ||
-        PhotoStatus.datesFixed ||
-        PhotoStatus.prunedTrashed =>
-          AppColors.success,
-        PhotoStatus.alreadyTagged ||
-        PhotoStatus.dryRun =>
-          AppColors.contour,
-        PhotoStatus.noGps ||
-        PhotoStatus.noTimestamp =>
-          AppColors.warning,
-        PhotoStatus.prunedDeleted => AppColors.terracottaDark,
-        PhotoStatus.error => AppColors.danger,
-      };
+    PhotoStatus.tagged ||
+    PhotoStatus.interpolated ||
+    PhotoStatus.datesFixed ||
+    PhotoStatus.prunedTrashed => AppColors.success,
+    PhotoStatus.alreadyTagged || PhotoStatus.dryRun => AppColors.contour,
+    PhotoStatus.noGps || PhotoStatus.noTimestamp => AppColors.warning,
+    PhotoStatus.prunedDeleted => AppColors.terracottaDark,
+    PhotoStatus.error => AppColors.danger,
+  };
 }

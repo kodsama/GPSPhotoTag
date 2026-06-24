@@ -33,16 +33,27 @@ void main() {
   });
 
   test('per-item error in summary -> partial', () {
-    expect(exitFor([const DoneEvent({'error': 1})]), ExitCodes.partial);
+    expect(
+      exitFor([
+        const DoneEvent({'error': 1}),
+      ]),
+      ExitCodes.partial,
+    );
   });
 
   test('error events map to their codes', () {
-    expect(exitFor([const ErrorEvent('x', code: 'bad_input')]),
-        ExitCodes.badInput);
-    expect(exitFor([const ErrorEvent('x', code: 'missing_toolkit')]),
-        ExitCodes.missingToolkit);
-    expect(exitFor([const ErrorEvent('x', code: 'internal')]),
-        ExitCodes.internal);
+    expect(
+      exitFor([const ErrorEvent('x', code: 'bad_input')]),
+      ExitCodes.badInput,
+    );
+    expect(
+      exitFor([const ErrorEvent('x', code: 'missing_toolkit')]),
+      ExitCodes.missingToolkit,
+    );
+    expect(
+      exitFor([const ErrorEvent('x', code: 'internal')]),
+      ExitCodes.internal,
+    );
   });
 
   test('a fatal error outranks a later done summary', () {

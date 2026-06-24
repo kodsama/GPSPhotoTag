@@ -67,12 +67,14 @@ class ReviewStep extends StatelessWidget {
       spacing: 10,
       runSpacing: 8,
       children: [
-        _chip(context, Icons.photo_library,
-            '${summary.photoCount} photos'),
-        _chip(context, Icons.route, '$gpx GPX file(s)',
-            muted: gpx == 0),
-        _chip(context, Icons.timeline, '$google Google file(s)',
-            muted: google == 0),
+        _chip(context, Icons.photo_library, '${summary.photoCount} photos'),
+        _chip(context, Icons.route, '$gpx GPX file(s)', muted: gpx == 0),
+        _chip(
+          context,
+          Icons.timeline,
+          '$google Google file(s)',
+          muted: google == 0,
+        ),
         if (gpx == 0 && google == 0)
           Text(
             'No GPS source found in this folder — add a .gpx or Google export.',
@@ -82,11 +84,16 @@ class ReviewStep extends StatelessWidget {
     );
   }
 
-  Widget _chip(BuildContext context, IconData icon, String label,
-      {bool muted = false}) {
+  Widget _chip(
+    BuildContext context,
+    IconData icon,
+    String label, {
+    bool muted = false,
+  }) {
     final scheme = Theme.of(context).colorScheme;
-    final color =
-        muted ? scheme.onSurface.withValues(alpha: 0.45) : scheme.onSurface;
+    final color = muted
+        ? scheme.onSurface.withValues(alpha: 0.45)
+        : scheme.onSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -99,11 +106,12 @@ class ReviewStep extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
-          Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: color)),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: color),
+          ),
         ],
       ),
     );
@@ -127,11 +135,9 @@ class _FormatRow extends StatelessWidget {
       dense: true,
       value: included,
       controlAffinity: ListTileControlAffinity.leading,
-      onChanged: (value) =>
-          controller.setFormatIncluded(ext, value ?? false),
+      onChanged: (value) => controller.setFormatIncluded(ext, value ?? false),
       title: Text('.$ext'),
-      secondary: Text('$count',
-          style: Theme.of(context).textTheme.bodyMedium),
+      secondary: Text('$count', style: Theme.of(context).textTheme.bodyMedium),
     );
   }
 }

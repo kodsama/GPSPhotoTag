@@ -4,7 +4,7 @@ import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 class LogEntry {
   /// Creates a log entry at [time] (defaults to now).
   LogEntry(this.message, {this.level = LogLevel.info, DateTime? time})
-      : time = time ?? DateTime.now();
+    : time = time ?? DateTime.now();
 
   /// The message text.
   final String message;
@@ -16,7 +16,8 @@ class LogEntry {
   final DateTime time;
 
   /// `HH:MM:SS` clock stamp for display.
-  String get clock => '${_two(time.hour)}:${_two(time.minute)}:'
+  String get clock =>
+      '${_two(time.hour)}:${_two(time.minute)}:'
       '${_two(time.second)}';
 
   static String _two(int n) => n.toString().padLeft(2, '0');

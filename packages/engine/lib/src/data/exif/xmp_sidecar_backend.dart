@@ -19,7 +19,7 @@ class XmpSidecarBackend implements ExifBackend {
   /// [extensions] overrides the default RAW set; pass it lower-cased without
   /// leading dots.
   XmpSidecarBackend({Set<String>? extensions})
-      : _extensions = extensions ?? kRawExtensions;
+    : _extensions = extensions ?? kRawExtensions;
 
   final Set<String> _extensions;
 
@@ -55,22 +55,40 @@ class XmpSidecarBackend implements ExifBackend {
   static String _buildXmp(double latitude, double longitude) {
     final builder = XmlBuilder();
     builder.processing('xpacket', 'begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"');
-    builder.element('x:xmpmeta', nest: () {
-      builder.attribute('xmlns:x', 'adobe:ns:meta/');
-      builder.element('rdf:RDF', nest: () {
-        builder.attribute(
-            'xmlns:rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
-        builder.element('rdf:Description', nest: () {
-          builder.attribute('rdf:about', '');
-          builder.attribute('xmlns:exif', 'http://ns.adobe.com/exif/1.0/');
-          builder.element('exif:GPSLatitude',
-              nest: _formatGpsCoord(latitude, isLatitude: true));
-          builder.element('exif:GPSLongitude',
-              nest: _formatGpsCoord(longitude, isLatitude: false));
-          builder.element('exif:GPSMapDatum', nest: 'WGS-84');
-        });
-      });
-    });
+    builder.element(
+      'x:xmpmeta',
+      nest: () {
+        builder.attribute('xmlns:x', 'adobe:ns:meta/');
+        builder.element(
+          'rdf:RDF',
+          nest: () {
+            builder.attribute(
+              'xmlns:rdf',
+              'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+            );
+            builder.element(
+              'rdf:Description',
+              nest: () {
+                builder.attribute('rdf:about', '');
+                builder.attribute(
+                  'xmlns:exif',
+                  'http://ns.adobe.com/exif/1.0/',
+                );
+                builder.element(
+                  'exif:GPSLatitude',
+                  nest: _formatGpsCoord(latitude, isLatitude: true),
+                );
+                builder.element(
+                  'exif:GPSLongitude',
+                  nest: _formatGpsCoord(longitude, isLatitude: false),
+                );
+                builder.element('exif:GPSMapDatum', nest: 'WGS-84');
+              },
+            );
+          },
+        );
+      },
+    );
     builder.processing('xpacket', 'end="w"');
     return builder.buildDocument().toXmlString(pretty: true);
   }

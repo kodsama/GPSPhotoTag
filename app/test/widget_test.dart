@@ -9,17 +9,21 @@ import 'package:gpsphototag_gui/src/steps/toolkit_step.dart';
 import 'package:gpsphototag_gui/src/widgets/activity_log_panel.dart';
 import 'package:gpsphototag_gui/src/widgets/step_card.dart';
 
-ToolStatus _tool(String id, String name,
-        {bool present = true, String? version, String? installCommand}) =>
-    ToolStatus(
-      id: id,
-      name: name,
-      present: present,
-      version: version,
-      purpose: 'unlocks $name',
-      required: false,
-      installCommand: installCommand,
-    );
+ToolStatus _tool(
+  String id,
+  String name, {
+  bool present = true,
+  String? version,
+  String? installCommand,
+}) => ToolStatus(
+  id: id,
+  name: name,
+  present: present,
+  version: version,
+  purpose: 'unlocks $name',
+  required: false,
+  installCommand: installCommand,
+);
 
 /// Pumps the app with [controller] already seeded so no real isolate or
 /// subprocess runs during the test.
@@ -41,8 +45,9 @@ void main() {
     expect(find.text('ExifTool'), findsOneWidget);
   });
 
-  testWidgets('exactly one step card is expanded (shows Continue)',
-      (tester) async {
+  testWidgets('exactly one step card is expanded (shows Continue)', (
+    tester,
+  ) async {
     final controller = AppController()
       ..debugSetToolkit([_tool('exiftool', 'ExifTool')]);
     await _pumpApp(tester, controller);
@@ -52,13 +57,18 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
   });
 
-  testWidgets('toolkit step lists multiple tool rows from seeded results',
-      (tester) async {
+  testWidgets('toolkit step lists multiple tool rows from seeded results', (
+    tester,
+  ) async {
     final controller = AppController()
       ..debugSetToolkit([
         _tool('exiftool', 'ExifTool', version: '12.0'),
-        _tool('libheif', 'libheif',
-            present: false, installCommand: 'brew install libheif'),
+        _tool(
+          'libheif',
+          'libheif',
+          present: false,
+          installCommand: 'brew install libheif',
+        ),
       ]);
     await _pumpApp(tester, controller);
 
@@ -69,8 +79,9 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Install'), findsOneWidget);
   });
 
-  testWidgets('activity-log panel opens on FAB tap and shows entries',
-      (tester) async {
+  testWidgets('activity-log panel opens on FAB tap and shows entries', (
+    tester,
+  ) async {
     final controller = AppController()
       ..debugSetToolkit([_tool('exiftool', 'ExifTool')])
       ..debugAddLog('first event')
@@ -88,20 +99,23 @@ void main() {
     expect(find.text('second event'), findsOneWidget);
   });
 
-  testWidgets('completed steps collapse to a tappable row with Edit',
-      (tester) async {
+  testWidgets('completed steps collapse to a tappable row with Edit', (
+    tester,
+  ) async {
     final controller = AppController()
       ..debugSetToolkit([_tool('exiftool', 'ExifTool')])
-      ..debugSetSummary(InputSummary.from(
-        folder: '/photos',
-        photos: const ['/photos/a.jpg'],
-        gpxFiles: const [],
-        googleFiles: const [],
-      ))
-      ..debugSetStep(WizardStep.review, completed: {
-        WizardStep.toolkit,
-        WizardStep.input,
-      });
+      ..debugSetSummary(
+        InputSummary.from(
+          folder: '/photos',
+          photos: const ['/photos/a.jpg'],
+          gpxFiles: const [],
+          googleFiles: const [],
+        ),
+      )
+      ..debugSetStep(
+        WizardStep.review,
+        completed: {WizardStep.toolkit, WizardStep.input},
+      );
     await _pumpApp(tester, controller);
 
     // Completed earlier steps show an 'Edit' affordance.

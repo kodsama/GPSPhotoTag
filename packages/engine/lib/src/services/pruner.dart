@@ -35,10 +35,7 @@ class Pruner {
   /// Emits a [LogEvent] and an [ItemEvent] per action, and a final [DoneEvent]
   /// whose summary is keyed by [PhotoStatus.wire]. Per-file failures surface as
   /// an [ItemEvent] with [PhotoStatus.error] and do not abort the run.
-  Stream<EngineEvent> prune(
-    List<String> roots,
-    PruneOptions options,
-  ) async* {
+  Stream<EngineEvent> prune(List<String> roots, PruneOptions options) async* {
     final companions = <String>{};
     final raws = <File>[];
     await _scan(roots, companions, raws);
@@ -69,8 +66,10 @@ class Pruner {
     for (final root in roots) {
       final dir = Directory(root);
       if (!dir.existsSync()) continue;
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity in dir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is! File) continue;
         final ext = _ext(entity.path);
         if (_companionExtensions.contains(ext)) {
@@ -103,13 +102,13 @@ class Pruner {
       yield ItemEvent(PhotoRow(path: orphan.path, status: status));
       _bump(summary, status);
     } on Object catch (e) {
-      yield LogEvent('Failed to prune ${orphan.path}: $e',
-          level: LogLevel.error);
-      yield ItemEvent(PhotoRow(
-        path: orphan.path,
-        status: PhotoStatus.error,
-        note: '$e',
-      ));
+      yield LogEvent(
+        'Failed to prune ${orphan.path}: $e',
+        level: LogLevel.error,
+      );
+      yield ItemEvent(
+        PhotoRow(path: orphan.path, status: PhotoStatus.error, note: '$e'),
+      );
       _bump(summary, PhotoStatus.error);
     }
   }
@@ -127,14 +126,14 @@ class Pruner {
   PhotoStatus _statusFor(PruneOptions options) => options.dryRun
       ? PhotoStatus.dryRun
       : options.delete
-          ? PhotoStatus.prunedDeleted
-          : PhotoStatus.prunedTrashed;
+      ? PhotoStatus.prunedDeleted
+      : PhotoStatus.prunedTrashed;
 
   String _verbFor(PruneOptions options) => options.dryRun
       ? 'Would prune'
       : options.delete
-          ? 'Deleted'
-          : 'Trashed';
+      ? 'Deleted'
+      : 'Trashed';
 
   void _bump(Map<String, int> summary, PhotoStatus status) =>
       summary[status.wire] = (summary[status.wire] ?? 0) + 1;

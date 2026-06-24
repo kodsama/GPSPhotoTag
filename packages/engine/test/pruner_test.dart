@@ -42,9 +42,9 @@ void main() {
 
   test('trashes only orphan RAWs and their sidecars', () async {
     final trash = FakeTrash();
-    final events = await Pruner(trash: trash)
-        .prune([root.path], const PruneOptions())
-        .toList();
+    final events = await Pruner(
+      trash: trash,
+    ).prune([root.path], const PruneOptions()).toList();
 
     final orphan = p.join(root.path, 'DSCF2.RAF');
     final sidecar = p.join(root.path, 'DSCF2.RAF.xmp');
@@ -69,9 +69,9 @@ void main() {
 
   test('dry run removes and trashes nothing', () async {
     final trash = FakeTrash();
-    final events = await Pruner(trash: trash)
-        .prune([root.path], const PruneOptions(dryRun: true))
-        .toList();
+    final events = await Pruner(
+      trash: trash,
+    ).prune([root.path], const PruneOptions(dryRun: true)).toList();
 
     expect(trash.trashed, isEmpty);
     expect(File(p.join(root.path, 'DSCF2.RAF')).existsSync(), isTrue);
@@ -86,9 +86,9 @@ void main() {
 
   test('delete mode unlinks orphans without using trash', () async {
     final trash = FakeTrash();
-    final events = await Pruner(trash: trash)
-        .prune([root.path], const PruneOptions(delete: true))
-        .toList();
+    final events = await Pruner(
+      trash: trash,
+    ).prune([root.path], const PruneOptions(delete: true)).toList();
 
     expect(trash.trashed, isEmpty);
     expect(File(p.join(root.path, 'DSCF2.RAF')).existsSync(), isFalse);

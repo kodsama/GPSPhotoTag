@@ -111,8 +111,7 @@ class StepCard extends StatelessWidget {
           ),
         ),
         if (completed && !active)
-          Text('Edit',
-              style: text.labelLarge?.copyWith(color: scheme.primary)),
+          Text('Edit', style: text.labelLarge?.copyWith(color: scheme.primary)),
       ],
     );
   }
@@ -126,12 +125,10 @@ class StepCard extends StatelessWidget {
         color: done
             ? AppColors.success.withValues(alpha: 0.16)
             : active
-                ? scheme.primary
-                : scheme.surfaceContainerHighest,
+            ? scheme.primary
+            : scheme.surfaceContainerHighest,
         shape: BoxShape.circle,
-        border: Border.all(
-          color: done ? AppColors.success : scheme.outline,
-        ),
+        border: Border.all(color: done ? AppColors.success : scheme.outline),
       ),
       alignment: Alignment.center,
       child: done

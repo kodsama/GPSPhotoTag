@@ -43,7 +43,8 @@ class SystemTrash implements Trash {
 
   /// Moves [file] into the XDG trash and writes its `.trashinfo` record.
   Future<void> _toXdgTrash(File file) async {
-    final dataHome = Platform.environment['XDG_DATA_HOME'] ??
+    final dataHome =
+        Platform.environment['XDG_DATA_HOME'] ??
         p.join(_home(), '.local', 'share');
     final filesDir = Directory(p.join(dataHome, 'Trash', 'files'));
     final infoDir = Directory(p.join(dataHome, 'Trash', 'info'));
@@ -72,10 +73,7 @@ class SystemTrash implements Trash {
           "'$escaped','OnlyErrorDialogs','SendToRecycleBin')",
     ]);
     if (result.exitCode != 0) {
-      throw FileSystemException(
-        'Failed to recycle (${result.stderr})',
-        path,
-      );
+      throw FileSystemException('Failed to recycle (${result.stderr})', path);
     }
   }
 

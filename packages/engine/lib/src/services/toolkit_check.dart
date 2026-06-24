@@ -38,14 +38,14 @@ class ToolStatus {
 
   /// Serialises this status to a JSON-friendly map.
   Map<String, Object?> toJson() => {
-        'id': id,
-        'name': name,
-        'present': present,
-        'version': version,
-        'purpose': purpose,
-        'required': required,
-        'installCommand': installCommand,
-      };
+    'id': id,
+    'name': name,
+    'present': present,
+    'version': version,
+    'purpose': purpose,
+    'required': required,
+    'installCommand': installCommand,
+  };
 }
 
 /// Probes the machine for the external tools GPSPhotoTag can take advantage of.
@@ -63,10 +63,10 @@ class ToolkitChecker {
 
   /// Probes every known tool. Never throws: a missing binary => `present:false`.
   Future<List<ToolStatus>> check() async => [
-        await _checkExiftool(),
-        await _checkLibheif(),
-        await _checkPackageManager(),
-      ];
+    await _checkExiftool(),
+    await _checkLibheif(),
+    await _checkPackageManager(),
+  ];
 
   /// True when RAW GPS embedding is possible (requires exiftool).
   bool canEmbedRaw(List<ToolStatus> statuses) => _present(statuses, 'exiftool');
@@ -96,7 +96,8 @@ class ToolkitChecker {
       name: 'ExifTool',
       present: present,
       version: version,
-      purpose: 'Embed GPS into RAW (RAF/CR3) and read Fuji/Canon timestamps; '
+      purpose:
+          'Embed GPS into RAW (RAF/CR3) and read Fuji/Canon timestamps; '
           'tag HEIC.',
       required: false,
       installCommand: _exiftoolInstall(),
@@ -164,14 +165,22 @@ class ToolkitChecker {
   }
 
   List<_Probe> _packageManagerProbes() {
-    if (Platform.isMacOS) return const [_Probe('brew', ['--version'])];
+    if (Platform.isMacOS) {
+      return const [
+        _Probe('brew', ['--version']),
+      ];
+    }
     if (Platform.isLinux) {
       return const [
         _Probe('apt', ['--version']),
         _Probe('apt-get', ['--version']),
       ];
     }
-    if (Platform.isWindows) return const [_Probe('winget', ['--version'])];
+    if (Platform.isWindows) {
+      return const [
+        _Probe('winget', ['--version']),
+      ];
+    }
     return const [];
   }
 

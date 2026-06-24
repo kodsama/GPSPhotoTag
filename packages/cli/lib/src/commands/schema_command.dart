@@ -61,7 +61,8 @@ const _schema = {
         '--out|-o': 'string (required) — output PNG path',
         '--dpi': 'int (default 200) — output resolution',
         '--names': 'bool — RESERVED (no effect in 2.0; overview render only)',
-        '--clusters': "string — RESERVED (no effect in 2.0; overview render only)",
+        '--clusters':
+            "string — RESERVED (no effect in 2.0; overview render only)",
       },
       'emits': ['log', 'done', 'error'],
     },
@@ -88,13 +89,26 @@ const _schema = {
       'options': <String, String>{},
       'emits': ['(json) {tools:[...]}'],
     },
-    'info': {'summary': 'Version/platform/capabilities.', 'options': <String, String>{}},
-    'list-sources': {'summary': 'Supported location sources.', 'options': <String, String>{}},
-    'list-providers': {'summary': 'Tile/geocoder providers.', 'options': <String, String>{}},
+    'info': {
+      'summary': 'Version/platform/capabilities.',
+      'options': <String, String>{},
+    },
+    'list-sources': {
+      'summary': 'Supported location sources.',
+      'options': <String, String>{},
+    },
+    'list-providers': {
+      'summary': 'Tile/geocoder providers.',
+      'options': <String, String>{},
+    },
     'schema': {'summary': 'This document.', 'options': <String, String>{}},
   },
   'events': {
-    'log': {'event': 'log', 'level': 'debug|info|warning|error', 'message': 'string'},
+    'log': {
+      'event': 'log',
+      'level': 'debug|info|warning|error',
+      'message': 'string',
+    },
     'progress': {'event': 'progress', 'done': 'int', 'total': 'int'},
     'item': {
       'event': 'item',
@@ -108,7 +122,11 @@ const _schema = {
       'note': 'string (optional)',
     },
     'done': {'event': 'done', 'summary': '{status: count}', 'total': 'int'},
-    'error': {'event': 'error', 'code': 'bad_input|missing_toolkit|internal', 'message': 'string'},
+    'error': {
+      'event': 'error',
+      'code': 'bad_input|missing_toolkit|internal',
+      'message': 'string',
+    },
   },
   'exitCodes': {
     '0': 'ok — all items succeeded',

@@ -1,0 +1,17 @@
+# flutter_distributor .rpm config.
+display_name: GPSPhotoTag
+package_name: gpsphototag
+license: GPLv3+
+url: https://github.com/kodsama/GPSPhotoTag
+icon: ../../../../packaging/linux/icon_256.png
+generic_name: Photo GPS Tagger
+keywords:
+  - GPS
+  - EXIF
+  - Photo
+  - Geotag
+categories:
+  - Graphics
+  - Photography
+group: Applications/Multimedia
+summary: Tag photos with GPS coordinates from GPX or Google location history

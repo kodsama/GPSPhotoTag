@@ -37,7 +37,9 @@ class InfoCommand extends Command<int> {
       _out.writeln(jsonEncode(info));
     } else {
       _out.writeln('gpsphototag $cliVersion on ${Platform.operatingSystem}');
-      _out.writeln('formats: jpeg, png, raw (sidecar/exiftool), heic (exiftool)');
+      _out.writeln(
+        'formats: jpeg, png, raw (sidecar/exiftool), heic (exiftool)',
+      );
       _out.writeln('sources: gpx, google (records/timeline/kml)');
     }
     return 0;

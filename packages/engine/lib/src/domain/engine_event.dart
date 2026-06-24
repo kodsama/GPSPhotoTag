@@ -48,8 +48,11 @@ final class LogEvent extends EngineEvent {
   String get kind => 'log';
 
   @override
-  Map<String, Object?> toJson() =>
-      {'event': kind, 'level': level.name, 'message': message};
+  Map<String, Object?> toJson() => {
+    'event': kind,
+    'level': level.name,
+    'message': message,
+  };
 }
 
 /// Overall progress: [done] of [total] items processed.
@@ -70,8 +73,11 @@ final class ProgressEvent extends EngineEvent {
   String get kind => 'progress';
 
   @override
-  Map<String, Object?> toJson() =>
-      {'event': kind, 'done': done, 'total': total};
+  Map<String, Object?> toJson() => {
+    'event': kind,
+    'done': done,
+    'total': total,
+  };
 }
 
 /// One file finished processing.
@@ -104,8 +110,11 @@ final class DoneEvent extends EngineEvent {
   String get kind => 'done';
 
   @override
-  Map<String, Object?> toJson() =>
-      {'event': kind, 'summary': summary, 'total': total};
+  Map<String, Object?> toJson() => {
+    'event': kind,
+    'summary': summary,
+    'total': total,
+  };
 }
 
 /// A fatal error aborted the operation.
@@ -123,6 +132,9 @@ final class ErrorEvent extends EngineEvent {
   String get kind => 'error';
 
   @override
-  Map<String, Object?> toJson() =>
-      {'event': kind, 'code': code, 'message': message};
+  Map<String, Object?> toJson() => {
+    'event': kind,
+    'code': code,
+    'message': message,
+  };
 }

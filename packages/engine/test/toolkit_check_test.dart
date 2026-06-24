@@ -22,7 +22,12 @@ class FakeProcessRunner implements ProcessRunner {
 }
 
 class ProcessException implements Exception {
-  ProcessException(this.executable, this.arguments, this.message, this.errorCode);
+  ProcessException(
+    this.executable,
+    this.arguments,
+    this.message,
+    this.errorCode,
+  );
   final String executable;
   final List<String> arguments;
   final String message;
@@ -34,13 +39,17 @@ void main() {
     test('check() returns one entry per known tool', () async {
       final checker = ToolkitChecker(FakeProcessRunner(const {}));
       final statuses = await checker.check();
-      expect(statuses.map((s) => s.id), ['exiftool', 'libheif', 'package_manager']);
+      expect(statuses.map((s) => s.id), [
+        'exiftool',
+        'libheif',
+        'package_manager',
+      ]);
     });
 
     test('exiftool present: parses version and emits installCommand', () async {
-      final checker = ToolkitChecker(FakeProcessRunner({
-        'exiftool': const ProcResult(0, '13.55\n', ''),
-      }));
+      final checker = ToolkitChecker(
+        FakeProcessRunner({'exiftool': const ProcResult(0, '13.55\n', '')}),
+      );
       final statuses = await checker.check();
       final exiftool = statuses.firstWhere((s) => s.id == 'exiftool');
 
@@ -51,30 +60,34 @@ void main() {
       expect(checker.canHeic(statuses), isTrue);
     });
 
-    test('exiftool missing: present false but status still has install hint',
-        () async {
-      final checker = ToolkitChecker(FakeProcessRunner(const {}));
-      final statuses = await checker.check();
-      final exiftool = statuses.firstWhere((s) => s.id == 'exiftool');
+    test(
+      'exiftool missing: present false but status still has install hint',
+      () async {
+        final checker = ToolkitChecker(FakeProcessRunner(const {}));
+        final statuses = await checker.check();
+        final exiftool = statuses.firstWhere((s) => s.id == 'exiftool');
 
-      expect(exiftool.present, isFalse);
-      expect(exiftool.version, isNull);
-      expect(exiftool.installCommand, isNotNull);
-      expect(checker.canEmbedRaw(statuses), isFalse);
-    });
+        expect(exiftool.present, isFalse);
+        expect(exiftool.version, isNull);
+        expect(exiftool.installCommand, isNotNull);
+        expect(checker.canEmbedRaw(statuses), isFalse);
+      },
+    );
 
     test('exiftool non-zero exit is treated as absent', () async {
-      final checker = ToolkitChecker(FakeProcessRunner({
-        'exiftool': const ProcResult(1, '', 'boom'),
-      }));
+      final checker = ToolkitChecker(
+        FakeProcessRunner({'exiftool': const ProcResult(1, '', 'boom')}),
+      );
       final statuses = await checker.check();
       expect(statuses.firstWhere((s) => s.id == 'exiftool').present, isFalse);
     });
 
     test('libheif detected via heif-dec --version', () async {
-      final checker = ToolkitChecker(FakeProcessRunner({
-        'heif-dec': const ProcResult(0, 'libheif version: 1.17.6\n', ''),
-      }));
+      final checker = ToolkitChecker(
+        FakeProcessRunner({
+          'heif-dec': const ProcResult(0, 'libheif version: 1.17.6\n', ''),
+        }),
+      );
       final statuses = await checker.check();
       final libheif = statuses.firstWhere((s) => s.id == 'libheif');
 
@@ -84,17 +97,19 @@ void main() {
     });
 
     test('libheif falls back to heif-convert even on non-zero exit', () async {
-      final checker = ToolkitChecker(FakeProcessRunner({
-        'heif-convert': const ProcResult(1, '', 'usage: heif-convert ...'),
-      }));
+      final checker = ToolkitChecker(
+        FakeProcessRunner({
+          'heif-convert': const ProcResult(1, '', 'usage: heif-convert ...'),
+        }),
+      );
       final statuses = await checker.check();
       expect(statuses.firstWhere((s) => s.id == 'libheif').present, isTrue);
     });
 
     test('canHeic is true when only exiftool is present', () async {
-      final checker = ToolkitChecker(FakeProcessRunner({
-        'exiftool': const ProcResult(0, '13.55', ''),
-      }));
+      final checker = ToolkitChecker(
+        FakeProcessRunner({'exiftool': const ProcResult(0, '13.55', '')}),
+      );
       final statuses = await checker.check();
       expect(checker.canHeic(statuses), isTrue);
     });

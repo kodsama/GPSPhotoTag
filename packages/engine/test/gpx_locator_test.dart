@@ -33,7 +33,10 @@ void main() {
     final loc = Locator(gpx: pts);
 
     test('exact match within tolerance', () {
-      final r = loc.locate(DateTime.utc(2026, 6, 22, 12), const Duration(seconds: 300));
+      final r = loc.locate(
+        DateTime.utc(2026, 6, 22, 12),
+        const Duration(seconds: 300),
+      );
       expect(r, isNotNull);
       expect(r!.method, GpsMethod.exact);
       expect(r.latitude, 42.0);
@@ -41,32 +44,50 @@ void main() {
     });
 
     test('interpolates the midpoint', () {
-      final r = loc.locate(DateTime.utc(2026, 6, 22, 12, 5), const Duration(seconds: 600));
+      final r = loc.locate(
+        DateTime.utc(2026, 6, 22, 12, 5),
+        const Duration(seconds: 600),
+      );
       expect(r!.method, GpsMethod.interpolated);
       expect(r.latitude, closeTo(42.1, 1e-9));
       expect(r.longitude, closeTo(18.1, 1e-9));
     });
 
     test('returns null beyond the threshold', () {
-      final r = loc.locate(DateTime.utc(2026, 6, 22, 20), const Duration(seconds: 300));
+      final r = loc.locate(
+        DateTime.utc(2026, 6, 22, 20),
+        const Duration(seconds: 300),
+      );
       expect(r, isNull);
     });
 
     test('prefers GPX over Google when both cover the time', () {
       final google = [
-        TimedPoint(latitude: 0, longitude: 0, time: DateTime.utc(2026, 6, 22, 12)),
+        TimedPoint(
+          latitude: 0,
+          longitude: 0,
+          time: DateTime.utc(2026, 6, 22, 12),
+        ),
       ];
-      final r = Locator(gpx: pts, google: google)
-          .locate(DateTime.utc(2026, 6, 22, 12), const Duration(seconds: 300));
+      final r = Locator(
+        gpx: pts,
+        google: google,
+      ).locate(DateTime.utc(2026, 6, 22, 12), const Duration(seconds: 300));
       expect(r!.source, GpsSource.gpx);
     });
 
     test('falls back to Google when GPX misses', () {
       final google = [
-        TimedPoint(latitude: 9, longitude: 9, time: DateTime.utc(2026, 6, 22, 20)),
+        TimedPoint(
+          latitude: 9,
+          longitude: 9,
+          time: DateTime.utc(2026, 6, 22, 20),
+        ),
       ];
-      final r = Locator(gpx: pts, google: google)
-          .locate(DateTime.utc(2026, 6, 22, 20), const Duration(seconds: 60));
+      final r = Locator(
+        gpx: pts,
+        google: google,
+      ).locate(DateTime.utc(2026, 6, 22, 20), const Duration(seconds: 60));
       expect(r!.source, GpsSource.google);
       expect(r.latitude, 9);
     });

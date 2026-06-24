@@ -86,9 +86,9 @@ class MapService {
     required ProcessRunner runner,
     http.Client? client,
     bool exiftoolAvailable = true,
-  })  : _runner = runner,
-        _exiftoolAvailable = exiftoolAvailable,
-        _client = client ?? http.Client();
+  }) : _runner = runner,
+       _exiftoolAvailable = exiftoolAvailable,
+       _client = client ?? http.Client();
 
   final ProcessRunner _runner;
   final http.Client _client;
@@ -121,8 +121,10 @@ class MapService {
     yield LogEvent('${points.length} of ${photos.length} photos had GPS');
 
     if (points.isEmpty) {
-      yield const ErrorEvent('no GPS found in the given photos',
-          code: 'bad_input');
+      yield const ErrorEvent(
+        'no GPS found in the given photos',
+        code: 'bad_input',
+      );
       return;
     }
 
@@ -141,8 +143,10 @@ class MapService {
     if (basemap.fetchedAny) {
       yield LogEvent('Fetched ${basemap.tilesFetched} CARTO basemap tile(s)');
     } else {
-      yield const LogEvent('basemap tiles unavailable; rendering without basemap',
-          level: LogLevel.warning);
+      yield const LogEvent(
+        'basemap tiles unavailable; rendering without basemap',
+        level: LogLevel.warning,
+      );
     }
 
     final canvasPoints = [
@@ -238,7 +242,8 @@ class MapService {
   /// fall back to a basemap-less render.
   Future<img.Image?> _fetchTile(int z, int x, int y) async {
     final url = Uri.parse(
-        'https://basemaps.cartocdn.com/light_all/$z/$x/$y@2x.png');
+      'https://basemaps.cartocdn.com/light_all/$z/$x/$y@2x.png',
+    );
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final res = await _client.get(url);
@@ -354,7 +359,11 @@ class MapService {
 
   /// Draws a small filled red dot with a thin white outline per point so single
   /// or sparse points stay visible above the heat field.
-  void _stampDots(img.Image base, List<({double x, double y})> points, int dpi) {
+  void _stampDots(
+    img.Image base,
+    List<({double x, double y})> points,
+    int dpi,
+  ) {
     final dot = (dpi / 50).clamp(3, 7).toInt();
     final white = img.ColorRgb8(255, 255, 255);
     final red = img.ColorRgb8(214, 40, 40);
@@ -362,10 +371,22 @@ class MapService {
       final x = pt.x.round();
       final y = pt.y.round();
       if (x < 0 || y < 0 || x >= base.width || y >= base.height) continue;
-      img.fillCircle(base,
-          x: x, y: y, radius: dot + 1, color: white, antialias: true);
-      img.fillCircle(base,
-          x: x, y: y, radius: dot, color: red, antialias: true);
+      img.fillCircle(
+        base,
+        x: x,
+        y: y,
+        radius: dot + 1,
+        color: white,
+        antialias: true,
+      );
+      img.fillCircle(
+        base,
+        x: x,
+        y: y,
+        radius: dot,
+        color: red,
+        antialias: true,
+      );
     }
   }
 }

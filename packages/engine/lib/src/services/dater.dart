@@ -18,10 +18,10 @@ class Dater {
   /// Creates a dater backed by [exif] (for reading capture time) and [runner]
   /// (for invoking `SetFile` and `exiftool`).
   Dater({required ExifBackend exif, required ProcessRunner runner})
+    // ignore: prefer_initializing_formals
+    : _exif = exif,
       // ignore: prefer_initializing_formals
-      : _exif = exif,
-        // ignore: prefer_initializing_formals
-        _runner = runner;
+      _runner = runner;
 
   final ExifBackend _exif;
   final ProcessRunner _runner;
@@ -49,8 +49,16 @@ class Dater {
     for (final path in files) {
       try {
         yield* switch (mode) {
-          FixDatesMode.exif => _fromExif(path, dryRun: dryRun, summary: summary),
-          FixDatesMode.file => _fromFile(path, dryRun: dryRun, summary: summary),
+          FixDatesMode.exif => _fromExif(
+            path,
+            dryRun: dryRun,
+            summary: summary,
+          ),
+          FixDatesMode.file => _fromFile(
+            path,
+            dryRun: dryRun,
+            summary: summary,
+          ),
           FixDatesMode.none => const Stream<EngineEvent>.empty(),
         };
       } on Object catch (e) {
@@ -73,14 +81,24 @@ class Dater {
     final meta = await _exif.read(path);
     final naive = meta.captureNaive;
     if (naive == null) {
-      yield _item(path, PhotoStatus.noTimestamp, summary,
-          note: 'no EXIF DateTimeOriginal');
+      yield _item(
+        path,
+        PhotoStatus.noTimestamp,
+        summary,
+        note: 'no EXIF DateTimeOriginal',
+      );
       return;
     }
 
     // captureNaive is wall-clock; treat it as a local DateTime for the mtime.
-    final target =
-        DateTime(naive.year, naive.month, naive.day, naive.hour, naive.minute, naive.second);
+    final target = DateTime(
+      naive.year,
+      naive.month,
+      naive.day,
+      naive.hour,
+      naive.minute,
+      naive.second,
+    );
 
     if (dryRun) {
       yield _item(path, PhotoStatus.dryRun, summary);
@@ -109,8 +127,10 @@ class Dater {
         );
       }
     } on Object catch (e) {
-      yield LogEvent('SetFile unavailable; left birthtime unchanged ($e)',
-          level: LogLevel.warning);
+      yield LogEvent(
+        'SetFile unavailable; left birthtime unchanged ($e)',
+        level: LogLevel.warning,
+      );
     }
   }
 
@@ -138,14 +158,22 @@ class Dater {
         path,
       ]);
     } on Object catch (e) {
-      yield _item(path, PhotoStatus.error, summary,
-          note: 'exiftool unavailable: $e');
+      yield _item(
+        path,
+        PhotoStatus.error,
+        summary,
+        note: 'exiftool unavailable: $e',
+      );
       return;
     }
 
     if (!result.ok) {
-      yield _item(path, PhotoStatus.error, summary,
-          note: 'exiftool exited ${result.exitCode}: ${result.stderr.trim()}');
+      yield _item(
+        path,
+        PhotoStatus.error,
+        summary,
+        note: 'exiftool exited ${result.exitCode}: ${result.stderr.trim()}',
+      );
       return;
     }
 

@@ -29,12 +29,14 @@ void main() {
   group('SystemProcessRunner', () {
     const runner = SystemProcessRunner();
 
-    test('captures exit code, stdout, and ok for a successful command',
-        () async {
-      final result = await runner.run('echo', ['hi']);
-      expect(result.exitCode, 0);
-      expect(result.ok, isTrue);
-      expect(result.stdout.trim(), 'hi');
-    });
+    test(
+      'captures exit code, stdout, and ok for a successful command',
+      () async {
+        final result = await runner.run('echo', ['hi']);
+        expect(result.exitCode, 0);
+        expect(result.ok, isTrue);
+        expect(result.stdout.trim(), 'hi');
+      },
+    );
   });
 }

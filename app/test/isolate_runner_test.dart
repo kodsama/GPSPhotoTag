@@ -62,10 +62,16 @@ void main() {
   });
 
   test('map runs the worker and reaches a terminal event', () async {
-    final jpg = await writeJpegWithDate(tmp, 'g.jpg',
-        dateTimeOriginal: DateTime(2026, 1, 1, 9));
-    await const JpegExifBackend()
-        .writeGps(jpg, latitude: 42.5, longitude: 18.1);
+    final jpg = await writeJpegWithDate(
+      tmp,
+      'g.jpg',
+      dateTimeOriginal: DateTime(2026, 1, 1, 9),
+    );
+    await const JpegExifBackend().writeGps(
+      jpg,
+      latitude: 42.5,
+      longitude: 18.1,
+    );
 
     // The map service reads GPS via exiftool; without it the worker fails fast
     // with a missing_toolkit error. Either way the worker plumbing runs and the
@@ -73,7 +79,10 @@ void main() {
     final out = '${tmp.path}/heatmap.png';
     const runner = IsolateRunner(exiftoolAvailable: false);
     final events = await runner
-        .map(photos: [jpg], options: MapOptions(outputPng: out))
+        .map(
+          photos: [jpg],
+          options: MapOptions(outputPng: out),
+        )
         .toList();
 
     final err = events.whereType<ErrorEvent>();
@@ -81,8 +90,11 @@ void main() {
   });
 
   test('fixDates runs on a worker and reports a result per file', () async {
-    final jpg = await writeJpegWithDate(tmp, 'd.jpg',
-        dateTimeOriginal: DateTime(2026, 3, 4, 5, 6, 7));
+    final jpg = await writeJpegWithDate(
+      tmp,
+      'd.jpg',
+      dateTimeOriginal: DateTime(2026, 3, 4, 5, 6, 7),
+    );
     const runner = IsolateRunner(exiftoolAvailable: false);
     final events = await runner
         .fixDates(files: [jpg], mode: FixDatesMode.exif, dryRun: true)

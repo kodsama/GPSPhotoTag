@@ -30,27 +30,33 @@ void main() {
       );
     });
 
-    test('writeGps persists DateTimeOriginal and read parses it back',
-        () async {
-      final path = p.join(dir.path, 'dated.png');
-      File(path).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
+    test(
+      'writeGps persists DateTimeOriginal and read parses it back',
+      () async {
+        final path = p.join(dir.path, 'dated.png');
+        File(
+          path,
+        ).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
 
-      final dt = DateTime(2026, 6, 24, 9, 8, 7);
-      await backend.writeGps(
-        path,
-        latitude: 12.5,
-        longitude: -8.25,
-        dateTimeOriginal: dt,
-      );
+        final dt = DateTime(2026, 6, 24, 9, 8, 7);
+        await backend.writeGps(
+          path,
+          latitude: 12.5,
+          longitude: -8.25,
+          dateTimeOriginal: dt,
+        );
 
-      final meta = await backend.read(path);
-      expect(meta.captureNaive, dt);
-      expect(meta.hasGps, isTrue);
-    });
+        final meta = await backend.read(path);
+        expect(meta.captureNaive, dt);
+        expect(meta.hasGps, isTrue);
+      },
+    );
 
     test('second write rehydrates EXIF from the stored tEXt chunk', () async {
       final path = p.join(dir.path, 'twice.png');
-      File(path).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
+      File(
+        path,
+      ).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
 
       await backend.writeGps(
         path,

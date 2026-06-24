@@ -18,9 +18,9 @@ abstract final class Collectors {
 
   /// Expands [inputs] into Google history files (`.json`, `.kml`).
   static List<String> googleHistory(Iterable<String> inputs) => _expand(
-        inputs,
-        (path) => const {'json', 'kml'}.contains(PhotoFormats.extOf(path)),
-      );
+    inputs,
+    (path) => const {'json', 'kml'}.contains(PhotoFormats.extOf(path)),
+  );
 
   static List<String> _expand(
     Iterable<String> inputs,

@@ -1,0 +1,13 @@
+# flutter_distributor AppImage config.
+display_name: GPSPhotoTag
+icon: ../../../../packaging/linux/icon_256.png
+keywords:
+  - GPS
+  - EXIF
+  - Photo
+  - Geotag
+generic_name: Photo GPS Tagger
+categories:
+  - Graphics
+  - Photography
+supported_mime_type: []

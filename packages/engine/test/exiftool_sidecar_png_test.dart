@@ -28,7 +28,9 @@ class FakeProcessRunner implements ProcessRunner {
 void main() {
   group('ExiftoolBackend', () {
     test('supports RAW and HEIC extensions, rejects others', () {
-      final backend = ExiftoolBackend(FakeProcessRunner(const ProcResult(0, '', '')));
+      final backend = ExiftoolBackend(
+        FakeProcessRunner(const ProcResult(0, '', '')),
+      );
       expect(backend.supports('/x/DSCF1.RAF'), isTrue);
       expect(backend.supports('/x/DSCF1.raf'), isTrue);
       expect(backend.supports('/x/IMG.HEIC'), isTrue);
@@ -46,7 +48,9 @@ void main() {
   "GPSLatitude": "48.8584",
   "GPSLongitude": "2.2945"
 }]''';
-      final backend = ExiftoolBackend(FakeProcessRunner(const ProcResult(0, json, '')));
+      final backend = ExiftoolBackend(
+        FakeProcessRunner(const ProcResult(0, json, '')),
+      );
       final meta = await backend.read('/x/photo.raf');
 
       expect(meta.captureNaive, DateTime(2023, 7, 15, 14, 30, 5));
@@ -57,7 +61,9 @@ void main() {
     test('read falls back to CreateDate and reports no GPS', () async {
       const json = '''
 [{"CreateDate": "2020:01:02 03:04:05.123-05:00"}]''';
-      final backend = ExiftoolBackend(FakeProcessRunner(const ProcResult(0, json, '')));
+      final backend = ExiftoolBackend(
+        FakeProcessRunner(const ProcResult(0, json, '')),
+      );
       final meta = await backend.read('/x/photo.nef');
 
       expect(meta.captureNaive, DateTime(2020, 1, 2, 3, 4, 5));
@@ -66,8 +72,9 @@ void main() {
     });
 
     test('read returns empty PhotoMeta on non-zero exit', () async {
-      final backend =
-          ExiftoolBackend(FakeProcessRunner(const ProcResult(1, '', 'boom')));
+      final backend = ExiftoolBackend(
+        FakeProcessRunner(const ProcResult(1, '', 'boom')),
+      );
       final meta = await backend.read('/x/photo.raf');
 
       expect(meta.captureNaive, isNull);
@@ -78,7 +85,11 @@ void main() {
     test('writeGps emits exact GPS args with N/E refs', () async {
       final runner = FakeProcessRunner(const ProcResult(0, '', ''));
       final backend = ExiftoolBackend(runner);
-      await backend.writeGps('/x/photo.raf', latitude: 48.8584, longitude: 2.2945);
+      await backend.writeGps(
+        '/x/photo.raf',
+        latitude: 48.8584,
+        longitude: 2.2945,
+      );
 
       expect(runner.executable, 'exiftool');
       final args = runner.args!;
@@ -94,7 +105,11 @@ void main() {
     test('writeGps uses S/W refs for negative coordinates', () async {
       final runner = FakeProcessRunner(const ProcResult(0, '', ''));
       final backend = ExiftoolBackend(runner);
-      await backend.writeGps('/x/p.raf', latitude: -33.8688, longitude: -70.6693);
+      await backend.writeGps(
+        '/x/p.raf',
+        latitude: -33.8688,
+        longitude: -70.6693,
+      );
 
       final args = runner.args!;
       expect(args, contains('-GPSLatitude=33.8688'));
@@ -119,8 +134,9 @@ void main() {
     });
 
     test('writeGps throws StateError on non-zero exit', () async {
-      final backend =
-          ExiftoolBackend(FakeProcessRunner(const ProcResult(2, '', 'nope')));
+      final backend = ExiftoolBackend(
+        FakeProcessRunner(const ProcResult(2, '', 'nope')),
+      );
       expect(
         () => backend.writeGps('/x/p.raf', latitude: 0, longitude: 0),
         throwsA(isA<StateError>()),
@@ -151,7 +167,10 @@ void main() {
       final doc = XmlDocument.parse(sidecar.readAsStringSync());
       final lat = doc.findAllElements('exif:GPSLatitude').single.innerText;
       final lon = doc.findAllElements('exif:GPSLongitude').single.innerText;
-      expect(doc.findAllElements('exif:GPSMapDatum').single.innerText, 'WGS-84');
+      expect(
+        doc.findAllElements('exif:GPSMapDatum').single.innerText,
+        'WGS-84',
+      );
       expect(lat, endsWith('S'));
       expect(lon, endsWith('E'));
       expect(lat, startsWith('33,'));
@@ -189,7 +208,9 @@ void main() {
 
     test('writeGps then read round-trips GPS within tolerance', () async {
       final path = '${dir.path}/tiny.png';
-      File(path).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
+      File(
+        path,
+      ).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
 
       const backend = PngExifBackend();
       const lat = -33.8688;
@@ -211,7 +232,9 @@ void main() {
 
     test('read reports hasGps false for PNG without GPS', () async {
       final path = '${dir.path}/plain.png';
-      File(path).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
+      File(
+        path,
+      ).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
 
       final meta = await const PngExifBackend().read(path);
       expect(meta.hasGps, isFalse);
@@ -222,7 +245,5 @@ void main() {
 /// Mirrors the backend's tEXt-stored EXIF reload, for assertion in tests.
 img.ExifData _reloadExif(img.Image image) {
   final stored = image.textData?['gpsphototag:exif'];
-  return img.ExifData.fromInputBuffer(
-    img.InputBuffer(base64Decode(stored!)),
-  );
+  return img.ExifData.fromInputBuffer(img.InputBuffer(base64Decode(stored!)));
 }

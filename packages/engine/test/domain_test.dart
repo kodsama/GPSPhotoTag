@@ -65,25 +65,26 @@ void main() {
   group('EngineEvent', () {
     test('events serialise with their discriminator', () {
       expect(const LogEvent('hi').toJson()['event'], 'log');
+      expect(const ProgressEvent(done: 1, total: 4).toJson(), {
+        'event': 'progress',
+        'done': 1,
+        'total': 4,
+      });
       expect(
-        const ProgressEvent(done: 1, total: 4).toJson(),
-        {'event': 'progress', 'done': 1, 'total': 4},
+        const ProgressEvent(done: 1, total: 4).fraction,
+        closeTo(0.25, 1e-9),
       );
-      expect(const ProgressEvent(done: 1, total: 4).fraction, closeTo(0.25, 1e-9));
-      expect(
-        const DoneEvent({'tagged': 3, 'no_gps': 1}).total,
-        4,
-      );
+      expect(const DoneEvent({'tagged': 3, 'no_gps': 1}).total, 4);
     });
 
     test('exhaustive switch over the sealed hierarchy compiles', () {
       String describe(EngineEvent e) => switch (e) {
-            LogEvent() => 'log',
-            ProgressEvent() => 'progress',
-            ItemEvent() => 'item',
-            DoneEvent() => 'done',
-            ErrorEvent() => 'error',
-          };
+        LogEvent() => 'log',
+        ProgressEvent() => 'progress',
+        ItemEvent() => 'item',
+        DoneEvent() => 'done',
+        ErrorEvent() => 'error',
+      };
       expect(describe(const LogEvent('x')), 'log');
       expect(describe(const ErrorEvent('boom')), 'error');
     });

@@ -93,8 +93,12 @@ class ListSourcesCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    _print(_out, globalResults!.flag('json'), 'sources',
-        locationSources.cast<Map<String, Object?>>());
+    _print(
+      _out,
+      globalResults!.flag('json'),
+      'sources',
+      locationSources.cast<Map<String, Object?>>(),
+    );
     return 0;
   }
 }
@@ -114,8 +118,12 @@ class ListProvidersCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    _print(_out, globalResults!.flag('json'), 'providers',
-        mapProviders.cast<Map<String, Object?>>());
+    _print(
+      _out,
+      globalResults!.flag('json'),
+      'providers',
+      mapProviders.cast<Map<String, Object?>>(),
+    );
     return 0;
   }
 }

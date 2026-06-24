@@ -29,25 +29,36 @@ void main() {
     // and is unreachable in this CI environment.
     final posix = Platform.isMacOS || Platform.isLinux;
 
-    test('moves a file out of its source location', () async {
-      final src = File(p.join(tmp.path, 'orphan.raf'))..writeAsStringSync('a');
-      await trash.toTrash(src.path);
-      expect(src.existsSync(), isFalse);
-    }, skip: posix ? false : 'POSIX-only trash layout');
+    test(
+      'moves a file out of its source location',
+      () async {
+        final src = File(p.join(tmp.path, 'orphan.raf'))
+          ..writeAsStringSync('a');
+        await trash.toTrash(src.path);
+        expect(src.existsSync(), isFalse);
+      },
+      skip: posix ? false : 'POSIX-only trash layout',
+    );
 
-    test('handles a name conflict by de-duplicating in the trash', () async {
-      // Two distinct files that share a basename: the second must not clobber
-      // the first in the trash directory, exercising the _uniqueDest counter.
-      final dirA = Directory(p.join(tmp.path, 'a'))..createSync();
-      final dirB = Directory(p.join(tmp.path, 'b'))..createSync();
-      final fileA = File(p.join(dirA.path, 'dup.raf'))..writeAsStringSync('A');
-      final fileB = File(p.join(dirB.path, 'dup.raf'))..writeAsStringSync('B');
+    test(
+      'handles a name conflict by de-duplicating in the trash',
+      () async {
+        // Two distinct files that share a basename: the second must not clobber
+        // the first in the trash directory, exercising the _uniqueDest counter.
+        final dirA = Directory(p.join(tmp.path, 'a'))..createSync();
+        final dirB = Directory(p.join(tmp.path, 'b'))..createSync();
+        final fileA = File(p.join(dirA.path, 'dup.raf'))
+          ..writeAsStringSync('A');
+        final fileB = File(p.join(dirB.path, 'dup.raf'))
+          ..writeAsStringSync('B');
 
-      await trash.toTrash(fileA.path);
-      await trash.toTrash(fileB.path);
+        await trash.toTrash(fileA.path);
+        await trash.toTrash(fileB.path);
 
-      expect(fileA.existsSync(), isFalse);
-      expect(fileB.existsSync(), isFalse);
-    }, skip: posix ? false : 'POSIX-only trash layout');
+        expect(fileA.existsSync(), isFalse);
+        expect(fileB.existsSync(), isFalse);
+      },
+      skip: posix ? false : 'POSIX-only trash layout',
+    );
   });
 }

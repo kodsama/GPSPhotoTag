@@ -12,14 +12,22 @@ class FixDatesCommand extends Command<int> {
   // ignore: prefer_initializing_formals
   FixDatesCommand({IOSink? sink}) : _sink = sink {
     argParser
-      ..addMultiOption('photo',
-          abbr: 'p', help: 'Photo file or directory (repeatable, recursive).')
-      ..addOption('mode',
-          allowed: ['exif', 'file'],
-          mandatory: true,
-          help: "'exif': file date <- EXIF; 'file': EXIF <- file date.")
-      ..addFlag('dry-run',
-          negatable: false, help: 'Report only; change nothing.');
+      ..addMultiOption(
+        'photo',
+        abbr: 'p',
+        help: 'Photo file or directory (repeatable, recursive).',
+      )
+      ..addOption(
+        'mode',
+        allowed: ['exif', 'file'],
+        mandatory: true,
+        help: "'exif': file date <- EXIF; 'file': EXIF <- file date.",
+      )
+      ..addFlag(
+        'dry-run',
+        negatable: false,
+        help: 'Report only; change nothing.',
+      );
   }
 
   final IOSink? _sink;
@@ -34,20 +42,24 @@ class FixDatesCommand extends Command<int> {
   @override
   Future<int> run() async {
     final out = CliOutput(
-        json: globalResults!.flag('json'), sink: _sink, errorSink: _sink);
+      json: globalResults!.flag('json'),
+      sink: _sink,
+      errorSink: _sink,
+    );
     final photos = Collectors.photos(argResults!.multiOption('photo'));
     if (photos.isEmpty) {
-      out.add(const ErrorEvent('no photos found for --photo', code: 'bad_input'));
+      out.add(
+        const ErrorEvent('no photos found for --photo', code: 'bad_input'),
+      );
       return out.exitCode;
     }
     const runner = SystemProcessRunner();
     final exiftool = await detectExiftool(runner);
-    final registry =
-        BackendRegistry(runner: runner, exiftoolAvailable: exiftool);
-    final dater = Dater(
-      exif: DispatchingExifBackend(registry),
+    final registry = BackendRegistry(
       runner: runner,
+      exiftoolAvailable: exiftool,
     );
+    final dater = Dater(exif: DispatchingExifBackend(registry), runner: runner);
     final mode = FixDatesMode.values.byName(argResults!.option('mode')!);
     return out.consume(
       dater.fixDates(photos, mode, dryRun: argResults!.flag('dry-run')),

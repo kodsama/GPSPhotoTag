@@ -23,8 +23,7 @@ class GpsPhotoTagApp extends StatefulWidget {
 }
 
 class _GpsPhotoTagAppState extends State<GpsPhotoTagApp> {
-  late final AppController _controller =
-      widget.controller ?? AppController();
+  late final AppController _controller = widget.controller ?? AppController();
 
   @override
   void initState() {

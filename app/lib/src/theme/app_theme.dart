@@ -17,29 +17,29 @@ abstract final class AppTheme {
 
   /// The light ("paper") theme.
   static ThemeData get light => _build(
-        brightness: Brightness.light,
-        bg: AppColors.paper,
-        surface: AppColors.paperRaised,
-        sunk: AppColors.paperSunk,
-        border: AppColors.sand,
-        text: AppColors.ink,
-        textSoft: AppColors.inkSoft,
-        primary: AppColors.terracotta,
-        secondary: AppColors.contour,
-      );
+    brightness: Brightness.light,
+    bg: AppColors.paper,
+    surface: AppColors.paperRaised,
+    sunk: AppColors.paperSunk,
+    border: AppColors.sand,
+    text: AppColors.ink,
+    textSoft: AppColors.inkSoft,
+    primary: AppColors.terracotta,
+    secondary: AppColors.contour,
+  );
 
   /// The dark ("dusk") theme.
   static ThemeData get dark => _build(
-        brightness: Brightness.dark,
-        bg: AppColors.dusk,
-        surface: AppColors.duskRaised,
-        sunk: AppColors.duskSunk,
-        border: AppColors.duskBorder,
-        text: AppColors.parchment,
-        textSoft: AppColors.parchmentSoft,
-        primary: AppColors.terracottaBright,
-        secondary: AppColors.contourBright,
-      );
+    brightness: Brightness.dark,
+    bg: AppColors.dusk,
+    surface: AppColors.duskRaised,
+    sunk: AppColors.duskSunk,
+    border: AppColors.duskBorder,
+    text: AppColors.parchment,
+    textSoft: AppColors.parchmentSoft,
+    primary: AppColors.terracottaBright,
+    secondary: AppColors.contourBright,
+  );
 
   static ThemeData _build({
     required Brightness brightness,
@@ -82,10 +82,14 @@ abstract final class AppTheme {
           letterSpacing: -0.5,
           height: 1.05,
         ),
-        headlineSmall: t.headlineSmall
-            ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.2),
-        titleMedium: t.titleMedium
-            ?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.1),
+        headlineSmall: t.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+        titleMedium: t.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
+        ),
         labelLarge: t.labelLarge?.copyWith(
           fontWeight: FontWeight.w600,
           letterSpacing: 0.4,
@@ -105,8 +109,9 @@ abstract final class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: primary,
-          foregroundColor:
-              brightness == Brightness.light ? Colors.white : AppColors.dusk,
+          foregroundColor: brightness == Brightness.light
+              ? Colors.white
+              : AppColors.dusk,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
@@ -134,8 +139,10 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: sunk,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: border),

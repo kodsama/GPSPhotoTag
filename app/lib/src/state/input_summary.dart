@@ -17,13 +17,13 @@ class InputSummary {
 
   /// An empty summary (nothing picked yet).
   const InputSummary.empty()
-      : folder = null,
-        photos = const [],
-        gpxFiles = const [],
-        googleFiles = const [],
-        countsByFormat = const {},
-        earliest = null,
-        latest = null;
+    : folder = null,
+      photos = const [],
+      gpxFiles = const [],
+      googleFiles = const [],
+      countsByFormat = const {},
+      earliest = null,
+      latest = null;
 
   /// The picked folder, or null when nothing is selected.
   final String? folder;

@@ -40,18 +40,18 @@ class Walkthrough extends StatelessWidget {
   }
 
   static String _continueLabel(WizardStep step) => switch (step) {
-        WizardStep.run => 'Skip',
-        WizardStep.result => 'Done',
-        _ => 'Continue',
-      };
+    WizardStep.run => 'Skip',
+    WizardStep.result => 'Done',
+    _ => 'Continue',
+  };
 
   Widget _bodyFor(WizardStep step) => switch (step) {
-        WizardStep.toolkit => const ToolkitStep(),
-        WizardStep.input => const InputStep(),
-        WizardStep.review => const ReviewStep(),
-        WizardStep.options => const OptionsStep(),
-        WizardStep.output => const OutputStep(),
-        WizardStep.run => const RunStep(),
-        WizardStep.result => const ResultStep(),
-      };
+    WizardStep.toolkit => const ToolkitStep(),
+    WizardStep.input => const InputStep(),
+    WizardStep.review => const ReviewStep(),
+    WizardStep.options => const OptionsStep(),
+    WizardStep.output => const OutputStep(),
+    WizardStep.run => const RunStep(),
+    WizardStep.result => const ResultStep(),
+  };
 }

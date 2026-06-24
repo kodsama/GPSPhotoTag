@@ -15,8 +15,8 @@ class Locator {
   /// Pass [gpx] and/or [google]; either may be empty. The lists are assumed
   /// sorted — [parseGpx] and the Google parsers guarantee this.
   Locator({List<TimedPoint>? gpx, List<TimedPoint>? google})
-      : _gpx = gpx ?? const [],
-        _google = google ?? const [];
+    : _gpx = gpx ?? const [],
+      _google = google ?? const [];
 
   final List<TimedPoint> _gpx;
   final List<TimedPoint> _google;
@@ -85,8 +85,7 @@ class Locator {
     GpsSource source,
   ) {
     final span = b.time.difference(a.time).inMicroseconds;
-    final frac =
-        span == 0 ? 0.0 : t.difference(a.time).inMicroseconds / span;
+    final frac = span == 0 ? 0.0 : t.difference(a.time).inMicroseconds / span;
     final clamped = frac.clamp(0.0, 1.0);
     return LocationResult(
       latitude: a.latitude + (b.latitude - a.latitude) * clamped,

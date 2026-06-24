@@ -27,24 +27,21 @@ class InputStep extends StatelessWidget {
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(AppTheme.radius),
-              border: Border.all(
-                color: scheme.outline,
-                width: 1.4,
-              ),
+              border: Border.all(color: scheme.outline, width: 1.4),
             ),
             child: Column(
               children: [
                 Icon(Icons.folder_open, size: 38, color: scheme.primary),
                 const SizedBox(height: 12),
                 Text(
-                  controller.parsing
-                      ? 'Scanning…'
-                      : 'Choose photos folder',
+                  controller.parsing ? 'Scanning…' : 'Choose photos folder',
                   style: text.titleMedium,
                 ),
                 const SizedBox(height: 4),
-                Text('Folders are scanned recursively for photos and GPS files.',
-                    style: text.bodySmall),
+                Text(
+                  'Folders are scanned recursively for photos and GPS files.',
+                  style: text.bodySmall,
+                ),
               ],
             ),
           ),
@@ -53,8 +50,7 @@ class InputStep extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(Icons.check_circle,
-                  size: 18, color: scheme.primary),
+              Icon(Icons.check_circle, size: 18, color: scheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

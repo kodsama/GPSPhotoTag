@@ -56,7 +56,9 @@ void main() {
 
     test('writeGps dispatches to the JPEG backend and round-trips', () async {
       final path = p.join(tmp.path, 'photo.jpg');
-      File(path).writeAsBytesSync(img.encodeJpg(img.Image(width: 4, height: 4)));
+      File(
+        path,
+      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 4, height: 4)));
 
       await backend.writeGps(path, latitude: 42.7077, longitude: 18.3441);
 

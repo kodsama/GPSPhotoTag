@@ -12,7 +12,7 @@ import 'package:path/path.dart' as p;
 /// constructor was handed (defaulting to a one-item success run).
 class FakeEngineRunner implements EngineRunner {
   FakeEngineRunner({List<EngineEvent>? events, this.keepOpen = false})
-      : _events = events ?? _success();
+    : _events = events ?? _success();
 
   final List<EngineEvent> _events;
 
@@ -34,20 +34,22 @@ class FakeEngineRunner implements EngineRunner {
   TagOptions? lastTagOptions;
 
   static List<EngineEvent> _success() => [
-        const LogEvent('working'),
-        const ProgressEvent(done: 1, total: 1),
-        const ItemEvent(PhotoRow(
-          path: '/photos/a.jpg',
-          status: PhotoStatus.tagged,
-          location: LocationResult(
-            latitude: 42.5,
-            longitude: 18.1,
-            source: GpsSource.gpx,
-            method: GpsMethod.exact,
-          ),
-        )),
-        const DoneEvent({'tagged': 1}),
-      ];
+    const LogEvent('working'),
+    const ProgressEvent(done: 1, total: 1),
+    const ItemEvent(
+      PhotoRow(
+        path: '/photos/a.jpg',
+        status: PhotoStatus.tagged,
+        location: LocationResult(
+          latitude: 42.5,
+          longitude: 18.1,
+          source: GpsSource.gpx,
+          method: GpsMethod.exact,
+        ),
+      ),
+    ),
+    const DoneEvent({'tagged': 1}),
+  ];
 
   Stream<EngineEvent> _emit() async* {
     for (final event in _events) {
@@ -75,8 +77,9 @@ class FakeEngineRunner implements EngineRunner {
   }) {
     calls.add('map');
     // Write a tiny real PNG so result_step's Image.file has a file to point at.
-    File(options.outputPng)
-        .writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
+    File(
+      options.outputPng,
+    ).writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
     return _emit();
   }
 
@@ -121,8 +124,13 @@ Future<String> writeJpegWithDate(
 }
 
 /// Writes a minimal one-point GPX file and returns its path.
-String writeGpx(Directory dir, String name, DateTime time,
-    {double lat = 42.5, double lon = 18.1}) {
+String writeGpx(
+  Directory dir,
+  String name,
+  DateTime time, {
+  double lat = 42.5,
+  double lon = 18.1,
+}) {
   final path = p.join(dir.path, name);
   final iso = time.toUtc().toIso8601String();
   File(path).writeAsStringSync('''

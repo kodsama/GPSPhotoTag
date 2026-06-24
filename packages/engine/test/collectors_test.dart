@@ -34,14 +34,11 @@ void main() {
       // exercise de-duplication of the same absolute path.
       final result = Collectors.photos([tmp.path, p.join(tmp.path, 'a.jpg')]);
 
-      expect(
-        result,
-        [
-          p.absolute(p.join(tmp.path, 'a.jpg')),
-          p.absolute(p.join(tmp.path, 'sub', 'b.RAF')),
-          p.absolute(p.join(tmp.path, 'sub', 'deeper', 'c.png')),
-        ],
-      );
+      expect(result, [
+        p.absolute(p.join(tmp.path, 'a.jpg')),
+        p.absolute(p.join(tmp.path, 'sub', 'b.RAF')),
+        p.absolute(p.join(tmp.path, 'sub', 'deeper', 'c.png')),
+      ]);
       // Sorted ascending.
       final sorted = [...result]..sort();
       expect(result, sorted);
@@ -62,10 +59,9 @@ void main() {
       touch('track.gpx');
       touch('other.json');
       touch('photo.jpg');
-      expect(
-        Collectors.gpx([tmp.path]),
-        [p.absolute(p.join(tmp.path, 'track.gpx'))],
-      );
+      expect(Collectors.gpx([tmp.path]), [
+        p.absolute(p.join(tmp.path, 'track.gpx')),
+      ]);
     });
 
     test('googleHistory: keeps json and kml', () {

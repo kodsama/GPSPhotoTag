@@ -23,10 +23,8 @@ import 'wizard_step.dart';
 class AppController extends ChangeNotifier {
   /// Creates a controller. Inject a fake [runner] and/or a [pickFolder] override
   /// in tests; both default to the real implementations.
-  AppController({
-    EngineRunner? runner,
-    Future<String?> Function()? pickFolder,
-  })  : _pickFolder = pickFolder ?? getDirectoryPath {
+  AppController({EngineRunner? runner, Future<String?> Function()? pickFolder})
+    : _pickFolder = pickFolder ?? getDirectoryPath {
     _runner = runner;
   }
 
@@ -51,8 +49,9 @@ class AppController extends ChangeNotifier {
 
   /// Cycles between light and dark.
   void toggleTheme() {
-    _themeMode =
-        _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    _themeMode = _themeMode == ThemeMode.dark
+        ? ThemeMode.light
+        : ThemeMode.dark;
     notifyListeners();
   }
 
@@ -90,14 +89,14 @@ class AppController extends ChangeNotifier {
 
   /// Whether [step]'s Continue action should be enabled.
   bool isStepSatisfied(WizardStep step) => switch (step) {
-        WizardStep.toolkit => _toolkit.isNotEmpty,
-        WizardStep.input => _summary.hasPhotos,
-        WizardStep.review => includedCount > 0,
-        WizardStep.options => true,
-        WizardStep.output => _outputValid,
-        WizardStep.run => _lastSummary != null,
-        WizardStep.result => true,
-      };
+    WizardStep.toolkit => _toolkit.isNotEmpty,
+    WizardStep.input => _summary.hasPhotos,
+    WizardStep.review => includedCount > 0,
+    WizardStep.options => true,
+    WizardStep.output => _outputValid,
+    WizardStep.run => _lastSummary != null,
+    WizardStep.result => true,
+  };
 
   // --- Toolkit -------------------------------------------------------------
 
@@ -121,8 +120,10 @@ class AppController extends ChangeNotifier {
     _toolkit = await ToolkitChecker(const SystemProcessRunner()).check();
     _runner = null; // rebuild engine with fresh exiftool availability
     _toolkitLoading = false;
-    _log('Toolkit checked: '
-        '${_toolkit.where((t) => t.present).length}/${_toolkit.length} present');
+    _log(
+      'Toolkit checked: '
+      '${_toolkit.where((t) => t.present).length}/${_toolkit.length} present',
+    );
     notifyListeners();
   }
 
@@ -142,8 +143,7 @@ class AppController extends ChangeNotifier {
   bool isIncluded(String path) => _included[path] ?? true;
 
   /// Number of photos currently included.
-  int get includedCount =>
-      _summary.photos.where(isIncluded).length;
+  int get includedCount => _summary.photos.where(isIncluded).length;
 
   /// The included photo paths, in order.
   List<String> get includedPhotos =>
@@ -173,8 +173,10 @@ class AppController extends ChangeNotifier {
       ..clear()
       ..addEntries(photos.map((path) => MapEntry(path, true)));
     _parsing = false;
-    _log('Scanned $folder: ${photos.length} photo(s), '
-        '${gpx.length} GPX, ${google.length} Google file(s)');
+    _log(
+      'Scanned $folder: ${photos.length} photo(s), '
+      '${gpx.length} GPX, ${google.length} Google file(s)',
+    );
     notifyListeners();
   }
 
@@ -272,14 +274,14 @@ class AppController extends ChangeNotifier {
 
   /// Builds [TagOptions] from the current selections.
   TagOptions buildTagOptions() => TagOptions(
-        outDir: _copyToFolder ? _outDir : null,
-        overwrite: !_copyToFolder,
-        replace: _replace,
-        rawMode: _rawMode,
-        maxTimeDiff: Duration(seconds: _maxTimeDiffSeconds),
-        timezone: _timezone,
-        dryRun: _dryRun,
-      );
+    outDir: _copyToFolder ? _outDir : null,
+    overwrite: !_copyToFolder,
+    replace: _replace,
+    rawMode: _rawMode,
+    maxTimeDiff: Duration(seconds: _maxTimeDiffSeconds),
+    timezone: _timezone,
+    dryRun: _dryRun,
+  );
 
   // --- Run state -----------------------------------------------------------
 
@@ -339,21 +341,21 @@ class AppController extends ChangeNotifier {
 
   /// Tags the included photos, streaming events into state.
   Future<void> runTag() => _consume(
-        _engine.tag(
-          photos: includedPhotos,
-          gpxFiles: _summary.gpxFiles,
-          googleFiles: _summary.googleFiles,
-          options: buildTagOptions(),
-        ),
-        startMessage: 'Tagging $includedCount photo(s)…',
-        total: includedCount,
-        onDone: () {
-          if (_lastSummary != null && _step == WizardStep.run) {
-            _completed.add(WizardStep.run);
-            _step = WizardStep.result;
-          }
-        },
-      );
+    _engine.tag(
+      photos: includedPhotos,
+      gpxFiles: _summary.gpxFiles,
+      googleFiles: _summary.googleFiles,
+      options: buildTagOptions(),
+    ),
+    startMessage: 'Tagging $includedCount photo(s)…',
+    total: includedCount,
+    onDone: () {
+      if (_lastSummary != null && _step == WizardStep.run) {
+        _completed.add(WizardStep.run);
+        _step = WizardStep.result;
+      }
+    },
+  );
 
   /// Renders a heatmap PNG into the picked folder; returns its path or null.
   Future<String?> renderMap() async {
@@ -388,11 +390,7 @@ class AppController extends ChangeNotifier {
   /// Fixes capture/file dates for the picked photos in [mode].
   Future<void> runFixDates(FixDatesMode mode, {bool dryRun = false}) =>
       _consume(
-        _engine.fixDates(
-          files: includedPhotos,
-          mode: mode,
-          dryRun: dryRun,
-        ),
+        _engine.fixDates(files: includedPhotos, mode: mode, dryRun: dryRun),
         startMessage: 'Fixing dates (${mode.name})…',
         total: includedCount,
       );
@@ -458,8 +456,10 @@ class AppController extends ChangeNotifier {
         if (_rows.length > 200) _rows.removeLast();
       case DoneEvent(:final summary):
         _lastSummary = summary;
-        _log('Done: '
-            '${summary.entries.map((e) => '${e.key}=${e.value}').join(', ')}');
+        _log(
+          'Done: '
+          '${summary.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
+        );
       case ErrorEvent(:final message):
         _errorMessage = message;
         _log(message, level: LogLevel.error);

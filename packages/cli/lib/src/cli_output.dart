@@ -19,8 +19,8 @@ class CliOutput {
   /// human-mode error/warning lines (defaults to [stderr]). Tests pass
   /// buffer-backed sinks to capture output in-process.
   CliOutput({required this.json, IOSink? sink, IOSink? errorSink})
-      : _sink = sink ?? stdout,
-        _errorSink = errorSink ?? stderr;
+    : _sink = sink ?? stdout,
+      _errorSink = errorSink ?? stderr;
 
   /// Whether to emit newline-delimited JSON.
   final bool json;
@@ -71,19 +71,23 @@ class CliOutput {
         final coords = row.location == null
             ? ''
             : '  ${row.location!.latitude.toStringAsFixed(5)}, '
-                '${row.location!.longitude.toStringAsFixed(5)} '
-                '(${row.location!.provenance})';
+                  '${row.location!.longitude.toStringAsFixed(5)} '
+                  '(${row.location!.provenance})';
         final note = row.note == null ? '' : '  — ${row.note}';
-        _sink.writeln('${p.basename(row.path).padRight(28)} '
-            '${row.status.wire.padRight(15)}$coords$note');
+        _sink.writeln(
+          '${p.basename(row.path).padRight(28)} '
+          '${row.status.wire.padRight(15)}$coords$note',
+        );
       case DoneEvent(:final summary):
         _sink.writeln('—' * 40);
         final keys = summary.keys.toList()..sort();
         for (final k in keys) {
           _sink.writeln('${k.padRight(20)} ${summary[k]}');
         }
-        _sink.writeln('${'total'.padRight(20)} '
-            '${summary.values.fold(0, (a, b) => a + b)}');
+        _sink.writeln(
+          '${'total'.padRight(20)} '
+          '${summary.values.fold(0, (a, b) => a + b)}',
+        );
       case ErrorEvent(:final message):
         _errorSink.writeln('error: $message');
       case ProgressEvent():
@@ -92,10 +96,10 @@ class CliOutput {
   }
 
   int _mapErrorCode(String code) => switch (code) {
-        'bad_input' => ExitCodes.badInput,
-        'missing_toolkit' => ExitCodes.missingToolkit,
-        _ => ExitCodes.internal,
-      };
+    'bad_input' => ExitCodes.badInput,
+    'missing_toolkit' => ExitCodes.missingToolkit,
+    _ => ExitCodes.internal,
+  };
 
   /// Any no-match / no-timestamp / per-item error makes the run "partial".
   int _exitForSummary(Map<String, int> summary) {

@@ -55,8 +55,7 @@ class OptionsStep extends StatelessWidget {
         SegmentedButton<RawMode>(
           segments: [
             const ButtonSegment(value: RawMode.auto, label: Text('Auto')),
-            const ButtonSegment(
-                value: RawMode.sidecar, label: Text('Sidecar')),
+            const ButtonSegment(value: RawMode.sidecar, label: Text('Sidecar')),
             ButtonSegment(
               value: RawMode.embed,
               label: const Text('Embed'),
@@ -70,8 +69,11 @@ class OptionsStep extends StatelessWidget {
         if (embedDisabled)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text('Embed needs ExifTool (missing) — Auto falls back to '
-                'sidecars.', style: text.bodySmall),
+            child: Text(
+              'Embed needs ExifTool (missing) — Auto falls back to '
+              'sidecars.',
+              style: text.bodySmall,
+            ),
           ),
       ],
     );
@@ -88,8 +90,10 @@ class OptionsStep extends StatelessWidget {
             children: [
               Text('Max time difference (seconds)', style: text.titleMedium),
               const SizedBox(height: 2),
-              Text('Largest gap between a photo and a GPS point.',
-                  style: text.bodySmall),
+              Text(
+                'Largest gap between a photo and a GPS point.',
+                style: text.bodySmall,
+              ),
             ],
           ),
         ),
@@ -98,8 +102,7 @@ class OptionsStep extends StatelessWidget {
           child: TextFormField(
             initialValue: '${controller.maxTimeDiffSeconds}',
             keyboardType: TextInputType.number,
-            onChanged: (v) =>
-                controller.setMaxTimeDiff(int.tryParse(v) ?? 300),
+            onChanged: (v) => controller.setMaxTimeDiff(int.tryParse(v) ?? 300),
           ),
         ),
       ],
@@ -113,8 +116,10 @@ class OptionsStep extends StatelessWidget {
       children: [
         Text('Timezone (optional)', style: text.titleMedium),
         const SizedBox(height: 2),
-        Text('IANA name used when EXIF has no offset, e.g. Europe/Paris.',
-            style: text.bodySmall),
+        Text(
+          'IANA name used when EXIF has no offset, e.g. Europe/Paris.',
+          style: text.bodySmall,
+        ),
         const SizedBox(height: 8),
         TextFormField(
           initialValue: controller.timezone ?? '',

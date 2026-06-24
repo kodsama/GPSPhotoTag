@@ -27,8 +27,10 @@ void main() {
 
   /// Last non-empty JSON line emitted (commands emit one object per line).
   Map<String, Object?> lastJsonLine() {
-    final lines =
-        buf.text.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    final lines = buf.text
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
     return jsonDecode(lines.last) as Map<String, Object?>;
   }
 
@@ -109,8 +111,12 @@ void main() {
     Future<String> seedPhoto(String name, DateTime time) async {
       final path = p.join(tmp.path, name);
       File(path).writeAsBytesSync(minimalJpeg());
-      await const JpegExifBackend()
-          .writeGps(path, latitude: 1, longitude: 1, dateTimeOriginal: time);
+      await const JpegExifBackend().writeGps(
+        path,
+        latitude: 1,
+        longitude: 1,
+        dateTimeOriginal: time,
+      );
       return path;
     }
 
@@ -125,35 +131,44 @@ void main() {
       return path;
     }
 
-    test('tags a photo from a matching GPX point; GPS readable after', () async {
-      // Naive EXIF time becomes UTC via the host's local zone (no offset).
-      final naive = DateTime(2026, 6, 22, 12, 0, 0);
-      final photo = await seedPhoto('img.jpg', naive);
-      final gpx = seedGpx(naive.toUtc());
+    test(
+      'tags a photo from a matching GPX point; GPS readable after',
+      () async {
+        // Naive EXIF time becomes UTC via the host's local zone (no offset).
+        final naive = DateTime(2026, 6, 22, 12, 0, 0);
+        final photo = await seedPhoto('img.jpg', naive);
+        final gpx = seedGpx(naive.toUtc());
 
+        final code = await run([
+          '--json',
+          'tag',
+          '-p',
+          tmp.path,
+          '-g',
+          gpx,
+          '--overwrite',
+          '--replace',
+        ]);
+
+        expect(code, ExitCodes.ok);
+        final done = lastJsonLine();
+        expect(done['event'], 'done');
+        expect((done['summary'] as Map)['tagged'], 1);
+
+        final meta = await const JpegExifBackend().read(photo);
+        expect(meta.hasGps, isTrue);
+      },
+    );
+
+    test('no photos -> bad_input (exit 3)', () async {
+      final empty = Directory(p.join(tmp.path, 'empty'))..createSync();
       final code = await run([
         '--json',
         'tag',
         '-p',
-        tmp.path,
-        '-g',
-        gpx,
+        empty.path,
         '--overwrite',
-        '--replace',
       ]);
-
-      expect(code, ExitCodes.ok);
-      final done = lastJsonLine();
-      expect(done['event'], 'done');
-      expect((done['summary'] as Map)['tagged'], 1);
-
-      final meta = await const JpegExifBackend().read(photo);
-      expect(meta.hasGps, isTrue);
-    });
-
-    test('no photos -> bad_input (exit 3)', () async {
-      final empty = Directory(p.join(tmp.path, 'empty'))..createSync();
-      final code = await run(['--json', 'tag', '-p', empty.path, '--overwrite']);
       expect(code, ExitCodes.badInput);
       expect(lastJsonLine()['code'], 'bad_input');
     });
@@ -204,8 +219,10 @@ void main() {
           .where((l) => l.trim().isNotEmpty)
           .map((l) => jsonDecode(l) as Map<String, Object?>)
           .toList();
-      final item =
-          lines.firstWhere((e) => e['event'] == 'item', orElse: () => {});
+      final item = lines.firstWhere(
+        (e) => e['event'] == 'item',
+        orElse: () => {},
+      );
       expect(item['status'], 'dry_run');
       expect(item['path'], endsWith('A.RAF'));
 
@@ -225,8 +242,12 @@ void main() {
     test('exif mode dry-run on a dated photo; exit 0', () async {
       final path = p.join(tmp.path, 'img.jpg');
       File(path).writeAsBytesSync(minimalJpeg());
-      await const JpegExifBackend().writeGps(path,
-          latitude: 1, longitude: 1, dateTimeOriginal: DateTime(2026, 6, 22, 12));
+      await const JpegExifBackend().writeGps(
+        path,
+        latitude: 1,
+        longitude: 1,
+        dateTimeOriginal: DateTime(2026, 6, 22, 12),
+      );
 
       final code = await run([
         '--json',
@@ -245,8 +266,14 @@ void main() {
 
     test('no photos -> bad_input (exit 3)', () async {
       final empty = Directory(p.join(tmp.path, 'empty'))..createSync();
-      final code = await run(
-          ['--json', 'fix-dates', '-p', empty.path, '--mode', 'exif']);
+      final code = await run([
+        '--json',
+        'fix-dates',
+        '-p',
+        empty.path,
+        '--mode',
+        'exif',
+      ]);
       expect(code, ExitCodes.badInput);
       expect(lastJsonLine()['code'], 'bad_input');
     });

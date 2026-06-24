@@ -44,9 +44,12 @@ class RunStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('${controller.done}/${controller.total}',
-                  style: text.bodyMedium?.copyWith(
-                      fontFeatures: AppTheme.tabular)),
+              Text(
+                '${controller.done}/${controller.total}',
+                style: text.bodyMedium?.copyWith(
+                  fontFeatures: AppTheme.tabular,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -143,11 +146,12 @@ class _ErrorBanner extends StatelessWidget {
           const Icon(Icons.error_outline, color: AppColors.danger),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(message,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppColors.danger)),
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+            ),
           ),
         ],
       ),

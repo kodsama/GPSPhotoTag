@@ -19,12 +19,15 @@ class PhotoMeta {
   final bool hasGps;
 
   /// A copy with selected fields replaced.
-  PhotoMeta copyWith({DateTime? captureNaive, Duration? offset, bool? hasGps}) =>
-      PhotoMeta(
-        captureNaive: captureNaive ?? this.captureNaive,
-        offset: offset ?? this.offset,
-        hasGps: hasGps ?? this.hasGps,
-      );
+  PhotoMeta copyWith({
+    DateTime? captureNaive,
+    Duration? offset,
+    bool? hasGps,
+  }) => PhotoMeta(
+    captureNaive: captureNaive ?? this.captureNaive,
+    offset: offset ?? this.offset,
+    hasGps: hasGps ?? this.hasGps,
+  );
 }
 
 /// Reads capture metadata from, and writes GPS into, one family of photo files.

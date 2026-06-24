@@ -6,7 +6,9 @@ import 'package:gpsphototag_gui/src/widgets/status_pill.dart';
 
 Future<Color> _pillTextColor(WidgetTester tester, PhotoStatus status) async {
   await tester.pumpWidget(
-    MaterialApp(home: Scaffold(body: Center(child: StatusPill(status)))),
+    MaterialApp(
+      home: Scaffold(body: Center(child: StatusPill(status))),
+    ),
   );
   final text = tester.widget<Text>(find.byType(Text));
   return text.style!.color!;
@@ -38,16 +40,15 @@ void main() {
       await _pillTextColor(tester, PhotoStatus.prunedDeleted),
       AppColors.terracottaDark,
     );
-    expect(
-      await _pillTextColor(tester, PhotoStatus.error),
-      AppColors.danger,
-    );
+    expect(await _pillTextColor(tester, PhotoStatus.error), AppColors.danger);
   });
 
   testWidgets('the wire name is shown with underscores spaced', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(body: Center(child: StatusPill(PhotoStatus.alreadyTagged))),
+        home: Scaffold(
+          body: Center(child: StatusPill(PhotoStatus.alreadyTagged)),
+        ),
       ),
     );
     expect(find.text('already tagged'), findsOneWidget);

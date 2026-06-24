@@ -145,7 +145,8 @@ class JpegExifBackend implements ExifBackend {
     if (gpsPtr != null) {
       final gpsOffset = gpsPtr.valueAsLong(bd, little);
       final gpsIfd = _readIfd(bd, gpsOffset, little);
-      hasGps = gpsIfd.containsKey(_tagGpsLatitude) &&
+      hasGps =
+          gpsIfd.containsKey(_tagGpsLatitude) &&
           gpsIfd.containsKey(_tagGpsLatitudeRef);
     }
 
@@ -265,10 +266,12 @@ class JpegExifBackend implements ExifBackend {
     }
 
     if (dateTimeOriginal != null) {
-      exifFields.add(_Field.ascii(
-        _tagDateTimeOriginal,
-        _formatExifDateTime(dateTimeOriginal),
-      ));
+      exifFields.add(
+        _Field.ascii(
+          _tagDateTimeOriginal,
+          _formatExifDateTime(dateTimeOriginal),
+        ),
+      );
     }
 
     final gpsFields = _buildGpsFields(latitude, longitude);
@@ -593,28 +596,27 @@ class _Field {
     required int type,
     required int count,
     required Uint8List rawValue,
-  }) =>
-      _Field._(tag: tag, type: type, count: count, rawValue: rawValue);
+  }) => _Field._(tag: tag, type: type, count: count, rawValue: rawValue);
 
   /// A single LONG value (used for IFD pointer entries).
   factory _Field.long(int tag, int value) {
     return _Field._(
-      tag: tag,
-      type: JpegExifBackend._typeLong,
-      count: 1,
-      rawValue: Uint8List(0),
-    )
+        tag: tag,
+        type: JpegExifBackend._typeLong,
+        count: 1,
+        rawValue: Uint8List(0),
+      )
       ..isPointer = true
       ..pointerValue = value;
   }
 
   /// A BYTE array field.
   factory _Field.bytes(int tag, Uint8List value) => _Field._(
-        tag: tag,
-        type: JpegExifBackend._typeByte,
-        count: value.length,
-        rawValue: value,
-      );
+    tag: tag,
+    type: JpegExifBackend._typeByte,
+    count: value.length,
+    rawValue: value,
+  );
 
   /// An ASCII field; a trailing NUL terminator is appended.
   factory _Field.ascii(int tag, String value) {
@@ -629,11 +631,11 @@ class _Field {
 
   /// A RATIONAL[n] field; bytes are written at serialization time per-endian.
   factory _Field.rationals(int tag, List<_Rational> values) => _Field._(
-        tag: tag,
-        type: JpegExifBackend._typeRational,
-        count: values.length,
-        rawValue: Uint8List(0),
-      )..rationals = values;
+    tag: tag,
+    type: JpegExifBackend._typeRational,
+    count: values.length,
+    rawValue: Uint8List(0),
+  )..rationals = values;
 
   final int tag;
   final int type;

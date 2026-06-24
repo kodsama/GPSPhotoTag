@@ -34,16 +34,20 @@ void main() {
   });
 
   test('item with a location renders coordinates and provenance', () {
-    human().add(const ItemEvent(PhotoRow(
-      path: '/photos/img.jpg',
-      status: PhotoStatus.tagged,
-      location: LocationResult(
-        latitude: 42.70771,
-        longitude: 18.34412,
-        source: GpsSource.gpx,
-        method: GpsMethod.exact,
+    human().add(
+      const ItemEvent(
+        PhotoRow(
+          path: '/photos/img.jpg',
+          status: PhotoStatus.tagged,
+          location: LocationResult(
+            latitude: 42.70771,
+            longitude: 18.34412,
+            source: GpsSource.gpx,
+            method: GpsMethod.exact,
+          ),
+        ),
       ),
-    )));
+    );
     expect(out.text, contains('img.jpg'));
     expect(out.text, contains('42.70771'));
     expect(out.text, contains('18.34412'));
@@ -51,11 +55,15 @@ void main() {
   });
 
   test('item without a location renders status and note only', () {
-    human().add(const ItemEvent(PhotoRow(
-      path: '/photos/skip.jpg',
-      status: PhotoStatus.alreadyTagged,
-      note: 'use replace to overwrite',
-    )));
+    human().add(
+      const ItemEvent(
+        PhotoRow(
+          path: '/photos/skip.jpg',
+          status: PhotoStatus.alreadyTagged,
+          note: 'use replace to overwrite',
+        ),
+      ),
+    );
     expect(out.text, contains('skip.jpg'));
     expect(out.text, contains('already_tagged'));
     expect(out.text, contains('use replace to overwrite'));

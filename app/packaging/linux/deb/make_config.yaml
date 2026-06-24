@@ -1,0 +1,19 @@
+# flutter_distributor .deb config.
+display_name: GPSPhotoTag
+package_name: gpsphototag
+maintainer:
+  name: Kodsama
+  email: support@kodsama.ai
+dependencies: []
+icon: ../../../../packaging/linux/icon_256.png
+generic_name: Photo GPS Tagger
+keywords:
+  - GPS
+  - EXIF
+  - Photo
+  - Geotag
+categories:
+  - Graphics
+  - Photography
+priority: optional
+section: graphics

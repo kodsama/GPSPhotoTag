@@ -38,10 +38,10 @@ List<McpTool> buildTools({
   bool exiftoolAvailable = true,
 }) {
   BackendRegistry registry(RawMode mode) => BackendRegistry(
-        runner: runner,
-        rawMode: mode,
-        exiftoolAvailable: exiftoolAvailable,
-      );
+    runner: runner,
+    rawMode: mode,
+    exiftoolAvailable: exiftoolAvailable,
+  );
 
   return [
     McpTool(
@@ -70,12 +70,14 @@ List<McpTool> buildTools({
           },
           'out': {
             'type': 'string',
-            'description': 'Output directory; copies originals. Omit to tag in '
+            'description':
+                'Output directory; copies originals. Omit to tag in '
                 'place (then set overwrite=true).',
           },
           'overwrite': {
             'type': 'boolean',
-            'description': 'Modify originals in place (required when out unset).',
+            'description':
+                'Modify originals in place (required when out unset).',
           },
           'replace': {
             'type': 'boolean',
@@ -88,7 +90,8 @@ List<McpTool> buildTools({
           },
           'max_time_diff': {
             'type': 'integer',
-            'description': 'Max seconds between photo time and a fix (def 300).',
+            'description':
+                'Max seconds between photo time and a fix (def 300).',
           },
           'timezone': {
             'type': 'string',
@@ -116,29 +119,34 @@ List<McpTool> buildTools({
             'error': 'no location source: provide gpx and/or maps_history',
           };
         }
-        final mode = RawMode.values
-            .byName((args['raw_mode'] as String?) ?? 'auto');
+        final mode = RawMode.values.byName(
+          (args['raw_mode'] as String?) ?? 'auto',
+        );
         final options = TagOptions(
           outDir: args['out'] as String?,
           overwrite: args['overwrite'] as bool? ?? false,
           replace: args['replace'] as bool? ?? false,
           rawMode: mode,
-          maxTimeDiff:
-              Duration(seconds: (args['max_time_diff'] as num?)?.toInt() ?? 300),
+          maxTimeDiff: Duration(
+            seconds: (args['max_time_diff'] as num?)?.toInt() ?? 300,
+          ),
           timezone: args['timezone'] as String?,
           dryRun: args['dry_run'] as bool? ?? false,
         );
-        return collectResult(TagService(registry: registry(mode)).tag(
-          photos: photos,
-          gpx: sources.gpx,
-          google: sources.google,
-          options: options,
-        ));
+        return collectResult(
+          TagService(registry: registry(mode)).tag(
+            photos: photos,
+            gpx: sources.gpx,
+            google: sources.google,
+            options: options,
+          ),
+        );
       },
     ),
     McpTool(
       name: 'render_heatmap',
-      description: 'Render a density-heatmap PNG of where photos were taken '
+      description:
+          'Render a density-heatmap PNG of where photos were taken '
           '(reads existing GPS; read-only). Needs exiftool to read coordinates.',
       inputSchema: {
         'type': 'object',
@@ -166,17 +174,25 @@ List<McpTool> buildTools({
             'error': 'photos and out are required',
           };
         }
-        final service =
-            MapService(runner: runner, exiftoolAvailable: exiftoolAvailable);
-        return collectResult(service.render(
-          photos,
-          MapOptions(outputPng: out, dpi: (args['dpi'] as num?)?.toInt() ?? 200),
-        ));
+        final service = MapService(
+          runner: runner,
+          exiftoolAvailable: exiftoolAvailable,
+        );
+        return collectResult(
+          service.render(
+            photos,
+            MapOptions(
+              outputPng: out,
+              dpi: (args['dpi'] as num?)?.toInt() ?? 200,
+            ),
+          ),
+        );
       },
     ),
     McpTool(
       name: 'prune_raw',
-      description: 'Move RAW files that have no same-name JPG/HEIC companion '
+      description:
+          'Move RAW files that have no same-name JPG/HEIC companion '
           '(anywhere in the tree) to the Trash, or delete them.',
       inputSchema: {
         'type': 'object',
@@ -199,18 +215,21 @@ List<McpTool> buildTools({
         if (roots.isEmpty) {
           return {'ok': false, 'code': 'bad_input', 'error': 'roots required'};
         }
-        return collectResult(Pruner(trash: const SystemTrash()).prune(
-          roots,
-          PruneOptions(
-            delete: args['delete'] as bool? ?? false,
-            dryRun: args['dry_run'] as bool? ?? false,
+        return collectResult(
+          Pruner(trash: const SystemTrash()).prune(
+            roots,
+            PruneOptions(
+              delete: args['delete'] as bool? ?? false,
+              dryRun: args['dry_run'] as bool? ?? false,
+            ),
           ),
-        ));
+        );
       },
     ),
     McpTool(
       name: 'fix_dates',
-      description: "Realign dates. mode 'exif': file date <- EXIF; mode 'file': "
+      description:
+          "Realign dates. mode 'exif': file date <- EXIF; mode 'file': "
           'EXIF capture date <- file date.',
       inputSchema: {
         'type': 'object',
@@ -224,7 +243,8 @@ List<McpTool> buildTools({
           'mode': {
             'type': 'string',
             'enum': ['exif', 'file'],
-            'description': "'exif': file date <- EXIF; 'file': EXIF <- file date.",
+            'description':
+                "'exif': file date <- EXIF; 'file': EXIF <- file date.",
           },
           'dry_run': {'type': 'boolean', 'description': 'Report only.'},
         },
@@ -243,16 +263,19 @@ List<McpTool> buildTools({
           exif: DispatchingExifBackend(registry(RawMode.auto)),
           runner: runner,
         );
-        return collectResult(dater.fixDates(
-          photos,
-          FixDatesMode.values.byName(modeName),
-          dryRun: args['dry_run'] as bool? ?? false,
-        ));
+        return collectResult(
+          dater.fixDates(
+            photos,
+            FixDatesMode.values.byName(modeName),
+            dryRun: args['dry_run'] as bool? ?? false,
+          ),
+        );
       },
     ),
     McpTool(
       name: 'check_toolkit',
-      description: 'Report external tools (exiftool, libheif, package manager): '
+      description:
+          'Report external tools (exiftool, libheif, package manager): '
           'presence, version, purpose, and install command.',
       inputSchema: const {'type': 'object', 'properties': {}},
       run: (args) async {
@@ -265,7 +288,8 @@ List<McpTool> buildTools({
     ),
     McpTool(
       name: 'get_capabilities',
-      description: 'Describe supported formats, location sources, and the RAW '
+      description:
+          'Describe supported formats, location sources, and the RAW '
           'write modes available in this environment.',
       inputSchema: const {'type': 'object', 'properties': {}},
       run: (args) async => {
@@ -276,7 +300,9 @@ List<McpTool> buildTools({
           'raw': exiftoolAvailable
               ? 'XMP sidecar or exiftool embed'
               : 'XMP sidecar only (exiftool not found)',
-          'heic': exiftoolAvailable ? 'exiftool' : 'unavailable (need exiftool)',
+          'heic': exiftoolAvailable
+              ? 'exiftool'
+              : 'unavailable (need exiftool)',
         },
         'sources': ['gpx', 'google_records', 'google_timeline', 'google_kml'],
         'raw_modes': ['auto', 'sidecar', 'embed'],

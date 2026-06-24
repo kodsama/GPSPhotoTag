@@ -11,13 +11,21 @@ class PruneCommand extends Command<int> {
   // ignore: prefer_initializing_formals
   PruneCommand({IOSink? sink}) : _sink = sink {
     argParser
-      ..addMultiOption('photo',
-          abbr: 'p', help: 'Root file or directory to scan (repeatable).')
-      ..addFlag('rm',
-          negatable: false,
-          help: 'Permanently delete orphans instead of moving to Trash.')
-      ..addFlag('dry-run',
-          negatable: false, help: 'Report only; remove nothing.');
+      ..addMultiOption(
+        'photo',
+        abbr: 'p',
+        help: 'Root file or directory to scan (repeatable).',
+      )
+      ..addFlag(
+        'rm',
+        negatable: false,
+        help: 'Permanently delete orphans instead of moving to Trash.',
+      )
+      ..addFlag(
+        'dry-run',
+        negatable: false,
+        help: 'Report only; remove nothing.',
+      );
   }
 
   final IOSink? _sink;
@@ -32,19 +40,26 @@ class PruneCommand extends Command<int> {
   @override
   Future<int> run() async {
     final out = CliOutput(
-        json: globalResults!.flag('json'), sink: _sink, errorSink: _sink);
+      json: globalResults!.flag('json'),
+      sink: _sink,
+      errorSink: _sink,
+    );
     final roots = argResults!.multiOption('photo');
     if (roots.isEmpty) {
-      out.add(const ErrorEvent('no roots given for --photo', code: 'bad_input'));
+      out.add(
+        const ErrorEvent('no roots given for --photo', code: 'bad_input'),
+      );
       return out.exitCode;
     }
     final pruner = Pruner(trash: const SystemTrash());
-    return out.consume(pruner.prune(
-      roots,
-      PruneOptions(
-        delete: argResults!.flag('rm'),
-        dryRun: argResults!.flag('dry-run'),
+    return out.consume(
+      pruner.prune(
+        roots,
+        PruneOptions(
+          delete: argResults!.flag('rm'),
+          dryRun: argResults!.flag('dry-run'),
+        ),
       ),
-    ));
+    );
   }
 }

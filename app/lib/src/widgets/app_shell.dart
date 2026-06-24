@@ -56,10 +56,7 @@ class _AppShellState extends State<AppShell> {
       ),
       floatingActionButton: _logOpen
           ? null
-          : _LogButton(
-              unread: controller.unreadCount,
-              onPressed: _toggleLog,
-            ),
+          : _LogButton(unread: controller.unreadCount, onPressed: _toggleLog),
     );
   }
 }
@@ -89,8 +86,11 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('GPSPhotoTag', style: text.headlineSmall),
-                Text('Geotag your photos from GPX & Google location history',
-                    style: text.bodySmall, overflow: TextOverflow.ellipsis),
+                Text(
+                  'Geotag your photos from GPX & Google location history',
+                  style: text.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -121,15 +121,15 @@ class _McpChip extends StatelessWidget {
       builder: (context, _) {
         final (Color color, String label, String tip) = switch (mcp) {
           _ when mcp.running => (
-              AppColors.success,
-              'MCP :${mcp.port}',
-              'LLM endpoint live on 127.0.0.1:${mcp.port} (MCP over TCP)',
-            ),
+            AppColors.success,
+            'MCP :${mcp.port}',
+            'LLM endpoint live on 127.0.0.1:${mcp.port} (MCP over TCP)',
+          ),
           _ when mcp.error != null => (
-              AppColors.danger,
-              'MCP off',
-              'MCP server failed to start: ${mcp.error}',
-            ),
+            AppColors.danger,
+            'MCP off',
+            'MCP server failed to start: ${mcp.error}',
+          ),
           _ => (AppColors.warning, 'MCP …', 'Starting MCP server…'),
         };
         return Tooltip(
@@ -141,15 +141,21 @@ class _McpChip extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: scheme.outline),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 7),
-              Text(label, style: Theme.of(context).textTheme.labelMedium),
-            ]),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Text(label, style: Theme.of(context).textTheme.labelMedium),
+              ],
+            ),
           ),
         );
       },

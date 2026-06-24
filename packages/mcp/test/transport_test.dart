@@ -15,8 +15,9 @@ class _FakeRunner implements ProcessRunner {
   }
 }
 
-McpServer _server() =>
-    McpServer(tools: buildTools(runner: _FakeRunner(), exiftoolAvailable: true));
+McpServer _server() => McpServer(
+  tools: buildTools(runner: _FakeRunner(), exiftoolAvailable: true),
+);
 
 void main() {
   group('processLine', () {
@@ -61,10 +62,7 @@ void main() {
       // Collect newline-delimited responses as they arrive.
       final responses = <Map<String, Object?>>[];
       final gotThree = Completer<void>();
-      utf8.decoder
-          .bind(socket)
-          .transform(const LineSplitter())
-          .listen((line) {
+      utf8.decoder.bind(socket).transform(const LineSplitter()).listen((line) {
         if (line.trim().isEmpty) return;
         responses.add(jsonDecode(line) as Map<String, Object?>);
         if (responses.length == 3 && !gotThree.isCompleted) {
@@ -72,18 +70,25 @@ void main() {
         }
       });
 
-      socket.writeln(jsonEncode({
-        'jsonrpc': '2.0',
-        'id': 1,
-        'method': 'initialize',
-        'params': {'protocolVersion': '2025-06-18'},
-      }));
-      socket.writeln(jsonEncode({
-        'jsonrpc': '2.0',
-        'id': 2,
-        'method': 'tools/call',
-        'params': {'name': 'get_capabilities', 'arguments': <String, Object?>{}},
-      }));
+      socket.writeln(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'initialize',
+          'params': {'protocolVersion': '2025-06-18'},
+        }),
+      );
+      socket.writeln(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'id': 2,
+          'method': 'tools/call',
+          'params': {
+            'name': 'get_capabilities',
+            'arguments': <String, Object?>{},
+          },
+        }),
+      );
       // Malformed line -> parse error.
       socket.writeln('{bogus');
       await socket.flush();
@@ -91,8 +96,10 @@ void main() {
       await gotThree.future.timeout(const Duration(seconds: 5));
 
       final init = responses.firstWhere((r) => r['id'] == 1);
-      expect((init['result'] as Map<String, Object?>)['protocolVersion'],
-          '2025-06-18');
+      expect(
+        (init['result'] as Map<String, Object?>)['protocolVersion'],
+        '2025-06-18',
+      );
 
       final call = responses.firstWhere((r) => r['id'] == 2);
       final result = call['result'] as Map<String, Object?>;
@@ -111,10 +118,7 @@ void main() {
       addTearDown(() => socket.destroy());
 
       final firstLine = Completer<Map<String, Object?>>();
-      utf8.decoder
-          .bind(socket)
-          .transform(const LineSplitter())
-          .listen((line) {
+      utf8.decoder.bind(socket).transform(const LineSplitter()).listen((line) {
         if (line.trim().isEmpty) return;
         if (!firstLine.isCompleted) {
           firstLine.complete(jsonDecode(line) as Map<String, Object?>);
@@ -124,8 +128,9 @@ void main() {
       socket.writeln('123');
       await socket.flush();
 
-      final response =
-          await firstLine.future.timeout(const Duration(seconds: 5));
+      final response = await firstLine.future.timeout(
+        const Duration(seconds: 5),
+      );
       expect((response['error'] as Map<String, Object?>)['code'], -32600);
     });
 

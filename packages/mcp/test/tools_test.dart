@@ -17,9 +17,10 @@ class _FakeRunner implements ProcessRunner {
   }
 }
 
-McpTool _tool(String name, {bool exiftoolAvailable = false}) =>
-    buildTools(runner: _FakeRunner(), exiftoolAvailable: exiftoolAvailable)
-        .firstWhere((t) => t.name == name);
+McpTool _tool(String name, {bool exiftoolAvailable = false}) => buildTools(
+  runner: _FakeRunner(),
+  exiftoolAvailable: exiftoolAvailable,
+).firstWhere((t) => t.name == name);
 
 void main() {
   late Directory tmp;
@@ -30,8 +31,12 @@ void main() {
   Future<String> seededJpeg(String name, DateTime dt) async {
     final path = '${tmp.path}/$name';
     File(path).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
-    await const JpegExifBackend()
-        .writeGps(path, latitude: 0, longitude: 0, dateTimeOriginal: dt);
+    await const JpegExifBackend().writeGps(
+      path,
+      latitude: 0,
+      longitude: 0,
+      dateTimeOriginal: dt,
+    );
     return path;
   }
 
@@ -137,19 +142,27 @@ void main() {
 
   group('get_capabilities', () {
     test('reflects exiftoolAvailable=true', () async {
-      final result = await _tool('get_capabilities', exiftoolAvailable: true)
-          .run({});
+      final result = await _tool(
+        'get_capabilities',
+        exiftoolAvailable: true,
+      ).run({});
       expect(result['exiftool_available'], isTrue);
-      expect((result['formats'] as Map<String, Object?>)['heic'],
-          contains('exiftool'));
+      expect(
+        (result['formats'] as Map<String, Object?>)['heic'],
+        contains('exiftool'),
+      );
     });
 
     test('reflects exiftoolAvailable=false', () async {
-      final result = await _tool('get_capabilities', exiftoolAvailable: false)
-          .run({});
+      final result = await _tool(
+        'get_capabilities',
+        exiftoolAvailable: false,
+      ).run({});
       expect(result['exiftool_available'], isFalse);
-      expect((result['formats'] as Map<String, Object?>)['heic'],
-          contains('unavailable'));
+      expect(
+        (result['formats'] as Map<String, Object?>)['heic'],
+        contains('unavailable'),
+      );
     });
   });
 }
