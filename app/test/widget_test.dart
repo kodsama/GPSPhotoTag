@@ -43,8 +43,8 @@ void main() {
 
     expect(find.text('GPSPhotoTag'), findsOneWidget);
     expect(find.text('Toolkit'), findsOneWidget);
-    // The toolkit step body shows the seeded tool row.
-    expect(find.text('ExifTool'), findsOneWidget);
+    // Unbundled fallback path: a found exiftool shows the ready banner.
+    expect(find.textContaining('ExifTool found on PATH'), findsOneWidget);
   });
 
   testWidgets('exactly one step card is expanded (shows Continue)', (
@@ -59,26 +59,28 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
   });
 
-  testWidgets('toolkit step lists multiple tool rows from seeded results', (
-    tester,
-  ) async {
-    final controller = AppController()
-      ..debugSetToolkit([
-        _tool('exiftool', 'ExifTool', version: '12.0'),
-        _tool(
-          'libheif',
-          'libheif',
-          present: false,
-          installCommand: 'brew install libheif',
-        ),
-      ]);
+  testWidgets('bundled exiftool shows the ready confirmation', (tester) async {
+    final controller = AppController(exiftoolBundleDir: '/app/exiftool')
+      ..debugSetBundleVerify(version: '13.55');
     await _pumpApp(tester, controller);
 
     expect(find.byType(ToolkitStep), findsOneWidget);
-    expect(find.text('ExifTool'), findsOneWidget);
-    expect(find.text('libheif'), findsOneWidget);
-    // Missing + installable tool gets an Install button.
-    expect(find.widgetWithText(OutlinedButton, 'Install'), findsOneWidget);
+    expect(find.textContaining('exiftool bundled (v13.55)'), findsOneWidget);
+    // Bundled exiftool means RAW/HEIC are available and Continue is enabled.
+    expect(controller.exiftoolAvailable, isTrue);
+    expect(controller.isStepSatisfied(WizardStep.toolkit), isTrue);
+  });
+
+  testWidgets('bundled exiftool that cannot run shows a Perl note', (
+    tester,
+  ) async {
+    final controller = AppController(exiftoolBundleDir: '/app/exiftool')
+      ..debugSetBundleVerify(failed: true);
+    await _pumpApp(tester, controller);
+
+    expect(find.textContaining('need Perl'), findsOneWidget);
+    // Still bundled, so the step is satisfiable and the user can continue.
+    expect(controller.isStepSatisfied(WizardStep.toolkit), isTrue);
   });
 
   testWidgets('activity-log panel opens on FAB tap and shows entries', (
@@ -125,67 +127,29 @@ void main() {
 
     expect(controller.toolkitLoading, isFalse);
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text('ExifTool'), findsOneWidget);
+    expect(find.textContaining('ExifTool found on PATH'), findsOneWidget);
   });
 
-  testWidgets('toolkit warning banner shows when exiftool is missing', (
-    tester,
-  ) async {
-    final controller = AppController()
-      ..debugSetToolkit([_tool('exiftool', 'ExifTool', present: false)]);
-    await _pumpApp(tester, controller);
+  testWidgets(
+    'unbundled warning banner shows when exiftool is missing from PATH',
+    (tester) async {
+      final controller = AppController()
+        ..debugSetToolkit([_tool('exiftool', 'ExifTool', present: false)]);
+      await _pumpApp(tester, controller);
 
-    expect(controller.exiftoolAvailable, isFalse);
-    expect(find.textContaining('ExifTool is missing'), findsOneWidget);
-  });
+      expect(controller.exiftoolAvailable, isFalse);
+      expect(find.textContaining('not found on PATH'), findsOneWidget);
+    },
+  );
 
-  testWidgets('toolkit success banner shows when exiftool is present', (
+  testWidgets('unbundled success banner shows when exiftool is on PATH', (
     tester,
   ) async {
     final controller = AppController()
       ..debugSetToolkit([_tool('exiftool', 'ExifTool')]);
     await _pumpApp(tester, controller);
 
-    expect(find.textContaining('All capabilities available'), findsOneWidget);
-  });
-
-  testWidgets('tapping Install runs the install flow and re-probes', (
-    tester,
-  ) async {
-    var probes = 0;
-    // After install, the re-probe returns libheif now present.
-    final controller =
-        AppController(
-          probeToolkit: () async {
-            probes++;
-            return [_tool('libheif', 'libheif')];
-          },
-        )..debugSetToolkit([
-          _tool(
-            'libheif',
-            'libheif',
-            present: false,
-            // A harmless no-op command so the install attempt is fast and does
-            // not change the host; the flow then re-probes via runToolkitCheck.
-            installCommand: 'true',
-          ),
-        ]);
-    await _pumpApp(tester, controller);
-
-    // The install flow runs a real (fast) subprocess then re-probes; let real
-    // async work run to completion via runAsync, then pump to flush the rebuild.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Install'));
-      while (probes == 0) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-    });
-    await tester.pumpAndSettle();
-
-    // The re-probe ran and the seeded "missing" libheif is now reported present.
-    expect(probes, 1);
-    expect(controller.toolkit.single.present, isTrue);
-    expect(find.widgetWithText(OutlinedButton, 'Install'), findsNothing);
+    expect(find.textContaining('ExifTool found on PATH'), findsOneWidget);
   });
 
   testWidgets('completed steps collapse to a tappable row with Edit', (

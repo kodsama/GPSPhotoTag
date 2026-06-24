@@ -44,6 +44,8 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      # Vendor exiftool so the app's declared bundle asset exists for the build.
+      - run: bash tool/fetch-exiftool.sh
 
       - name: Build APK (obfuscated)
         working-directory: app
@@ -97,6 +99,8 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      # Vendor exiftool so the app's declared bundle asset exists for the build.
+      - run: bash tool/fetch-exiftool.sh
 
       - name: Build IPA (unsigned, obfuscated)
         working-directory: app
@@ -153,6 +157,8 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      # Vendor exiftool so the app's declared bundle asset exists for the build.
+      - run: bash tool/fetch-exiftool.sh
 
       - name: Build macOS app (obfuscated)
         working-directory: app
@@ -212,6 +218,14 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      # Vendor exiftool so the app's declared bundle assets exist for the build.
+      # TODO(windows): ship a self-contained exiftool.exe here instead of the
+      # Perl distribution; the `perl -ver` self-check does not hold on Windows,
+      # so this step is best-effort (the app falls back to PATH exiftool).
+      - name: Vendor bundled exiftool (best-effort on Windows)
+        shell: bash
+        continue-on-error: true
+        run: bash tool/fetch-exiftool.sh
 
       - name: Build Windows app (obfuscated)
         working-directory: app
@@ -297,6 +311,8 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
+      # Vendor exiftool so the app's declared bundle asset exists for the build.
+      - run: bash tool/fetch-exiftool.sh
 
       - name: Build Linux app (obfuscated)
         working-directory: app

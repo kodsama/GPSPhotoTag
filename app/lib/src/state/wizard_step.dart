@@ -3,8 +3,8 @@
 /// Each step renders as a collapsible card; exactly one is active (expanded) at
 /// a time and earlier completed steps collapse to a single tappable row.
 enum WizardStep {
-  /// Probe the machine for optional external tools (exiftool, libheif).
-  toolkit('Toolkit', 'Check the optional tools that unlock RAW & HEIC.'),
+  /// Confirm the bundled exiftool (which powers RAW-embed & HEIC) is ready.
+  toolkit('Toolkit', 'Confirm the bundled photo tools are ready.'),
 
   /// Pick the folder of photos to tag.
   input('Photos', 'Choose the folder of photos to geotag.'),

@@ -282,7 +282,7 @@ List<McpTool> buildTools({
     McpTool(
       name: 'check_toolkit',
       description:
-          'Report external tools (exiftool, libheif, package manager): '
+          'Report exiftool status (HEIC and RAW-embed run via exiftool): '
           'presence, version, purpose, and install command.',
       inputSchema: const {'type': 'object', 'properties': {}},
       run: (args) async {

@@ -15,11 +15,16 @@ import 'engine_runner.dart';
 class IsolateRunner implements EngineRunner {
   /// Creates a runner. [exiftoolAvailable] is detected once on the UI side and
   /// passed in so workers skip a redundant probe; pass null to let each worker
-  /// probe for itself.
-  const IsolateRunner({this.exiftoolAvailable});
+  /// probe for itself. [exiftoolBundleDir] is the on-disk directory of the
+  /// app-bundled exiftool (null = use whatever is on `PATH`); each worker builds
+  /// its own [ExiftoolRunner] from it since runners aren't isolate-sendable.
+  const IsolateRunner({this.exiftoolAvailable, this.exiftoolBundleDir});
 
   /// Whether exiftool was detected; null means "detect inside the worker".
   final bool? exiftoolAvailable;
+
+  /// On-disk dir of the bundled exiftool, or null to use `PATH`.
+  final String? exiftoolBundleDir;
 
   /// Tags [photos] using GPS read from [gpxFiles] and [googleFiles].
   @override
@@ -37,6 +42,7 @@ class IsolateRunner implements EngineRunner {
       googleFiles: googleFiles,
       options: options,
       exiftoolAvailable: exiftoolAvailable,
+      bundleDir: exiftoolBundleDir,
     ),
   );
 
@@ -52,6 +58,7 @@ class IsolateRunner implements EngineRunner {
       photos: photos,
       options: options,
       exiftoolAvailable: exiftoolAvailable,
+      bundleDir: exiftoolBundleDir,
     ),
   );
 
@@ -79,6 +86,7 @@ class IsolateRunner implements EngineRunner {
       mode: mode,
       dryRun: dryRun,
       exiftoolAvailable: exiftoolAvailable,
+      bundleDir: exiftoolBundleDir,
     ),
   );
 
@@ -125,6 +133,7 @@ class _TagRequest {
     required this.googleFiles,
     required this.options,
     required this.exiftoolAvailable,
+    required this.bundleDir,
   });
 
   final SendPort port;
@@ -133,6 +142,7 @@ class _TagRequest {
   final List<String> googleFiles;
   final TagOptions options;
   final bool? exiftoolAvailable;
+  final String? bundleDir;
 }
 
 class _MapRequest {
@@ -141,12 +151,14 @@ class _MapRequest {
     required this.photos,
     required this.options,
     required this.exiftoolAvailable,
+    required this.bundleDir,
   });
 
   final SendPort port;
   final List<String> photos;
   final MapOptions options;
   final bool? exiftoolAvailable;
+  final String? bundleDir;
 }
 
 class _PruneRequest {
@@ -168,6 +180,7 @@ class _FixDatesRequest {
     required this.mode,
     required this.dryRun,
     required this.exiftoolAvailable,
+    required this.bundleDir,
   });
 
   final SendPort port;
@@ -175,6 +188,7 @@ class _FixDatesRequest {
   final FixDatesMode mode;
   final bool dryRun;
   final bool? exiftoolAvailable;
+  final String? bundleDir;
 }
 
 // --- Worker entry points (top-level, run on the spawned isolate) -----------
@@ -185,6 +199,15 @@ Future<bool> _resolveExiftool(bool? passed) async {
   final tools = await ToolkitChecker(const SystemProcessRunner()).check();
   return tools.any((t) => t.id == 'exiftool' && t.present);
 }
+
+/// Builds the runner for a worker: a plain system runner when no bundle dir is
+/// known, otherwise one that routes `exiftool` to the bundled copy.
+ProcessRunner _buildRunner(String? bundleDir) => bundleDir == null
+    ? const SystemProcessRunner()
+    : ExiftoolRunner(
+        const SystemProcessRunner(),
+        ExiftoolInvocation.resolve(bundleDir),
+      );
 
 /// Reads and parses every GPX file into a flat, time-sorted point list.
 List<TimedPoint> _loadGpx(List<String> files) {
@@ -223,8 +246,9 @@ Future<void> _pump(SendPort port, Stream<EngineEvent> events) async {
 Future<void> _tagEntry(_TagRequest req) async {
   try {
     final exiftool = await _resolveExiftool(req.exiftoolAvailable);
+    final runner = _buildRunner(req.bundleDir);
     final registry = BackendRegistry(
-      runner: const SystemProcessRunner(),
+      runner: runner,
       rawMode: req.options.rawMode,
       exiftoolAvailable: exiftool,
     );
@@ -244,7 +268,7 @@ Future<void> _mapEntry(_MapRequest req) async {
   try {
     final exiftool = await _resolveExiftool(req.exiftoolAvailable);
     final service = MapService(
-      runner: const SystemProcessRunner(),
+      runner: _buildRunner(req.bundleDir),
       exiftoolAvailable: exiftool,
     );
     await _pump(req.port, service.render(req.photos, req.options));
@@ -267,14 +291,12 @@ Future<void> _pruneEntry(_PruneRequest req) async {
 Future<void> _fixDatesEntry(_FixDatesRequest req) async {
   try {
     final exiftool = await _resolveExiftool(req.exiftoolAvailable);
+    final runner = _buildRunner(req.bundleDir);
     final registry = BackendRegistry(
-      runner: const SystemProcessRunner(),
+      runner: runner,
       exiftoolAvailable: exiftool,
     );
-    final dater = Dater(
-      exif: DispatchingExifBackend(registry),
-      runner: const SystemProcessRunner(),
-    );
+    final dater = Dater(exif: DispatchingExifBackend(registry), runner: runner);
     await _pump(
       req.port,
       dater.fixDates(req.files, req.mode, dryRun: req.dryRun),

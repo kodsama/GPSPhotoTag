@@ -15,7 +15,7 @@ class ToolStatus {
     this.installCommand,
   });
 
-  /// Stable identifier: `'exiftool'`, `'libheif'`, or `'package_manager'`.
+  /// Stable identifier. Currently only `'exiftool'`.
   final String id;
 
   /// Human-readable display name.
@@ -48,13 +48,13 @@ class ToolStatus {
   };
 }
 
-/// Probes the machine for the external tools GPSPhotoTag can take advantage of.
+/// Probes the machine for exiftool, the one external tool GPSPhotoTag can use.
 ///
-/// The pure-Dart JPEG/PNG tagging path always works; this checker reports the
-/// optional binaries (exiftool, libheif) that unlock RAW-embed and HEIC, plus
-/// the system package manager used to install them. Detection logic is driven
-/// through an injected [ProcessRunner] so it can be tested without the real
-/// binaries.
+/// The pure-Dart JPEG/PNG tagging path always works without any tools. ExifTool
+/// unlocks RAW-embed and HEIC; the desktop app bundles its own copy, so a probe
+/// here is only meaningful for the CLI/MCP (which use whatever is on `PATH`).
+/// Detection is driven through an injected [ProcessRunner] so it can be tested
+/// without the real binary.
 class ToolkitChecker {
   /// Creates a checker that probes via [_runner].
   ToolkitChecker(this._runner);
@@ -62,19 +62,13 @@ class ToolkitChecker {
   final ProcessRunner _runner;
 
   /// Probes every known tool. Never throws: a missing binary => `present:false`.
-  Future<List<ToolStatus>> check() async => [
-    await _checkExiftool(),
-    await _checkLibheif(),
-    await _checkPackageManager(),
-  ];
+  Future<List<ToolStatus>> check() async => [await _checkExiftool()];
 
   /// True when RAW GPS embedding is possible (requires exiftool).
   bool canEmbedRaw(List<ToolStatus> statuses) => _present(statuses, 'exiftool');
 
-  /// True when HEIC/HEIF decoding is possible (requires either exiftool or
-  /// libheif).
-  bool canHeic(List<ToolStatus> statuses) =>
-      _present(statuses, 'exiftool') || _present(statuses, 'libheif');
+  /// True when HEIC/HEIF decoding is possible (requires exiftool).
+  bool canHeic(List<ToolStatus> statuses) => _present(statuses, 'exiftool');
 
   bool _present(List<ToolStatus> statuses, String id) =>
       statuses.any((s) => s.id == id && s.present);
@@ -104,86 +98,6 @@ class ToolkitChecker {
     );
   }
 
-  Future<ToolStatus> _checkLibheif() async {
-    String? version;
-    var present = false;
-    try {
-      final dec = await _runner.run('heif-dec', const ['--version']);
-      if (dec.ok) {
-        present = true;
-        version = _parseVersion(dec.stdout);
-      }
-    } on Object {
-      present = false;
-    }
-    if (!present) {
-      try {
-        // `heif-convert -h` exits non-zero on some builds but still proves the
-        // binary is installed and runnable.
-        await _runner.run('heif-convert', const ['-h']);
-        present = true;
-      } on Object {
-        present = false;
-      }
-    }
-    return ToolStatus(
-      id: 'libheif',
-      name: 'libheif',
-      present: present,
-      version: version,
-      purpose: 'Decode HEIC/HEIF for reading and previews.',
-      required: false,
-      installCommand: _libheifInstall(),
-    );
-  }
-
-  Future<ToolStatus> _checkPackageManager() async {
-    final probes = _packageManagerProbes();
-    String? version;
-    var present = false;
-    for (final probe in probes) {
-      try {
-        final result = await _runner.run(probe.executable, probe.args);
-        if (result.ok) {
-          present = true;
-          version = _parseVersion(result.stdout);
-          break;
-        }
-      } on Object {
-        // Try the next candidate.
-      }
-    }
-    return ToolStatus(
-      id: 'package_manager',
-      name: 'Package manager',
-      present: present,
-      version: version,
-      purpose: 'Used to auto-install the tools above.',
-      required: false,
-      installCommand: null,
-    );
-  }
-
-  List<_Probe> _packageManagerProbes() {
-    if (Platform.isMacOS) {
-      return const [
-        _Probe('brew', ['--version']),
-      ];
-    }
-    if (Platform.isLinux) {
-      return const [
-        _Probe('apt', ['--version']),
-        _Probe('apt-get', ['--version']),
-      ];
-    }
-    if (Platform.isWindows) {
-      return const [
-        _Probe('winget', ['--version']),
-      ];
-    }
-    return const [];
-  }
-
   String? _exiftoolInstall() {
     if (Platform.isMacOS) return 'brew install exiftool';
     if (Platform.isLinux) return 'sudo apt install libimage-exiftool-perl';
@@ -191,12 +105,6 @@ class ToolkitChecker {
       return 'winget install -e --id OliverBetz.ExifTool';
     }
     return null;
-  }
-
-  String? _libheifInstall() {
-    if (Platform.isMacOS) return 'brew install libheif';
-    if (Platform.isLinux) return 'sudo apt install libheif-examples';
-    return null; // Windows: no maintained CLI package.
   }
 
   /// Extracts a version-looking token from [output], falling back to the full
@@ -213,12 +121,4 @@ class ToolkitChecker {
     }
     return trimmed;
   }
-}
-
-/// A single executable+args invocation candidate.
-class _Probe {
-  const _Probe(this.executable, this.args);
-
-  final String executable;
-  final List<String> args;
 }

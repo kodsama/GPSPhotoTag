@@ -1,29 +1,39 @@
 import 'package:flutter/material.dart';
 
+import 'src/engine/exiftool_bundle.dart';
 import 'src/state/app_controller.dart';
 import 'src/state/controller_scope.dart';
 import 'src/theme/app_theme.dart';
 import 'src/widgets/app_shell.dart';
 
-void main() => runApp(const GpsPhotoTagApp());
+void main() =>
+    runApp(GpsPhotoTagApp(exiftoolBundleDir: locateBundledExiftool()));
 
 /// Root of the GPSPhotoTag desktop GUI.
 ///
 /// Owns the single [AppController], publishes it to the tree via
 /// [ControllerScope], and rebuilds [MaterialApp] when the theme mode changes.
 class GpsPhotoTagApp extends StatefulWidget {
-  /// Creates the app, optionally with an injected [controller] (tests).
-  const GpsPhotoTagApp({super.key, this.controller});
+  /// Creates the app, optionally with an injected [controller] (tests). When no
+  /// controller is injected, builds one wired to the bundled [exiftoolBundleDir]
+  /// located in `main`.
+  const GpsPhotoTagApp({super.key, this.controller, this.exiftoolBundleDir});
 
   /// The controller to use; a fresh one is created when null.
   final AppController? controller;
+
+  /// On-disk dir of the bundled exiftool, forwarded into a freshly built
+  /// controller (ignored when [controller] is injected).
+  final String? exiftoolBundleDir;
 
   @override
   State<GpsPhotoTagApp> createState() => _GpsPhotoTagAppState();
 }
 
 class _GpsPhotoTagAppState extends State<GpsPhotoTagApp> {
-  late final AppController _controller = widget.controller ?? AppController();
+  late final AppController _controller =
+      widget.controller ??
+      AppController(exiftoolBundleDir: widget.exiftoolBundleDir);
 
   @override
   void initState() {

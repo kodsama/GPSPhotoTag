@@ -36,14 +36,10 @@ class ProcessException implements Exception {
 
 void main() {
   group('ToolkitChecker', () {
-    test('check() returns one entry per known tool', () async {
+    test('check() returns only the exiftool entry', () async {
       final checker = ToolkitChecker(FakeProcessRunner(const {}));
       final statuses = await checker.check();
-      expect(statuses.map((s) => s.id), [
-        'exiftool',
-        'libheif',
-        'package_manager',
-      ]);
+      expect(statuses.map((s) => s.id), ['exiftool']);
     });
 
     test('exiftool present: parses version and emits installCommand', () async {
@@ -71,6 +67,7 @@ void main() {
         expect(exiftool.version, isNull);
         expect(exiftool.installCommand, isNotNull);
         expect(checker.canEmbedRaw(statuses), isFalse);
+        expect(checker.canHeic(statuses), isFalse);
       },
     );
 
@@ -81,51 +78,6 @@ void main() {
       final statuses = await checker.check();
       expect(statuses.firstWhere((s) => s.id == 'exiftool').present, isFalse);
     });
-
-    test('libheif detected via heif-dec --version', () async {
-      final checker = ToolkitChecker(
-        FakeProcessRunner({
-          'heif-dec': const ProcResult(0, 'libheif version: 1.17.6\n', ''),
-        }),
-      );
-      final statuses = await checker.check();
-      final libheif = statuses.firstWhere((s) => s.id == 'libheif');
-
-      expect(libheif.present, isTrue);
-      expect(libheif.version, '1.17.6');
-      expect(checker.canHeic(statuses), isTrue);
-    });
-
-    test('libheif falls back to heif-convert even on non-zero exit', () async {
-      final checker = ToolkitChecker(
-        FakeProcessRunner({
-          'heif-convert': const ProcResult(1, '', 'usage: heif-convert ...'),
-        }),
-      );
-      final statuses = await checker.check();
-      expect(statuses.firstWhere((s) => s.id == 'libheif').present, isTrue);
-    });
-
-    test('canHeic is true when only exiftool is present', () async {
-      final checker = ToolkitChecker(
-        FakeProcessRunner({'exiftool': const ProcResult(0, '13.55', '')}),
-      );
-      final statuses = await checker.check();
-      expect(checker.canHeic(statuses), isTrue);
-    });
-
-    test('package manager detected: parses version from probe', () async {
-      // The macOS probe is `brew --version`; supply a canned hit.
-      final checker = ToolkitChecker(
-        FakeProcessRunner({
-          'brew': const ProcResult(0, 'Homebrew 4.3.8\n', ''),
-        }),
-      );
-      final statuses = await checker.check();
-      final pm = statuses.firstWhere((s) => s.id == 'package_manager');
-      expect(pm.present, isTrue);
-      expect(pm.version, '4.3.8');
-    }, testOn: 'mac-os');
 
     test('every status serialises to JSON with expected keys', () async {
       final checker = ToolkitChecker(FakeProcessRunner(const {}));

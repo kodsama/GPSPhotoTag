@@ -51,3 +51,6 @@ coverage/
 # Local build artifacts
 *.dmg
 *.app/
+
+# Vendored exiftool (bundled at build time via tool/fetch-exiftool.sh)
+app/assets/exiftool/

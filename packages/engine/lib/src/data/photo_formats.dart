@@ -10,7 +10,7 @@ abstract final class PhotoFormats {
   /// PNG files.
   static const png = {'png'};
 
-  /// HEIC/HEIF files (need libheif/exiftool).
+  /// HEIC/HEIF files (handled via exiftool).
   static const heic = {'heic', 'heif'};
 
   /// RAW containers (XMP sidecar by default, or exiftool embed).

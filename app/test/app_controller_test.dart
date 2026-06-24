@@ -292,6 +292,48 @@ void main() {
         );
       },
     );
+
+    test('hasBundledExiftool reflects the injected bundle dir', () {
+      expect(AppController().hasBundledExiftool, isFalse);
+      expect(AppController(exiftoolBundleDir: '/x').hasBundledExiftool, isTrue);
+      // A bundle makes exiftool available without any host probe.
+      expect(AppController(exiftoolBundleDir: '/x').exiftoolAvailable, isTrue);
+    });
+
+    test('verifyBundledExiftool is a no-op when nothing is bundled', () async {
+      final c = AppController();
+      await c.verifyBundledExiftool();
+      expect(c.bundledExiftoolVersion, isNull);
+      expect(c.bundleVerifyFailed, isFalse);
+    });
+
+    test('verifyBundledExiftool runs the bundled script via perl', () async {
+      final dir = Directory.systemTemp.createTempSync('bundle_ok');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      File('${dir.path}/exiftool').writeAsStringSync('print "12.99\\n";\n');
+      final c = AppController(exiftoolBundleDir: dir.path);
+
+      await c.verifyBundledExiftool();
+
+      expect(c.bundleVerifyFailed, isFalse);
+      expect(c.bundledExiftoolVersion, '12.99');
+    }, testOn: '!windows');
+
+    test(
+      'verifyBundledExiftool flags failure when the script dies',
+      () async {
+        final dir = Directory.systemTemp.createTempSync('bundle_bad');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        File('${dir.path}/exiftool').writeAsStringSync('exit 3;\n');
+        final c = AppController(exiftoolBundleDir: dir.path);
+
+        await c.verifyBundledExiftool();
+
+        expect(c.bundleVerifyFailed, isTrue);
+        expect(c.bundledExiftoolVersion, isNull);
+      },
+      testOn: '!windows',
+    );
   });
 
   group('lifecycle', () {

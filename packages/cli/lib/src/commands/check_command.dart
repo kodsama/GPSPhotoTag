@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
-/// `check` — probe external tools (exiftool, libheif, package manager).
+/// `check` — probe for exiftool (RAW-embed / HEIC via exiftool).
 class CheckCommand extends Command<int> {
   /// Creates the command. [sink] overrides stdout (for tests).
   CheckCommand({IOSink? sink}) : _out = sink ?? stdout;

@@ -9,6 +9,13 @@ import 'package:gpsphototag_mcp/gpsphototag_mcp.dart';
 /// started automatically when the app launches — so an LLM always has a live
 /// endpoint while GPSPhotoTag is open, without ever touching the UI isolate.
 class McpService extends ChangeNotifier {
+  /// Creates the service. [exiftoolBundleDir] is the on-disk dir of the bundled
+  /// exiftool, forwarded into the server isolate so its tools use it.
+  McpService({this.exiftoolBundleDir});
+
+  /// On-disk dir of the bundled exiftool, or null to use `PATH`.
+  final String? exiftoolBundleDir;
+
   /// Whether the server is currently listening.
   bool get running => _port != null;
 
@@ -32,7 +39,7 @@ class McpService extends ChangeNotifier {
     try {
       _isolate = await Isolate.spawn(
         _serverEntry,
-        _Config(_receive!.sendPort, base),
+        _Config(_receive!.sendPort, base, exiftoolBundleDir),
         debugName: 'mcp-server',
       );
     } on Object catch (e) {
@@ -72,18 +79,28 @@ class McpService extends ChangeNotifier {
 }
 
 class _Config {
-  const _Config(this.send, this.basePort);
+  const _Config(this.send, this.basePort, this.bundleDir);
   final SendPort send;
   final int basePort;
+  final String? bundleDir;
 }
 
 /// Isolate entry: probe exiftool, build the tool catalog, and serve TCP. Tries a
 /// small range of ports so a busy port doesn't leave the app without a server.
 Future<void> _serverEntry(_Config cfg) async {
-  const runner = SystemProcessRunner();
+  final ProcessRunner runner = cfg.bundleDir == null
+      ? const SystemProcessRunner()
+      : ExiftoolRunner(
+          const SystemProcessRunner(),
+          ExiftoolInvocation.resolve(cfg.bundleDir),
+        );
   final tools = await ToolkitChecker(runner).check();
-  final exiftool = tools.any((t) => t.id == 'exiftool' && t.present);
-  final server = McpServer(tools: buildTools(exiftoolAvailable: exiftool));
+  final exiftool =
+      cfg.bundleDir != null ||
+      tools.any((t) => t.id == 'exiftool' && t.present);
+  final server = McpServer(
+    tools: buildTools(runner: runner, exiftoolAvailable: exiftool),
+  );
 
   for (var port = cfg.basePort; port < cfg.basePort + 10; port++) {
     try {

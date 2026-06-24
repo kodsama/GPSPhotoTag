@@ -28,10 +28,13 @@ class AppController extends ChangeNotifier {
     EngineRunner? runner,
     Future<String?> Function()? pickFolder,
     Future<List<ToolStatus>> Function()? probeToolkit,
+    String? exiftoolBundleDir,
   }) : _pickFolder = pickFolder ?? getDirectoryPath,
+       _exiftoolBundleDir = exiftoolBundleDir,
        _probeToolkit =
            probeToolkit ??
-           (() => ToolkitChecker(const SystemProcessRunner()).check()) {
+           (() => ToolkitChecker(const SystemProcessRunner()).check()),
+       mcp = McpService(exiftoolBundleDir: exiftoolBundleDir) {
     _runner = runner;
   }
 
@@ -39,14 +42,22 @@ class AppController extends ChangeNotifier {
   final Future<String?> Function() _pickFolder;
   final Future<List<ToolStatus>> Function() _probeToolkit;
 
+  /// On-disk dir of the app-bundled exiftool, or null when none is bundled.
+  final String? _exiftoolBundleDir;
+
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
   /// only spawns its isolate when [McpService.start] is called from `main` — so
   /// tests that build an [AppController] never start a real server.
-  final McpService mcp = McpService();
+  final McpService mcp;
+
+  /// Whether a bundled exiftool is present on disk.
+  bool get hasBundledExiftool => _exiftoolBundleDir != null;
 
   /// The runner, lazily built once exiftool availability is known.
-  EngineRunner get _engine =>
-      _runner ??= IsolateRunner(exiftoolAvailable: exiftoolAvailable);
+  EngineRunner get _engine => _runner ??= IsolateRunner(
+    exiftoolAvailable: exiftoolAvailable,
+    exiftoolBundleDir: _exiftoolBundleDir,
+  );
 
   // --- Theme ---------------------------------------------------------------
 
@@ -97,7 +108,7 @@ class AppController extends ChangeNotifier {
 
   /// Whether [step]'s Continue action should be enabled.
   bool isStepSatisfied(WizardStep step) => switch (step) {
-    WizardStep.toolkit => _toolkit.isNotEmpty,
+    WizardStep.toolkit => hasBundledExiftool || _toolkit.isNotEmpty,
     WizardStep.input => _summary.hasPhotos,
     WizardStep.review => includedCount > 0,
     WizardStep.options => true,
@@ -117,8 +128,10 @@ class AppController extends ChangeNotifier {
   /// Whether a toolkit probe (or install) is in flight.
   bool get toolkitLoading => _toolkitLoading;
 
-  /// Whether exiftool was detected (gates RAW-embed & HEIC).
+  /// Whether exiftool is available (gates RAW-embed & HEIC). True whenever the
+  /// app bundles its own copy, else reflects the host probe.
   bool get exiftoolAvailable =>
+      hasBundledExiftool ||
       _toolkit.any((t) => t.id == 'exiftool' && t.present);
 
   /// Probes the machine for optional tools and auto-advances on first success.
@@ -132,6 +145,41 @@ class AppController extends ChangeNotifier {
       'Toolkit checked: '
       '${_toolkit.where((t) => t.present).length}/${_toolkit.length} present',
     );
+    notifyListeners();
+  }
+
+  String? _bundledVersion;
+  bool _bundleVerifyFailed = false;
+
+  /// The version reported by the bundled exiftool, once verified; else null.
+  String? get bundledExiftoolVersion => _bundledVersion;
+
+  /// Whether running the bundled exiftool failed (e.g. no Perl on the host).
+  bool get bundleVerifyFailed => _bundleVerifyFailed;
+
+  /// Runs the bundled exiftool `-ver` through the resolved runner to confirm it
+  /// launches on this machine. No-op (and clears state) when nothing is bundled.
+  Future<void> verifyBundledExiftool() async {
+    final dir = _exiftoolBundleDir;
+    if (dir == null) return;
+    final runner = ExiftoolRunner(
+      const SystemProcessRunner(),
+      ExiftoolInvocation.resolve(dir),
+    );
+    try {
+      final result = await runner.run('exiftool', const ['-ver']);
+      if (result.ok && result.stdout.trim().isNotEmpty) {
+        _bundledVersion = result.stdout.trim();
+        _bundleVerifyFailed = false;
+        _log('Bundled ExifTool ready: v$_bundledVersion');
+      } else {
+        _bundleVerifyFailed = true;
+        _log('Bundled ExifTool did not run', level: LogLevel.error);
+      }
+    } on Object {
+      _bundleVerifyFailed = true;
+      _log('Bundled ExifTool did not run', level: LogLevel.error);
+    }
     notifyListeners();
   }
 
@@ -529,6 +577,14 @@ class AppController extends ChangeNotifier {
   @visibleForTesting
   void debugAddLog(String message, {LogLevel level = LogLevel.info}) {
     _log(message, level: level);
+    notifyListeners();
+  }
+
+  /// Sets the bundled-exiftool verification result directly (tests only).
+  @visibleForTesting
+  void debugSetBundleVerify({String? version, bool failed = false}) {
+    _bundledVersion = version;
+    _bundleVerifyFailed = failed;
     notifyListeners();
   }
 }

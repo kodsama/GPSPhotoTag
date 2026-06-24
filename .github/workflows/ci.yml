@@ -34,6 +34,13 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      # Vendor exiftool into app/assets/exiftool/ and regenerate the pubspec
+      # asset list, so the declared bundle asset exists for the app tests/build.
+      # Falls back to downloading from exiftool.org when no system exiftool is
+      # present (Ubuntu runners ship libimage-exiftool-perl on most images).
+      - name: Vendor bundled exiftool
+        run: bash tool/fetch-exiftool.sh
+
       - name: Format check
         # Scoped to source dirs (kept in sync with .githooks/pre-commit) so
         # generated build/ output is never considered.
