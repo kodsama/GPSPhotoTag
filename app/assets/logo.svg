@@ -1,0 +1,54 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- GPSPhotoTag mark: a map pin whose lens frames a tiny landscape —
+       "a photo of a place". Cartographic paper background with contour arcs. -->
+  <defs>
+    <clipPath id="bg">
+      <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224"/>
+    </clipPath>
+    <clipPath id="lens">
+      <circle cx="512" cy="424" r="150"/>
+    </clipPath>
+  </defs>
+
+  <!-- Paper background -->
+  <g clip-path="url(#bg)">
+    <rect x="0" y="0" width="1024" height="1024" fill="#F3EDE1"/>
+    <!-- faint topographic contour arcs -->
+    <g fill="none" stroke="#DDD2BD" stroke-width="10">
+      <circle cx="170" cy="180" r="120"/>
+      <circle cx="170" cy="180" r="180"/>
+      <circle cx="880" cy="900" r="140"/>
+      <circle cx="880" cy="900" r="210"/>
+    </g>
+  </g>
+
+  <!-- Soft drop shadow under the pin tip -->
+  <ellipse cx="512" cy="892" rx="120" ry="26" fill="#23201A" opacity="0.12"/>
+
+  <!-- Pin body -->
+  <path d="M512 902
+           C512 902 286 612 286 424
+           A226 226 0 1 1 738 424
+           C738 612 512 902 512 902 Z"
+        fill="#C25A3A"/>
+  <path d="M512 902
+           C512 902 286 612 286 424
+           A226 226 0 1 1 738 424
+           C738 612 512 902 512 902 Z"
+        fill="none" stroke="#A4472B" stroke-width="10" opacity="0.5"/>
+
+  <!-- Lens / photo -->
+  <circle cx="512" cy="424" r="158" fill="#FBF7EF"/>
+  <g clip-path="url(#lens)">
+    <rect x="362" y="274" width="300" height="300" fill="#EAF0EC"/>
+    <!-- sky -->
+    <rect x="362" y="274" width="300" height="190" fill="#CFE3DD"/>
+    <!-- sun -->
+    <circle cx="452" cy="356" r="34" fill="#E0A33A"/>
+    <!-- mountains (contour teal) -->
+    <path d="M362 520 L470 392 L548 486 L600 430 L662 520 Z" fill="#2E6F6A"/>
+    <path d="M362 540 L520 452 L662 540 Z" fill="#3A7D6E"/>
+  </g>
+  <!-- lens rim -->
+  <circle cx="512" cy="424" r="158" fill="none" stroke="#A4472B" stroke-width="20"/>
+</svg>
