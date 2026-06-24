@@ -1,0 +1,51 @@
+# Flatpak manifest for GPSPhotoTag.
+#
+# Flatpak builds run offline in a sandbox, so this manifest does NOT build
+# Flutter from source. It packages the bundle produced by `flutter build linux`
+# (build/linux/x64/release/bundle) on the host runner.
+#
+# In CI, run `flutter build linux --release ...` first (see release.yml), then
+# point flatpak-builder at this manifest. The `dir` source below picks up the
+# already-built bundle from the repo's app/ build output.
+app-id: ai.kodsama.GPSPhotoTag
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: gpsphototag_gui
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # Read/write user files so the app can tag photos the user selects.
+  - --filesystem=home
+  # Network access for optional basemap tile downloads when rendering heatmaps.
+  - --share=network
+
+modules:
+  - name: gpsphototag
+    buildsystem: simple
+    build-commands:
+      # Install the pre-built Flutter Linux bundle.
+      - mkdir -p /app/bin /app/lib/gpsphototag
+      - cp -r bundle/* /app/lib/gpsphototag/
+      - ln -s /app/lib/gpsphototag/gpsphototag_gui /app/bin/gpsphototag_gui
+      # Desktop entry, icon and AppStream metadata.
+      - install -Dm644 ai.kodsama.GPSPhotoTag.desktop
+        /app/share/applications/ai.kodsama.GPSPhotoTag.desktop
+      - install -Dm644 ai.kodsama.GPSPhotoTag.metainfo.xml
+        /app/share/metainfo/ai.kodsama.GPSPhotoTag.metainfo.xml
+      - install -Dm644 icon_256.png
+        /app/share/icons/hicolor/256x256/apps/ai.kodsama.GPSPhotoTag.png
+    sources:
+      - type: dir
+        path: ../../app/build/linux/x64/release
+      - type: file
+        path: ../linux/ai.kodsama.GPSPhotoTag.desktop
+      - type: file
+        path: ai.kodsama.GPSPhotoTag.metainfo.xml
+      # 256px icon derived from app/assets/icon_1024.png (see RELEASE.md).
+      - type: file
+        path: ../linux/icon_256.png

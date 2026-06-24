@@ -1,0 +1,54 @@
+# flutter_distributor configuration.
+#
+# Run from the `app/` directory:
+#   dart pub global activate flutter_distributor
+#   flutter_distributor package --platform linux --targets appimage,deb,rpm
+#
+# The Flutter binary produced by `flutter build linux` is `gpsphototag_gui`
+# (BINARY_NAME in app/linux/CMakeLists.txt). The human-facing application name
+# is "GPSPhotoTag". Icon and .desktop metadata live under ../packaging/linux.
+
+output: dist/
+releases:
+  - name: release
+    jobs:
+      # --- Linux ------------------------------------------------------------
+      - name: linux-appimage
+        package:
+          platform: linux
+          target: appimage
+          build_args:
+            obfuscate: true
+            split-debug-info: build/symbols/linux
+      - name: linux-deb
+        package:
+          platform: linux
+          target: deb
+          build_args:
+            obfuscate: true
+            split-debug-info: build/symbols/linux
+      - name: linux-rpm
+        package:
+          platform: linux
+          target: rpm
+          build_args:
+            obfuscate: true
+            split-debug-info: build/symbols/linux
+
+      # --- Windows (optional; built in CI via choco + flutter_distributor) ---
+      - name: windows-exe
+        package:
+          platform: windows
+          target: exe
+          build_args:
+            obfuscate: true
+            split-debug-info: build/symbols/windows
+
+      # --- macOS (optional) --------------------------------------------------
+      - name: macos-dmg
+        package:
+          platform: macos
+          target: dmg
+          build_args:
+            obfuscate: true
+            split-debug-info: build/symbols/macos

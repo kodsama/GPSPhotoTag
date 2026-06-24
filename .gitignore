@@ -43,3 +43,7 @@ app/windows/flutter/ephemeral/
 # Keep the root workspace lockfile; ignore per-member stray locks
 packages/*/pubspec.lock
 app/pubspec.lock
+
+# Coverage output
+coverage/
+**/coverage/

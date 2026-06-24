@@ -1,0 +1,118 @@
+name: CI
+
+# Lint + test gate for the GPSPhotoTag pub workspace (engine, cli, mcp, app).
+# Mirrors .githooks/pre-commit, plus a per-package ≥90% line-coverage gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Pin the toolchain to the versions the repo is developed against.
+env:
+  FLUTTER_VERSION: 3.44.3
+  COVERAGE_MIN: 90
+
+jobs:
+  lint-and-test:
+    name: Lint, test & coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Print toolchain versions
+        run: flutter --version
+
+      # Resolves the whole workspace (engine, cli, mcp, app) with one lockfile.
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Format check
+        # Scoped to source dirs (kept in sync with .githooks/pre-commit) so
+        # generated build/ output is never considered.
+        run: >
+          dart format --output=none --set-exit-if-changed
+          packages/engine/lib packages/engine/test
+          packages/cli/lib packages/cli/bin packages/cli/test
+          packages/mcp/lib packages/mcp/bin packages/mcp/test
+          app/lib app/test
+
+      - name: Analyze Dart packages (workspace root)
+        run: dart analyze
+
+      - name: Analyze Flutter app
+        working-directory: app
+        run: flutter analyze
+
+      # --- Tests with coverage -------------------------------------------------
+      # Dart packages use package:coverage (dart test --coverage emits a raw
+      # coverage dir; format_coverage turns it into lcov). The Flutter app uses
+      # the built-in `flutter test --coverage`.
+      - name: Activate coverage tooling
+        run: dart pub global activate coverage
+
+      - name: Test engine (with coverage)
+        run: |
+          dart test --coverage=coverage packages/engine
+          dart pub global run coverage:format_coverage \
+            --lcov --check-ignore \
+            --in=packages/engine/coverage \
+            --out=packages/engine/coverage/lcov.info \
+            --report-on=packages/engine/lib
+        working-directory: packages/engine
+
+      - name: Test cli (with coverage)
+        run: |
+          dart test --coverage=coverage packages/cli
+          dart pub global run coverage:format_coverage \
+            --lcov --check-ignore \
+            --in=packages/cli/coverage \
+            --out=packages/cli/coverage/lcov.info \
+            --report-on=packages/cli/lib
+        working-directory: packages/cli
+
+      - name: Test mcp (with coverage)
+        run: |
+          dart test --coverage=coverage packages/mcp
+          dart pub global run coverage:format_coverage \
+            --lcov --check-ignore \
+            --in=packages/mcp/coverage \
+            --out=packages/mcp/coverage/lcov.info \
+            --report-on=packages/mcp/lib
+        working-directory: packages/mcp
+
+      - name: Test app (with coverage)
+        working-directory: app
+        run: flutter test --coverage
+
+      # --- Coverage gate (≥90% line coverage per package) ---------------------
+      - name: Coverage gate — engine
+        run: bash tool/check_coverage.sh packages/engine/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Coverage gate — cli
+        run: bash tool/check_coverage.sh packages/cli/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Coverage gate — mcp
+        run: bash tool/check_coverage.sh packages/mcp/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Coverage gate — app
+        run: bash tool/check_coverage.sh app/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov-reports
+          path: |
+            packages/engine/coverage/lcov.info
+            packages/cli/coverage/lcov.info
+            packages/mcp/coverage/lcov.info
+            app/coverage/lcov.info
+          if-no-files-found: warn
