@@ -49,6 +49,17 @@ const _schema = {
       },
       'emits': ['item', 'progress', 'done', 'error'],
     },
+    'map': {
+      'summary': 'Render a heatmap PNG of where photos were taken (read-only).',
+      'options': {
+        '--photo|-p': 'string[] (required) — files/dirs',
+        '--out|-o': 'string (required) — output PNG path',
+        '--dpi': 'int (default 200) — output resolution',
+        '--names': 'bool — label areas with filename ranges',
+        '--clusters': "string — 'all' or e.g. '1,2'",
+      },
+      'emits': ['log', 'done', 'error'],
+    },
     'prune-raw': {
       'summary': 'Trash/delete RAW files lacking a JPG/HEIC companion.',
       'options': {

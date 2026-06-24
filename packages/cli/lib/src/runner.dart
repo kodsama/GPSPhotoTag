@@ -4,6 +4,7 @@ import 'commands/check_command.dart';
 import 'commands/fix_dates_command.dart';
 import 'commands/info_command.dart';
 import 'commands/list_command.dart';
+import 'commands/map_command.dart';
 import 'commands/prune_command.dart';
 import 'commands/schema_command.dart';
 import 'commands/tag_command.dart';
@@ -31,6 +32,7 @@ CommandRunner<int> buildRunner() {
 
   runner
     ..addCommand(TagCommand())
+    ..addCommand(MapCommand())
     ..addCommand(PruneCommand())
     ..addCommand(FixDatesCommand())
     ..addCommand(CheckCommand())
