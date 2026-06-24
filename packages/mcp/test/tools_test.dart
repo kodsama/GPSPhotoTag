@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:gpsphototag_mcp/gpsphototag_mcp.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 // `image` resolves transitively via gpsphototag_engine; used here only to mint
 // tiny decodable JPEG fixtures.
 // ignore: depend_on_referenced_packages
@@ -17,9 +20,29 @@ class _FakeRunner implements ProcessRunner {
   }
 }
 
-McpTool _tool(String name, {bool exiftoolAvailable = false}) => buildTools(
-  runner: _FakeRunner(),
+/// Returns one GPS point in exiftool `-json` form for every photo path, so
+/// `render_heatmap` exercises its real render path without shelling out.
+class _GpsRunner implements ProcessRunner {
+  @override
+  Future<ProcResult> run(String executable, List<String> args) async {
+    final photos = args.where((a) => !a.startsWith('-')).toList();
+    final json = jsonEncode([
+      for (final p in photos)
+        {'SourceFile': p, 'GPSLatitude': 42.5, 'GPSLongitude': 18.1},
+    ]);
+    return ProcResult(0, json, '');
+  }
+}
+
+McpTool _tool(
+  String name, {
+  bool exiftoolAvailable = false,
+  ProcessRunner? runner,
+  http.Client? mapClient,
+}) => buildTools(
+  runner: runner ?? _FakeRunner(),
   exiftoolAvailable: exiftoolAvailable,
+  mapClient: mapClient,
 ).firstWhere((t) => t.name == name);
 
 void main() {
@@ -86,6 +109,32 @@ void main() {
       final result = await _tool('render_heatmap').run({'photos': <String>[]});
       expect(result['ok'], isFalse);
       expect(result['code'], 'bad_input');
+    });
+
+    test('renders a PNG from photos with GPS (basemap offline)', () async {
+      final photo = await seededJpeg('m.jpg', DateTime(2026));
+      final out = '${tmp.path}/heat.png';
+      // Every tile request fails, so the render falls back to a basemap-less
+      // image instead of hitting the network.
+      final offline = MockClient(
+        (_) async => throw const SocketException('offline'),
+      );
+
+      final result =
+          await _tool(
+            'render_heatmap',
+            exiftoolAvailable: true,
+            runner: _GpsRunner(),
+            mapClient: offline,
+          ).run({
+            'photos': [photo],
+            'out': out,
+            'dpi': 30,
+          });
+
+      expect(result['ok'], isTrue);
+      expect(File(out).existsSync(), isTrue);
+      expect(img.decodePng(File(out).readAsBytesSync()), isNotNull);
     });
   });
 

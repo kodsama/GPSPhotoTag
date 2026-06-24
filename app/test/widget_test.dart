@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
@@ -97,6 +99,93 @@ void main() {
     expect(find.text('Activity log'), findsOneWidget);
     expect(find.text('first event'), findsOneWidget);
     expect(find.text('second event'), findsOneWidget);
+
+    // Tapping the scrim (top-left, away from the panel) closes the panel via
+    // the AppShell.onClose callback; the FAB comes back.
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+    expect(find.byType(FloatingActionButton), findsOneWidget);
+  });
+
+  testWidgets('toolkit step shows a spinner while the first probe runs', (
+    tester,
+  ) async {
+    // Empty toolkit -> the post-frame callback kicks off a probe. A gated fake
+    // probe lets us observe the in-flight spinner, then resolve deterministically.
+    final gate = Completer<List<ToolStatus>>();
+    final controller = AppController(probeToolkit: () => gate.future);
+    await _pumpApp(tester, controller);
+    await tester.pump(); // run the post-frame callback (sets toolkitLoading)
+
+    expect(controller.toolkitLoading, isTrue);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete([_tool('exiftool', 'ExifTool')]);
+    await tester.pumpAndSettle();
+
+    expect(controller.toolkitLoading, isFalse);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('ExifTool'), findsOneWidget);
+  });
+
+  testWidgets('toolkit warning banner shows when exiftool is missing', (
+    tester,
+  ) async {
+    final controller = AppController()
+      ..debugSetToolkit([_tool('exiftool', 'ExifTool', present: false)]);
+    await _pumpApp(tester, controller);
+
+    expect(controller.exiftoolAvailable, isFalse);
+    expect(find.textContaining('ExifTool is missing'), findsOneWidget);
+  });
+
+  testWidgets('toolkit success banner shows when exiftool is present', (
+    tester,
+  ) async {
+    final controller = AppController()
+      ..debugSetToolkit([_tool('exiftool', 'ExifTool')]);
+    await _pumpApp(tester, controller);
+
+    expect(find.textContaining('All capabilities available'), findsOneWidget);
+  });
+
+  testWidgets('tapping Install runs the install flow and re-probes', (
+    tester,
+  ) async {
+    var probes = 0;
+    // After install, the re-probe returns libheif now present.
+    final controller =
+        AppController(
+          probeToolkit: () async {
+            probes++;
+            return [_tool('libheif', 'libheif')];
+          },
+        )..debugSetToolkit([
+          _tool(
+            'libheif',
+            'libheif',
+            present: false,
+            // A harmless no-op command so the install attempt is fast and does
+            // not change the host; the flow then re-probes via runToolkitCheck.
+            installCommand: 'true',
+          ),
+        ]);
+    await _pumpApp(tester, controller);
+
+    // The install flow runs a real (fast) subprocess then re-probes; let real
+    // async work run to completion via runAsync, then pump to flush the rebuild.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Install'));
+      while (probes == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    });
+    await tester.pumpAndSettle();
+
+    // The re-probe ran and the seeded "missing" libheif is now reported present.
+    expect(probes, 1);
+    expect(controller.toolkit.single.present, isTrue);
+    expect(find.widgetWithText(OutlinedButton, 'Install'), findsNothing);
   });
 
   testWidgets('completed steps collapse to a tappable row with Edit', (

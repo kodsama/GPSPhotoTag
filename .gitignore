@@ -47,3 +47,7 @@ app/pubspec.lock
 # Coverage output
 coverage/
 **/coverage/
+
+# Local build artifacts
+*.dmg
+*.app/

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:gpsphototag_gui/src/state/app_controller.dart';
@@ -188,6 +189,116 @@ void main() {
         ..debugSetSummary(_summaryWith(['/photos/a.jpg']));
       await c.runFixDates(FixDatesMode.exif, dryRun: true);
       expect(fake.calls, contains('fixDates'));
+    });
+
+    test(
+      'a stream-level error surfaces as errorMessage and ends the run',
+      () async {
+        final c = AppController(runner: ThrowingEngineRunner())
+          ..debugSetSummary(_summaryWith(['/photos/a.jpg']));
+        await c.runTag();
+
+        expect(c.errorMessage, contains('stream blew up'));
+        expect(c.running, isFalse);
+        // The error was mirrored into the activity log at error level.
+        expect(c.logEntries.any((e) => e.level == LogLevel.error), isTrue);
+      },
+    );
+  });
+
+  group('theme', () {
+    test('toggleTheme flips dark<->light from the system default', () {
+      final c = AppController();
+      expect(c.themeMode, ThemeMode.system);
+      c.toggleTheme(); // not dark -> dark
+      expect(c.themeMode, ThemeMode.dark);
+      c.toggleTheme(); // dark -> light
+      expect(c.themeMode, ThemeMode.light);
+      c.toggleTheme(); // light -> dark
+      expect(c.themeMode, ThemeMode.dark);
+    });
+  });
+
+  group('options branches', () {
+    test('turning copy-to-folder off clears the chosen outDir', () {
+      final c = AppController();
+      c.setCopyToFolder(true);
+      c.setOutDir('/out');
+      expect(c.outDir, '/out');
+      c.setCopyToFolder(false);
+      expect(c.outDir, isNull);
+    });
+
+    test('maxTimeDiff clamps negatives to zero', () {
+      final c = AppController();
+      c.setMaxTimeDiff(120);
+      expect(c.maxTimeDiffSeconds, 120);
+      expect(c.buildTagOptions().maxTimeDiff, const Duration(seconds: 120));
+      c.setMaxTimeDiff(-5);
+      expect(c.maxTimeDiffSeconds, 0);
+    });
+
+    test('setTimezone trims and treats blank as cleared', () {
+      final c = AppController();
+      c.setTimezone('  Europe/Paris  ');
+      expect(c.timezone, 'Europe/Paris');
+      c.setTimezone('   ');
+      expect(c.timezone, isNull);
+    });
+
+    test('pickOutDir sets the dir when one is chosen', () async {
+      final c = AppController(pickFolder: () async => '/picked');
+      await c.pickOutDir();
+      expect(c.outDir, '/picked');
+    });
+
+    test('pickOutDir is a no-op when the picker is cancelled', () async {
+      final c = AppController(pickFolder: () async => null);
+      await c.pickOutDir();
+      expect(c.outDir, isNull);
+    });
+  });
+
+  group('input branches', () {
+    test('setFormatIncluded toggles every photo of one extension', () {
+      final c = AppController()
+        ..debugSetSummary(_summaryWith(['/p/a.jpg', '/p/b.jpg', '/p/c.png']));
+      c.setFormatIncluded('jpg', false);
+      expect(c.isIncluded('/p/a.jpg'), isFalse);
+      expect(c.isIncluded('/p/b.jpg'), isFalse);
+      expect(c.isIncluded('/p/c.png'), isTrue);
+      expect(c.includedPhotos, ['/p/c.png']);
+
+      c.setFormatIncluded('jpg', true);
+      expect(c.includedCount, 3);
+    });
+  });
+
+  group('toolkit', () {
+    test(
+      'runToolkitCheck probes the host and records results + a log',
+      () async {
+        final c = AppController();
+        expect(c.toolkit, isEmpty);
+
+        await c.runToolkitCheck();
+
+        expect(c.toolkitLoading, isFalse);
+        expect(c.toolkit, isNotEmpty);
+        // The probe writes a summary line into the activity log.
+        expect(
+          c.logEntries.any((e) => e.message.startsWith('Toolkit checked')),
+          isTrue,
+        );
+      },
+    );
+  });
+
+  group('lifecycle', () {
+    test('dispose tears down the controller and its mcp service', () {
+      final c = AppController(runner: FakeEngineRunner());
+      // Should not throw: cancels any subscription and disposes the mcp.
+      expect(c.dispose, returnsNormally);
     });
   });
 }

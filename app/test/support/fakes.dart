@@ -103,6 +103,40 @@ class FakeEngineRunner implements EngineRunner {
   }
 }
 
+/// An [EngineRunner] whose streams emit a stream-level error (rather than an
+/// [ErrorEvent]), exercising the controller's `onError` handling.
+class ThrowingEngineRunner implements EngineRunner {
+  Stream<EngineEvent> _boom() =>
+      Stream<EngineEvent>.error(StateError('stream blew up'));
+
+  @override
+  Stream<EngineEvent> tag({
+    required List<String> photos,
+    required List<String> gpxFiles,
+    required List<String> googleFiles,
+    required TagOptions options,
+  }) => _boom();
+
+  @override
+  Stream<EngineEvent> map({
+    required List<String> photos,
+    required MapOptions options,
+  }) => _boom();
+
+  @override
+  Stream<EngineEvent> prune({
+    required List<String> roots,
+    required PruneOptions options,
+  }) => _boom();
+
+  @override
+  Stream<EngineEvent> fixDates({
+    required List<String> files,
+    required FixDatesMode mode,
+    bool dryRun = false,
+  }) => _boom();
+}
+
 /// Writes a tiny synthetic JPEG carrying [dateTimeOriginal] and returns its
 /// path. Used so [AppController.pickInput] / parseInput find a real photo.
 Future<String> writeJpegWithDate(

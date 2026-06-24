@@ -60,9 +60,9 @@ dart test packages/engine packages/cli packages/mcp
 (cd app && flutter test)
 ```
 
-## Coverage gate (≥90% line coverage per package)
+## Coverage gate (≥95% line coverage per package)
 
-CI enforces **≥90% line coverage for every package** with
+CI enforces **≥95% line coverage for every package** with
 `tool/check_coverage.sh <lcov-file> <minPercent>`. Reproduce locally:
 
 ```bash
@@ -85,7 +85,7 @@ Repeat the Dart steps for `packages/cli` and `packages/mcp`.
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
 format check → analyze (Dart + Flutter) → tests with coverage → per-package
-90% coverage gate → upload lcov artifacts.
+95% coverage gate → upload lcov artifacts.
 
 ## Releases
 

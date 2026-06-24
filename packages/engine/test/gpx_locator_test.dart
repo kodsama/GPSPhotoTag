@@ -61,6 +61,29 @@ void main() {
       expect(r, isNull);
     });
 
+    test('nearest fix when only one neighbour is in range', () {
+      // Photo at 12:09:00 sits between 12:00 and 12:10. With a 90s threshold
+      // only the 12:10 point qualifies -> nearest fix, interpolated provenance.
+      final r = loc.locate(
+        DateTime.utc(2026, 6, 22, 12, 9),
+        const Duration(seconds: 90),
+      );
+      expect(r, isNotNull);
+      expect(r!.method, GpsMethod.interpolated);
+      // It snapped to the in-range neighbour (12:10 -> 42.2), not interpolated.
+      expect(r.latitude, 42.2);
+    });
+
+    test('nearest fix uses the before-neighbour when only it is in range', () {
+      // Photo at 12:01:00; with a 90s threshold only the 12:00 point qualifies.
+      final r = loc.locate(
+        DateTime.utc(2026, 6, 22, 12, 1),
+        const Duration(seconds: 90),
+      );
+      expect(r!.method, GpsMethod.interpolated);
+      expect(r.latitude, 42.0);
+    });
+
     test('prefers GPX over Google when both cover the time', () {
       final google = [
         TimedPoint(

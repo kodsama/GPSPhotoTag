@@ -1,7 +1,7 @@
 name: CI
 
 # Lint + test gate for the GPSPhotoTag pub workspace (engine, cli, mcp, app).
-# Mirrors .githooks/pre-commit, plus a per-package ≥90% line-coverage gate.
+# Mirrors .githooks/pre-commit, plus a per-package ≥95% line-coverage gate.
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 # Pin the toolchain to the versions the repo is developed against.
 env:
   FLUTTER_VERSION: 3.44.3
-  COVERAGE_MIN: 90
+  COVERAGE_MIN: 95
 
 jobs:
   lint-and-test:
@@ -92,7 +92,7 @@ jobs:
         working-directory: app
         run: flutter test --coverage
 
-      # --- Coverage gate (≥90% line coverage per package) ---------------------
+      # --- Coverage gate (≥95% line coverage per package) ---------------------
       - name: Coverage gate — engine
         run: bash tool/check_coverage.sh packages/engine/coverage/lcov.info "${COVERAGE_MIN}"
 

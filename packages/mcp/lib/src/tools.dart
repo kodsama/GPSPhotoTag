@@ -1,4 +1,5 @@
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:http/http.dart' as http;
 
 import 'event_collector.dart';
 
@@ -33,9 +34,14 @@ List<String> _strList(Object? v) =>
 ///
 /// [exiftoolAvailable] gates RAW-embed/HEIC; pass the result of a one-time
 /// [ToolkitChecker] probe so each call doesn't re-probe.
+///
+/// [mapClient] overrides the HTTP client used by `render_heatmap` to fetch
+/// basemap tiles; leave null for the real network client. Exposed so tests can
+/// drive the render path offline.
 List<McpTool> buildTools({
   ProcessRunner runner = const SystemProcessRunner(),
   bool exiftoolAvailable = true,
+  http.Client? mapClient,
 }) {
   BackendRegistry registry(RawMode mode) => BackendRegistry(
     runner: runner,
@@ -176,6 +182,7 @@ List<McpTool> buildTools({
         }
         final service = MapService(
           runner: runner,
+          client: mapClient,
           exiftoolAvailable: exiftoolAvailable,
         );
         return collectResult(

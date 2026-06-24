@@ -104,4 +104,75 @@ void main() {
     expect(events.whereType<ItemEvent>(), isNotEmpty);
     expect(events.whereType<DoneEvent>(), isNotEmpty);
   });
+
+  test('tag loads Google history points and tags from them', () async {
+    final naive = DateTime(2026, 6, 22, 12, 0, 0);
+    final jpg = await writeJpegWithDate(tmp, 'g.jpg', dateTimeOriginal: naive);
+    // A minimal Google "Records.json" with one point at the capture instant.
+    final google = '${tmp.path}/Records.json';
+    final iso = naive.toUtc().toIso8601String();
+    File(google).writeAsStringSync(
+      '{"locations":[{"timestamp":"$iso",'
+      '"latitudeE7":425000000,"longitudeE7":181000000}]}',
+    );
+
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final events = await runner
+        .tag(
+          photos: [jpg],
+          gpxFiles: const [],
+          googleFiles: [google],
+          options: const TagOptions(overwrite: true, replace: true),
+        )
+        .toList();
+
+    final item = events.whereType<ItemEvent>().single;
+    expect(item.row.location, isNotNull);
+    expect(item.row.location!.source, GpsSource.google);
+    expect(events.whereType<DoneEvent>().single.total, 1);
+  });
+
+  test('tag probes for exiftool inside the worker when not told', () async {
+    // No exiftoolAvailable passed -> the worker runs _resolveExiftool, which
+    // probes the host itself. JPEG tagging is pure-Dart either way.
+    final naive = DateTime(2026, 6, 22, 12, 43, 38);
+    final jpg = await writeJpegWithDate(tmp, 'p.jpg', dateTimeOriginal: naive);
+    final gpx = writeGpx(tmp, 'track.gpx', naive);
+
+    const runner = IsolateRunner(); // exiftoolAvailable == null
+    final events = await runner
+        .tag(
+          photos: [jpg],
+          gpxFiles: [gpx],
+          googleFiles: const [],
+          options: const TagOptions(overwrite: true, replace: true),
+        )
+        .toList();
+
+    expect(events.whereType<DoneEvent>().single.total, 1);
+  });
+
+  test(
+    'tag with a missing GPX file ends with an ErrorEvent, not a hang',
+    () async {
+      final jpg = await writeJpegWithDate(
+        tmp,
+        'm.jpg',
+        dateTimeOriginal: DateTime(2026, 6, 22, 12),
+      );
+      const runner = IsolateRunner(exiftoolAvailable: false);
+      final events = await runner
+          .tag(
+            photos: [jpg],
+            gpxFiles: ['${tmp.path}/does-not-exist.gpx'],
+            googleFiles: const [],
+            options: const TagOptions(overwrite: true),
+          )
+          .toList();
+
+      // _loadGpx throws on the unreadable file; the worker converts it to an
+      // ErrorEvent and still sends the sentinel, so the stream closes cleanly.
+      expect(events.whereType<ErrorEvent>(), isNotEmpty);
+    },
+  );
 }

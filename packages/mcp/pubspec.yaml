@@ -12,6 +12,7 @@ environment:
 
 dependencies:
   gpsphototag_engine:
+  http: ^1.2.0
   path: ^1.9.0
 
 dev_dependencies:

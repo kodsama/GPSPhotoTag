@@ -102,6 +102,56 @@ void main() {
       },
     );
 
+    test('composites fetched tiles and logs the fetched count', () async {
+      const json = '''
+[
+  {"SourceFile":"/photos/a.jpg","GPSLatitude":43.8563,"GPSLongitude":18.4131},
+  {"SourceFile":"/photos/b.jpg","GPSLatitude":43.8580,"GPSLongitude":18.4150}
+]''';
+      final runner = FakeRunner(const ProcResult(0, json, ''));
+      // Serve a real, decodable PNG tile for every fetch so the compositing and
+      // fetched-count paths run.
+      final tilePng = img.encodePng(
+        img.Image(width: 512, height: 512)..clear(img.ColorRgb8(10, 20, 30)),
+      );
+      final client = MockClient((_) async => http.Response.bytes(tilePng, 200));
+      final outPath = p.join(tmp.path, 'tiled.png');
+      final service = MapService(runner: runner, client: client);
+
+      final events = await service.render([
+        '/photos/a.jpg',
+        '/photos/b.jpg',
+      ], MapOptions(outputPng: outPath, dpi: 160)).toList();
+
+      // Fetched-count log emitted (not the offline warning).
+      final fetchedLog = events.whereType<LogEvent>().firstWhere(
+        (e) => e.message.contains('CARTO basemap tile'),
+      );
+      expect(fetchedLog.level, LogLevel.info);
+      expect(events.whereType<DoneEvent>().single.summary['mapped'], 2);
+      expect(File(outPath).existsSync(), isTrue);
+    });
+
+    test(
+      'exiftool failure with empty stdout maps to missing_toolkit',
+      () async {
+        // Non-zero exit and empty stdout -> _readGps throws StateError, caught.
+        final runner = FakeRunner(
+          const ProcResult(1, '   ', 'exiftool: error'),
+        );
+        final service = MapService(
+          runner: runner,
+          client: MockClient((_) async => http.Response('', 404)),
+        );
+
+        final events = await service.render([
+          '/photos/x.jpg',
+        ], MapOptions(outputPng: p.join(tmp.path, 'x.png'))).toList();
+
+        expect(events.whereType<ErrorEvent>().single.code, 'missing_toolkit');
+      },
+    );
+
     test('emits missing_toolkit when exiftool is unavailable', () async {
       final runner = FakeRunner(const ProcResult(0, '[]', ''));
       final service = MapService(runner: runner, exiftoolAvailable: false);

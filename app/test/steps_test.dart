@@ -191,6 +191,32 @@ void main() {
       expect(find.text('/out'), findsOneWidget);
       expect(find.text('Change'), findsOneWidget);
     });
+
+    testWidgets('tapping "Choose destination folder" runs the picker', (
+      tester,
+    ) async {
+      final controller = AppController(
+        runner: FakeEngineRunner(),
+        pickFolder: () async => '/picked/out',
+      )..debugSetToolkit([_tool('exiftool')]);
+      controller.setCopyToFolder(true);
+      controller.debugSetStep(
+        WizardStep.output,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+        },
+      );
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Choose destination folder'));
+      await tester.pumpAndSettle();
+
+      expect(controller.outDir, '/picked/out');
+      expect(find.text('/picked/out'), findsOneWidget);
+    });
   });
 
   group('run step', () {
@@ -370,15 +396,89 @@ void main() {
       await controller.runTag();
       await _pump(tester, controller);
 
-      await tester.tap(find.text('Render heatmap'));
-      await tester.pumpAndSettle();
+      // renderMap awaits the engine stream; let real async work settle so the
+      // controller completes the op and the step's setState fires, then pump
+      // the resulting frame.
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Render heatmap'));
+        while (!controller.running &&
+            !File('${tmp.path}/gpsphototag-heatmap.png').existsSync()) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        // Then wait for the op to finish (running flips back to false).
+        while (controller.running) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      });
+      await tester.pump();
 
       // Tapping ran the map operation through the runner, which wrote the PNG
-      // into the picked folder. (The decoded Image.file widget itself is
-      // framework-internal and async, so we assert the deterministic effects.)
+      // into the picked folder, and the step set _heatmapPath -> the preview
+      // (Heatmap heading + an Image widget) now renders.
       expect(fake.calls, contains('map'));
       expect(controller.errorMessage, isNull);
       expect(File('${tmp.path}/gpsphototag-heatmap.png').existsSync(), isTrue);
+      expect(find.text('Heatmap'), findsOneWidget);
+      expect(find.byType(Image), findsWidgets);
+    });
+
+    testWidgets('cancelling the prune dialog does not run the runner', (
+      tester,
+    ) async {
+      final fake = FakeEngineRunner();
+      final controller = AppController(runner: fake)
+        ..debugSetToolkit([_tool('exiftool')]);
+      controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
+      controller.debugSetStep(
+        WizardStep.result,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+          WizardStep.run,
+        },
+      );
+      await controller.runTag();
+      await _pump(tester, controller);
+      fake.calls.clear();
+
+      await tester.tap(find.text('Prune orphan RAWs'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(fake.calls, isEmpty);
+    });
+
+    testWidgets('Fix dates "from file date" option runs the runner', (
+      tester,
+    ) async {
+      final fake = FakeEngineRunner();
+      final controller = AppController(runner: fake)
+        ..debugSetToolkit([_tool('exiftool')]);
+      controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
+      controller.debugSetStep(
+        WizardStep.result,
+        completed: {
+          WizardStep.toolkit,
+          WizardStep.input,
+          WizardStep.review,
+          WizardStep.options,
+          WizardStep.output,
+          WizardStep.run,
+        },
+      );
+      await controller.runTag();
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Fix dates'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Set EXIF capture time from file date'));
+      await tester.pumpAndSettle();
+
+      expect(fake.calls, contains('fixDates'));
     });
 
     testWidgets('Prune confirm dialog runs the runner', (tester) async {

@@ -21,15 +21,23 @@ import 'wizard_step.dart';
 /// deliberately small; tests drive state directly via the test-only setters at
 /// the bottom rather than spinning real isolates.
 class AppController extends ChangeNotifier {
-  /// Creates a controller. Inject a fake [runner] and/or a [pickFolder] override
-  /// in tests; both default to the real implementations.
-  AppController({EngineRunner? runner, Future<String?> Function()? pickFolder})
-    : _pickFolder = pickFolder ?? getDirectoryPath {
+  /// Creates a controller. Inject a fake [runner], a [pickFolder] override,
+  /// and/or a [probeToolkit] override in tests; all default to the real
+  /// implementations.
+  AppController({
+    EngineRunner? runner,
+    Future<String?> Function()? pickFolder,
+    Future<List<ToolStatus>> Function()? probeToolkit,
+  }) : _pickFolder = pickFolder ?? getDirectoryPath,
+       _probeToolkit =
+           probeToolkit ??
+           (() => ToolkitChecker(const SystemProcessRunner()).check()) {
     _runner = runner;
   }
 
   EngineRunner? _runner;
   final Future<String?> Function() _pickFolder;
+  final Future<List<ToolStatus>> Function() _probeToolkit;
 
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
   /// only spawns its isolate when [McpService.start] is called from `main` — so
@@ -117,7 +125,7 @@ class AppController extends ChangeNotifier {
   Future<void> runToolkitCheck() async {
     _toolkitLoading = true;
     notifyListeners();
-    _toolkit = await ToolkitChecker(const SystemProcessRunner()).check();
+    _toolkit = await _probeToolkit();
     _runner = null; // rebuild engine with fresh exiftool availability
     _toolkitLoading = false;
     _log(
@@ -236,6 +244,12 @@ class AppController extends ChangeNotifier {
   void setOutDir(String? dir) {
     _outDir = dir;
     notifyListeners();
+  }
+
+  /// Opens a directory picker and, if one is chosen, sets it as the output dir.
+  Future<void> pickOutDir() async {
+    final picked = await _pickFolder();
+    if (picked != null) setOutDir(picked);
   }
 
   /// Toggles overwriting existing GPS.

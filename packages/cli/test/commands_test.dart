@@ -9,6 +9,35 @@ import 'package:test/test.dart';
 
 import '_capture.dart';
 
+/// A [MapService] that renders nothing but records the [MapOptions] it received
+/// and emits canned events, so the `map` command's post-validation path can be
+/// driven without exiftool or network access.
+class _FakeMapService extends MapService {
+  _FakeMapService({this.fail = false})
+    : super(runner: const SystemProcessRunner(), exiftoolAvailable: false);
+
+  /// When true, emit an error instead of a success [DoneEvent].
+  final bool fail;
+
+  /// The photos passed to the last [render] call.
+  List<String>? lastPhotos;
+
+  /// The options passed to the last [render] call.
+  MapOptions? lastOptions;
+
+  @override
+  Stream<EngineEvent> render(List<String> photos, MapOptions options) async* {
+    lastPhotos = photos;
+    lastOptions = options;
+    yield const LogEvent('1 of 1 photos had GPS');
+    if (fail) {
+      yield const ErrorEvent('no GPS found', code: 'bad_input');
+    } else {
+      yield const DoneEvent({'mapped': 1});
+    }
+  }
+}
+
 void main() {
   late Directory tmp;
   late BufferSink buf;
@@ -321,6 +350,138 @@ void main() {
       ]);
       expect(code, ExitCodes.badInput);
       expect(lastJsonLine()['message'], contains('--dpi'));
+    });
+  });
+
+  group('map render path (fake service)', () {
+    late _FakeMapService fake;
+
+    /// Seeds one GPS-tagged photo and runs `map` against [fake].
+    Future<int> runMap(List<String> extra) async {
+      final path = p.join(tmp.path, 'img.jpg');
+      File(path).writeAsBytesSync(minimalJpeg());
+      await const JpegExifBackend().writeGps(path, latitude: 1, longitude: 1);
+      final runner = buildRunner(
+        sink: buf,
+        mapServiceFactory: () async => fake,
+      );
+      return (await runner.run([
+            '--json',
+            'map',
+            '-p',
+            tmp.path,
+            '-o',
+            p.join(tmp.path, 'out.png'),
+            ...extra,
+          ])) ??
+          0;
+    }
+
+    setUp(() => fake = _FakeMapService());
+
+    test(
+      'renders to completion; exit 0, parses dpi, default clusters',
+      () async {
+        final code = await runMap(['--dpi', '150']);
+        expect(code, ExitCodes.ok);
+        expect(fake.lastPhotos, isNotEmpty);
+        expect(fake.lastOptions!.dpi, 150);
+        // No --clusters => "all" => null.
+        expect(fake.lastOptions!.clusters, isNull);
+        expect(fake.lastOptions!.labelNames, isFalse);
+        final done = lastJsonLine();
+        expect(done['event'], 'done');
+        expect((done['summary'] as Map)['mapped'], 1);
+      },
+    );
+
+    test('--clusters "all" yields null cluster set', () async {
+      await runMap(['--clusters', 'all']);
+      expect(fake.lastOptions!.clusters, isNull);
+    });
+
+    test('--clusters "1,2" parses 1-based ids', () async {
+      await runMap(['--clusters', '1,2']);
+      expect(fake.lastOptions!.clusters, {1, 2});
+    });
+
+    test('--clusters "" (empty) yields null cluster set', () async {
+      await runMap(['--clusters', '']);
+      expect(fake.lastOptions!.clusters, isNull);
+    });
+
+    test('--clusters with no parseable ids yields null', () async {
+      await runMap(['--clusters', 'x,y']);
+      expect(fake.lastOptions!.clusters, isNull);
+    });
+
+    test('--names sets labelNames', () async {
+      await runMap(['--names']);
+      expect(fake.lastOptions!.labelNames, isTrue);
+    });
+
+    test('service error propagates to exit code', () async {
+      fake = _FakeMapService(fail: true);
+      final code = await runMap(const []);
+      expect(code, ExitCodes.badInput);
+      expect(lastJsonLine()['code'], 'bad_input');
+    });
+  });
+
+  group('tag with Google history (source_loader)', () {
+    test('loads a Records.json -m source; reaches the engine', () async {
+      final path = p.join(tmp.path, 'img.jpg');
+      File(path).writeAsBytesSync(minimalJpeg());
+      await const JpegExifBackend().writeGps(
+        path,
+        latitude: 1,
+        longitude: 1,
+        dateTimeOriginal: DateTime(2026, 6, 22, 12),
+      );
+      final history = p.join(tmp.path, 'Records.json');
+      File(history).writeAsStringSync(
+        '{"locations":[{"latitudeE7":427077000,"longitudeE7":183441000,'
+        '"timestamp":"2026-06-22T12:00:00Z"}]}',
+      );
+
+      final code = await run([
+        '--json',
+        'tag',
+        '-p',
+        tmp.path,
+        '-m',
+        history,
+        '--overwrite',
+        '--dry-run',
+      ]);
+
+      // No bad_input: the Google source loaded, so the engine ran.
+      expect(code, isNot(ExitCodes.badInput));
+      expect(lastJsonLine()['event'], 'done');
+    });
+  });
+
+  group('check human-mode install hint', () {
+    test('prints an install line for an absent tool', () async {
+      // Probe a guaranteed-absent tool name so the !present branch renders.
+      final tools = await ToolkitChecker(const SystemProcessRunner()).check();
+      final missing = tools.where(
+        (t) => !t.present && t.installCommand != null,
+      );
+      // Only assert the branch when the host actually lacks a tool; otherwise
+      // the human path with all-present tools is already covered above.
+      if (missing.isEmpty) return;
+      await run(['check']);
+      expect(buf.text, contains('install:'));
+    });
+  });
+
+  group('command descriptions', () {
+    test('every registered command exposes a non-empty description', () {
+      final runner = buildRunner(sink: buf);
+      for (final cmd in runner.commands.values) {
+        expect(cmd.description, isNotEmpty, reason: cmd.name);
+      }
     });
   });
 }

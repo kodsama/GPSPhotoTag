@@ -114,6 +114,19 @@ void main() {
       expect(checker.canHeic(statuses), isTrue);
     });
 
+    test('package manager detected: parses version from probe', () async {
+      // The macOS probe is `brew --version`; supply a canned hit.
+      final checker = ToolkitChecker(
+        FakeProcessRunner({
+          'brew': const ProcResult(0, 'Homebrew 4.3.8\n', ''),
+        }),
+      );
+      final statuses = await checker.check();
+      final pm = statuses.firstWhere((s) => s.id == 'package_manager');
+      expect(pm.present, isTrue);
+      expect(pm.version, '4.3.8');
+    }, testOn: 'mac-os');
+
     test('every status serialises to JSON with expected keys', () async {
       final checker = ToolkitChecker(FakeProcessRunner(const {}));
       final statuses = await checker.check();

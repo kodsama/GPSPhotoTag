@@ -134,6 +134,41 @@ void main() {
       expect((response['error'] as Map<String, Object?>)['code'], -32600);
     });
 
+    test(
+      'invalid UTF-8 on the socket triggers onError and destroys it',
+      () async {
+        final logs = <String>[];
+        final s = await serveTcp(_server(), port: 0, onLog: logs.add);
+        addTearDown(() => s.close());
+
+        final socket = await Socket.connect('127.0.0.1', s.port);
+        addTearDown(() => socket.destroy());
+
+        // When the server destroys the client, our read stream completes (or
+        // errors); either way the connection is observably gone.
+        final closed = Completer<void>();
+        socket.listen(
+          (_) {},
+          onError: (Object _) {
+            if (!closed.isCompleted) closed.complete();
+          },
+          onDone: () {
+            if (!closed.isCompleted) closed.complete();
+          },
+          cancelOnError: false,
+        );
+
+        // Wait for the connect log so the listener is attached, then send a byte
+        // sequence that is not valid UTF-8 to fault the decoder stream.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        socket.add([0xff, 0xfe, 0xff]);
+        await socket.flush();
+
+        await closed.future.timeout(const Duration(seconds: 5));
+        expect(logs.any((l) => l.contains('client connected')), isTrue);
+      },
+    );
+
     test('emits lifecycle log lines via onLog', () async {
       final logs = <String>[];
       final s = await serveTcp(_server(), port: 0, onLog: logs.add);

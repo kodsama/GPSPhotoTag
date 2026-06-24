@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
 import 'commands/check_command.dart';
 import 'commands/fix_dates_command.dart';
@@ -18,7 +19,14 @@ import 'commands/tag_command.dart';
 ///
 /// [sink] overrides where commands write their output (defaults to stdout);
 /// tests pass a buffer-backed sink to capture output in-process.
-CommandRunner<int> buildRunner({IOSink? sink}) {
+///
+/// [mapServiceFactory] overrides how the `map` command obtains its
+/// [MapService]; tests inject a fake to exercise rendering without exiftool or
+/// network. Defaults to the real, exiftool-detecting factory.
+CommandRunner<int> buildRunner({
+  IOSink? sink,
+  Future<MapService> Function()? mapServiceFactory,
+}) {
   final runner =
       CommandRunner<int>(
           'gpsphototag',
@@ -38,7 +46,7 @@ CommandRunner<int> buildRunner({IOSink? sink}) {
 
   runner
     ..addCommand(TagCommand(sink: sink))
-    ..addCommand(MapCommand(sink: sink))
+    ..addCommand(MapCommand(sink: sink, serviceFactory: mapServiceFactory))
     ..addCommand(PruneCommand(sink: sink))
     ..addCommand(FixDatesCommand(sink: sink))
     ..addCommand(CheckCommand(sink: sink))

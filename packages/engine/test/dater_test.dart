@@ -168,6 +168,45 @@ void main() {
     },
   );
 
+  test('exif direction warns when SetFile fails on macOS', () async {
+    final runner = FakeProcessRunner(result: const ProcResult(1, '', 'nope'));
+    final dater = Dater(
+      exif: FakeExifBackend(captureNaive: DateTime(2021, 7, 4, 13, 37, 5)),
+      runner: runner,
+    );
+
+    final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
+
+    // SetFile was invoked and its non-zero exit surfaced as a warning log.
+    expect(runner.calls.any((c) => c.first == 'SetFile'), isTrue);
+    final warn = events.whereType<LogEvent>().single;
+    expect(warn.level, LogLevel.warning);
+    expect(warn.message, contains('SetFile could not set birthtime'));
+    // The mtime fix still succeeded.
+    expect(
+      events.whereType<ItemEvent>().single.row.status,
+      PhotoStatus.datesFixed,
+    );
+  }, testOn: 'mac-os');
+
+  test('exif direction warns when SetFile is unavailable on macOS', () async {
+    final runner = FakeProcessRunner(throws: true);
+    final dater = Dater(
+      exif: FakeExifBackend(captureNaive: DateTime(2021, 7, 4, 13, 37, 5)),
+      runner: runner,
+    );
+
+    final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
+
+    final warn = events.whereType<LogEvent>().single;
+    expect(warn.level, LogLevel.warning);
+    expect(warn.message, contains('SetFile unavailable'));
+    expect(
+      events.whereType<ItemEvent>().single.row.status,
+      PhotoStatus.datesFixed,
+    );
+  }, testOn: 'mac-os');
+
   test('none mode yields a single empty DoneEvent', () async {
     final dater = Dater(exif: FakeExifBackend(), runner: FakeProcessRunner());
     final events = await dater.fixDates([photo], FixDatesMode.none).toList();

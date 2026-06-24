@@ -119,6 +119,34 @@ void main() {
     expect((r!['error'] as Map<String, Object?>)['code'], -32601);
   });
 
+  test(
+    'a thrown tool is reported as a tool error, not a protocol error',
+    () async {
+      final server = McpServer(
+        tools: [
+          McpTool(
+            name: 'boom',
+            description: 'always throws',
+            inputSchema: const {'type': 'object', 'properties': {}},
+            run: (_) async => throw StateError('kaboom'),
+          ),
+        ],
+      );
+
+      final r = await server.handle(
+        _req(8, 'tools/call', {'name': 'boom', 'arguments': {}}),
+      );
+
+      // It's a JSON-RPC result (not an error), but flagged isError with the text.
+      final result = r!['result'] as Map<String, Object?>;
+      expect(result['isError'], isTrue);
+      final content =
+          (result['content'] as List<Object?>).single as Map<String, Object?>;
+      expect(content['text'], contains('boom'));
+      expect(content['text'], contains('kaboom'));
+    },
+  );
+
   test('get_capabilities reflects exiftool availability', () async {
     final off = McpServer(
       tools: buildTools(runner: _FakeRunner(), exiftoolAvailable: false),

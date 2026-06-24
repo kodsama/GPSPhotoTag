@@ -9,8 +9,14 @@ import '../source_loader.dart';
 /// `map` — render a density heatmap PNG of where photos were taken (read-only).
 class MapCommand extends Command<int> {
   /// Registers the `map` flags. [sink] overrides stdout (for tests).
-  // ignore: prefer_initializing_formals
-  MapCommand({IOSink? sink}) : _sink = sink {
+  ///
+  /// [serviceFactory] builds the [MapService] used to render; it defaults to
+  /// detecting `exiftool` and constructing a real, network-backed service. Tests
+  /// inject a fake to exercise the render path without exiftool or network.
+  MapCommand({IOSink? sink, Future<MapService> Function()? serviceFactory})
+    // ignore: prefer_initializing_formals
+    : _sink = sink,
+      _serviceFactory = serviceFactory ?? _defaultServiceFactory {
     argParser
       ..addMultiOption(
         'photo',
@@ -35,6 +41,7 @@ class MapCommand extends Command<int> {
   }
 
   final IOSink? _sink;
+  final Future<MapService> Function() _serviceFactory;
 
   @override
   String get name => 'map';
@@ -73,9 +80,7 @@ class MapCommand extends Command<int> {
       return out.exitCode;
     }
 
-    const runner = SystemProcessRunner();
-    final exiftool = await detectExiftool(runner);
-    final service = MapService(runner: runner, exiftoolAvailable: exiftool);
+    final service = await _serviceFactory();
 
     final options = MapOptions(
       outputPng: outPath,
@@ -85,6 +90,13 @@ class MapCommand extends Command<int> {
     );
 
     return out.consume(service.render(photos, options));
+  }
+
+  /// Detects `exiftool` and builds a real, network-backed [MapService].
+  static Future<MapService> _defaultServiceFactory() async {
+    const runner = SystemProcessRunner();
+    final exiftool = await detectExiftool(runner);
+    return MapService(runner: runner, exiftoolAvailable: exiftool);
   }
 
   /// Parses `--clusters` into 1-based numbers; null for "all"/empty/absent.

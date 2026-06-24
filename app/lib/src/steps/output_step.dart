@@ -1,4 +1,3 @@
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../state/controller_scope.dart';
@@ -45,10 +44,7 @@ class OutputStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         OutlinedButton.icon(
-          onPressed: () async {
-            final picked = await getDirectoryPath();
-            if (picked != null) controller.setOutDir(picked);
-          },
+          onPressed: controller.pickOutDir,
           icon: const Icon(Icons.folder_open),
           label: Text(dir == null ? 'Choose destination folder' : 'Change'),
         ),

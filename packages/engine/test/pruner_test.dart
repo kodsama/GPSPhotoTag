@@ -16,6 +16,12 @@ class FakeTrash implements Trash {
   Future<void> toTrash(String path) async => trashed.add(path);
 }
 
+/// A trash that always fails, to drive the per-orphan error branch.
+class ThrowingTrash implements Trash {
+  @override
+  Future<void> toTrash(String path) async => throw StateError('trash full');
+}
+
 void main() {
   late Directory root;
   late String sub;
@@ -96,6 +102,24 @@ void main() {
 
     final done = events.whereType<DoneEvent>().single;
     expect(done.summary[PhotoStatus.prunedDeleted.wire], 1);
+  });
+
+  test('a failing removal surfaces an error item and log', () async {
+    final events = await Pruner(
+      trash: ThrowingTrash(),
+    ).prune([root.path], const PruneOptions()).toList();
+
+    final item = events.whereType<ItemEvent>().single;
+    expect(item.row.status, PhotoStatus.error);
+    expect(item.row.note, contains('trash full'));
+
+    final errLog = events.whereType<LogEvent>().firstWhere(
+      (e) => e.level == LogLevel.error,
+    );
+    expect(errLog.message, contains('Failed to prune'));
+
+    final done = events.whereType<DoneEvent>().single;
+    expect(done.summary[PhotoStatus.error.wire], 1);
   });
 }
 
