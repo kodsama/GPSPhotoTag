@@ -6,6 +6,7 @@ import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:path/path.dart' as p;
 
 import '../engine/isolate_runner.dart';
+import '../engine/mcp_service.dart';
 import 'input_summary.dart';
 import 'log_entry.dart';
 import 'wizard_step.dart';
@@ -30,6 +31,11 @@ class AppController extends ChangeNotifier {
 
   IsolateRunner? _runner;
   final Future<String?> Function() _pickFolder;
+
+  /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
+  /// only spawns its isolate when [McpService.start] is called from `main` — so
+  /// tests that build an [AppController] never start a real server.
+  final McpService mcp = McpService();
 
   /// The runner, lazily built once exiftool availability is known.
   IsolateRunner get _engine =>
@@ -469,6 +475,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    mcp.dispose();
     super.dispose();
   }
 

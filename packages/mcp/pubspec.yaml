@@ -1,0 +1,22 @@
+name: gpsphototag_mcp
+description: >-
+  Model Context Protocol (MCP) server exposing the GPSPhotoTag engine as tools,
+  so LLM clients can tag photos, render heatmaps, prune RAW and fix dates over a
+  standard JSON-RPC interface (stdio or local TCP).
+version: 2.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  gpsphototag_engine:
+  path: ^1.9.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^6.0.0
+
+executables:
+  gpsphototag_mcp:

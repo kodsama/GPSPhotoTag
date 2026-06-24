@@ -1,0 +1,8 @@
+{
+  "_comment": "Drop this into your MCP client config (the client's config file). Build the binary first: dart compile exe packages/mcp/bin/gpsphototag_mcp.dart -o gpsphototag_mcp, then point 'command' at it.",
+  "mcpServers": {
+    "gpsphototag": {
+      "command": "/absolute/path/to/gpsphototag_mcp"
+    }
+  }
+}

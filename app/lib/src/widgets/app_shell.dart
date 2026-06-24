@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../branding/logo_mark.dart';
+import '../engine/mcp_service.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
@@ -93,6 +94,7 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          _McpChip(mcp: controller.mcp),
           const SizedBox(width: 12),
           IconButton(
             tooltip: isDark ? 'Switch to light' : 'Switch to dark',
@@ -101,6 +103,56 @@ class _Header extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Header chip showing the always-on MCP server status (the LLM endpoint).
+class _McpChip extends StatelessWidget {
+  const _McpChip({required this.mcp});
+
+  final McpService mcp;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListenableBuilder(
+      listenable: mcp,
+      builder: (context, _) {
+        final (Color color, String label, String tip) = switch (mcp) {
+          _ when mcp.running => (
+              AppColors.success,
+              'MCP :${mcp.port}',
+              'LLM endpoint live on 127.0.0.1:${mcp.port} (MCP over TCP)',
+            ),
+          _ when mcp.error != null => (
+              AppColors.danger,
+              'MCP off',
+              'MCP server failed to start: ${mcp.error}',
+            ),
+          _ => (AppColors.warning, 'MCP …', 'Starting MCP server…'),
+        };
+        return Tooltip(
+          message: tip,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: scheme.outline),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 7),
+              Text(label, style: Theme.of(context).textTheme.labelMedium),
+            ]),
+          ),
+        );
+      },
     );
   }
 }

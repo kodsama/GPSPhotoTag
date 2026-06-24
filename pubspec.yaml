@@ -15,4 +15,5 @@ dev_dependencies:
 workspace:
   - packages/engine
   - packages/cli
+  - packages/mcp
   - app

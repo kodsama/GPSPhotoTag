@@ -27,6 +27,14 @@ class _GpsPhotoTagAppState extends State<GpsPhotoTagApp> {
       widget.controller ?? AppController();
 
   @override
+  void initState() {
+    super.initState();
+    // Always-on MCP endpoint for LLM clients, started only for the real app
+    // (an injected controller in tests must not spawn a server isolate).
+    if (widget.controller == null) _controller.mcp.start();
+  }
+
+  @override
   void dispose() {
     if (widget.controller == null) _controller.dispose();
     super.dispose();

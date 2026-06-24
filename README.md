@@ -94,8 +94,17 @@ gpsphototag tag -p ~/Pictures/Trip -g trip.gpx --dry-run
 
 ### For agents / scripting
 
-`--json` emits one JSON event per line; `schema` describes every command,
-option, event, and exit code. See [AGENTS.md](AGENTS.md) for the full contract.
+Two ways to drive it as an LLM:
+
+- **MCP server** — a standard Model Context Protocol server (JSON-RPC 2.0) with
+  tools `tag_photos`, `render_heatmap`, `prune_raw`, `fix_dates`,
+  `check_toolkit`, `get_capabilities`. Runs over **stdio** (build
+  `packages/mcp/bin/gpsphototag_mcp.dart`), **and** the desktop app keeps an **always-on TCP** endpoint at
+  `127.0.0.1:8787` whenever it's open.
+- **CLI JSON contract** — `--json` emits one JSON event per line; `schema`
+  describes every command, option, event, and exit code.
+
+See [AGENTS.md](AGENTS.md) and [docs/mcp-client-config.json](docs/mcp-client-config.json).
 
 ```bash
 gpsphototag schema                       # discover the surface
@@ -111,7 +120,8 @@ toolkit · `5` internal.
 ```
 packages/engine/   pure-Dart, Flutter-free engine (domain → data → services → app)
 packages/cli/      headless CLI over the engine
-app/               Flutter desktop GUI over the engine
+packages/mcp/      MCP server (stdio + TCP) over the engine
+app/               Flutter desktop GUI over the engine (+ always-on MCP server)
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
