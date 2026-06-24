@@ -1,0 +1,18 @@
+# Root of the GPSPhotoTag 2.0 pub workspace.
+# The Flutter-free engine, the CLI, and the Flutter GUI all resolve together so a
+# single `dart pub get` wires the whole monorepo with one shared lockfile.
+name: gpsphototag_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+# `lints` lives here so `package:lints/recommended.yaml` resolves for the
+# analyzer at the workspace root (the engine/cli include it).
+dev_dependencies:
+  lints: ^6.0.0
+
+workspace:
+  - packages/engine
+  - packages/cli
+  - app

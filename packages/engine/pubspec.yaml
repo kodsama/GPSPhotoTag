@@ -1,0 +1,24 @@
+name: gpsphototag_engine
+description: >-
+  Flutter-free engine that powers both the GPSPhotoTag desktop GUI and CLI:
+  GPS EXIF tagging from GPX / Google location history, RAW pruning, date fixing,
+  and heatmap rendering.
+version: 2.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  meta: ^1.16.0
+  collection: ^1.19.0
+  path: ^1.9.0
+  xml: ^6.5.0
+  http: ^1.2.0
+  image: ^4.3.0
+  archive: ^4.0.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^6.0.0

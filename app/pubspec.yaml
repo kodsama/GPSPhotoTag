@@ -1,0 +1,22 @@
+name: gpsphototag_gui
+description: GPSPhotoTag desktop app — GPS photo tagging on macOS, Linux, Windows.
+publish_to: 'none'
+version: 2.0.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  gpsphototag_engine:
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

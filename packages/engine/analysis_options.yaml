@@ -1,0 +1,6 @@
+# Engine is a reusable library: require dartdoc on every public member.
+include: ../../analysis_options.yaml
+
+analyzer:
+  errors:
+    public_member_api_docs: warning

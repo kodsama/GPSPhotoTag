@@ -1,0 +1,25 @@
+# Shared lint configuration for every package in the workspace.
+# Stricter than the default `lints` set: the engine is a library others depend on,
+# so we hold its public surface to a high bar.
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # Missing dartdoc on public APIs is a warning we want to see, not ignore.
+    public_member_api_docs: ignore # enabled per-package for the engine below
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - prefer_final_locals
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - unnecessary_late
+    - use_super_parameters
+    - directives_ordering
+    - omit_local_variable_types
