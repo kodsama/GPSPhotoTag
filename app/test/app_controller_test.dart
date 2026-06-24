@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:gpsphototag_gui/src/state/app_controller.dart';
 import 'package:gpsphototag_gui/src/state/input_summary.dart';
 import 'package:gpsphototag_gui/src/state/wizard_step.dart';
+
+import 'support/fakes.dart';
 
 ToolStatus _tool(String id, {bool present = true}) => ToolStatus(
       id: id,
@@ -113,6 +117,69 @@ void main() {
       expect(c.logEntries.length, 2);
       c.markLogRead();
       expect(c.unreadCount, 0);
+    });
+  });
+
+  group('operations', () {
+    test('runTag folds events into state and tallies the summary', () async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetSummary(_summaryWith(['/photos/a.jpg']));
+      await c.runTag();
+
+      expect(c.running, isFalse);
+      expect(c.lastSummary, {'tagged': 1});
+      expect(c.rows, isNotEmpty);
+      expect(c.errorMessage, isNull);
+    });
+
+    test('an ErrorEvent surfaces as errorMessage and stops the run', () async {
+      final c = AppController(
+        runner: FakeEngineRunner(events: const [ErrorEvent('nope')]),
+      )..debugSetSummary(_summaryWith(['/photos/a.jpg']));
+      await c.runTag();
+
+      expect(c.errorMessage, 'nope');
+      expect(c.running, isFalse);
+    });
+
+    test('renderMap returns null when no folder is picked', () async {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(await c.renderMap(), isNull);
+    });
+
+    test('renderMap runs the map op and returns the output path', () async {
+      final tmp = Directory.systemTemp.createTempSync('rendermap');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetSummary(InputSummary.from(
+          folder: tmp.path,
+          photos: ['${tmp.path}/a.jpg'],
+          gpxFiles: const [],
+          googleFiles: const [],
+        ));
+      final path = await c.renderMap();
+      expect(fake.calls, contains('map'));
+      expect(path, endsWith('gpsphototag-heatmap.png'));
+    });
+
+    test('runPrune is a no-op without a folder, runs with one', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.runPrune(); // no folder -> no call
+      expect(fake.calls, isEmpty);
+
+      c.debugSetSummary(_summaryWith(['/photos/a.jpg']));
+      await c.runPrune(dryRun: true);
+      expect(fake.calls, contains('prune'));
+    });
+
+    test('runFixDates streams through the runner', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetSummary(_summaryWith(['/photos/a.jpg']));
+      await c.runFixDates(FixDatesMode.exif, dryRun: true);
+      expect(fake.calls, contains('fixDates'));
     });
   });
 }

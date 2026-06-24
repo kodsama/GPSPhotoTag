@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
 
 import 'commands/check_command.dart';
@@ -13,7 +15,10 @@ import 'commands/tag_command.dart';
 ///
 /// Global flags (`--json`, `--verbose`) live on the runner and are read by each
 /// command via `globalResults`.
-CommandRunner<int> buildRunner() {
+///
+/// [sink] overrides where commands write their output (defaults to stdout);
+/// tests pass a buffer-backed sink to capture output in-process.
+CommandRunner<int> buildRunner({IOSink? sink}) {
   final runner = CommandRunner<int>(
     'gpsphototag',
     'Tag photos with GPS from GPX tracks or Google location history.',
@@ -31,15 +36,15 @@ CommandRunner<int> buildRunner() {
     );
 
   runner
-    ..addCommand(TagCommand())
-    ..addCommand(MapCommand())
-    ..addCommand(PruneCommand())
-    ..addCommand(FixDatesCommand())
-    ..addCommand(CheckCommand())
-    ..addCommand(InfoCommand())
-    ..addCommand(ListSourcesCommand())
-    ..addCommand(ListProvidersCommand())
-    ..addCommand(SchemaCommand());
+    ..addCommand(TagCommand(sink: sink))
+    ..addCommand(MapCommand(sink: sink))
+    ..addCommand(PruneCommand(sink: sink))
+    ..addCommand(FixDatesCommand(sink: sink))
+    ..addCommand(CheckCommand(sink: sink))
+    ..addCommand(InfoCommand(sink: sink))
+    ..addCommand(ListSourcesCommand(sink: sink))
+    ..addCommand(ListProvidersCommand(sink: sink))
+    ..addCommand(SchemaCommand(sink: sink));
 
   return runner;
 }

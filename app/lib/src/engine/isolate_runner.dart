@@ -4,13 +4,15 @@ import 'dart:isolate';
 
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
+import 'engine_runner.dart';
+
 /// Runs each engine operation on a dedicated worker isolate and surfaces its
 /// [EngineEvent]s as a broadcast [Stream] on the main isolate.
 ///
 /// The engine is Flutter-free and its events/options are plain data, so they
 /// cross the isolate boundary unchanged. File parsing (GPX/Google) happens
 /// inside the worker too, keeping the UI isolate free of all I/O and CPU work.
-class IsolateRunner {
+class IsolateRunner implements EngineRunner {
   /// Creates a runner. [exiftoolAvailable] is detected once on the UI side and
   /// passed in so workers skip a redundant probe; pass null to let each worker
   /// probe for itself.
@@ -20,6 +22,7 @@ class IsolateRunner {
   final bool? exiftoolAvailable;
 
   /// Tags [photos] using GPS read from [gpxFiles] and [googleFiles].
+  @override
   Stream<EngineEvent> tag({
     required List<String> photos,
     required List<String> gpxFiles,
@@ -39,6 +42,7 @@ class IsolateRunner {
       );
 
   /// Renders a heatmap PNG from the GPS already embedded in [photos].
+  @override
   Stream<EngineEvent> map({
     required List<String> photos,
     required MapOptions options,
@@ -54,6 +58,7 @@ class IsolateRunner {
       );
 
   /// Prunes orphan RAW files under [roots].
+  @override
   Stream<EngineEvent> prune({
     required List<String> roots,
     required PruneOptions options,
@@ -64,6 +69,7 @@ class IsolateRunner {
       );
 
   /// Fixes capture/file dates for [files] in the given [mode].
+  @override
   Stream<EngineEvent> fixDates({
     required List<String> files,
     required FixDatesMode mode,

@@ -253,14 +253,38 @@ def _make_raw_pair_dir(tmp_path):
     return tmp_path
 
 
-def test_prune_raw_deletes_orphans_keeps_pairs(tmp_path):
+def test_prune_raw_trashes_orphans_by_default(tmp_path, monkeypatch):
+    import send2trash
+    trashed: list[str] = []
+    monkeypatch.setattr(send2trash, "send2trash", trashed.append)
     d = _make_raw_pair_dir(tmp_path)
     rc = cli.main(["--photo", str(d), "--prune-raw"])
+    assert rc == 0
+    assert {str(d / "orphan.raf"), str(d / "orphan.raf.xmp")} <= set(trashed)
+    assert str(d / "pair.raf") not in trashed and str(d / "pair.jpg") not in trashed
+
+
+def test_prune_raw_rm_deletes_orphans_keeps_pairs(tmp_path):
+    d = _make_raw_pair_dir(tmp_path)
+    rc = cli.main(["--photo", str(d), "--prune-raw", "--rm"])
     assert rc == 0
     assert not (d / "orphan.raf").exists()
     assert not (d / "orphan.raf.xmp").exists()
     assert (d / "pair.raf").exists()
     assert (d / "pair.jpg").exists()
+
+
+def test_prune_raw_matches_companion_across_subfolders(tmp_path):
+    """RAWs in a RAF/ subfolder are kept when the JPG lives at the root."""
+    raf_dir = tmp_path / "RAF"
+    raf_dir.mkdir()
+    (raf_dir / "DSCF1.RAF").write_bytes(b"x")   # paired
+    (raf_dir / "DSCF2.RAF").write_bytes(b"x")   # orphan
+    (tmp_path / "DSCF1.JPG").write_bytes(b"x")
+    rc = cli.main(["--photo", str(tmp_path), "--prune-raw", "--rm"])
+    assert rc == 0
+    assert (raf_dir / "DSCF1.RAF").exists()
+    assert not (raf_dir / "DSCF2.RAF").exists()
 
 
 def test_prune_raw_dry_run_deletes_nothing(tmp_path):

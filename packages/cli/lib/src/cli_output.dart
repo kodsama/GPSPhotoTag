@@ -14,10 +14,19 @@ import 'exit_codes.dart';
 /// per-item line and a final summary; progress events are suppressed.
 class CliOutput {
   /// Creates an output renderer. [json] selects machine mode.
-  CliOutput({required this.json});
+  ///
+  /// [sink] receives normal output (defaults to [stdout]); [errorSink] receives
+  /// human-mode error/warning lines (defaults to [stderr]). Tests pass
+  /// buffer-backed sinks to capture output in-process.
+  CliOutput({required this.json, IOSink? sink, IOSink? errorSink})
+      : _sink = sink ?? stdout,
+        _errorSink = errorSink ?? stderr;
 
   /// Whether to emit newline-delimited JSON.
   final bool json;
+
+  final IOSink _sink;
+  final IOSink _errorSink;
 
   int _exit = ExitCodes.ok;
   bool _sawError = false;
@@ -28,7 +37,7 @@ class CliOutput {
   /// Renders [event] and updates the exit code.
   void add(EngineEvent event) {
     if (json) {
-      stdout.writeln(jsonEncode(event.toJson()));
+      _sink.writeln(jsonEncode(event.toJson()));
     } else {
       _human(event);
     }
@@ -55,8 +64,8 @@ class CliOutput {
     switch (event) {
       case LogEvent(:final message, :final level):
         final sink = level == LogLevel.error || level == LogLevel.warning
-            ? stderr
-            : stdout;
+            ? _errorSink
+            : _sink;
         sink.writeln('${level.name}: $message');
       case ItemEvent(:final row):
         final coords = row.location == null
@@ -65,18 +74,18 @@ class CliOutput {
                 '${row.location!.longitude.toStringAsFixed(5)} '
                 '(${row.location!.provenance})';
         final note = row.note == null ? '' : '  — ${row.note}';
-        stdout.writeln('${p.basename(row.path).padRight(28)} '
+        _sink.writeln('${p.basename(row.path).padRight(28)} '
             '${row.status.wire.padRight(15)}$coords$note');
       case DoneEvent(:final summary):
-        stdout.writeln('—' * 40);
+        _sink.writeln('—' * 40);
         final keys = summary.keys.toList()..sort();
         for (final k in keys) {
-          stdout.writeln('${k.padRight(20)} ${summary[k]}');
+          _sink.writeln('${k.padRight(20)} ${summary[k]}');
         }
-        stdout.writeln('${'total'.padRight(20)} '
+        _sink.writeln('${'total'.padRight(20)} '
             '${summary.values.fold(0, (a, b) => a + b)}');
       case ErrorEvent(:final message):
-        stderr.writeln('error: $message');
+        _errorSink.writeln('error: $message');
       case ProgressEvent():
         break;
     }

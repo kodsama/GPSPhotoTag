@@ -94,9 +94,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="label each area on the map with its filename range "
                         "(e.g. 'DSCF0795-0801')")
     p.add_argument("--prune-raw", action="store_true",
-                   help="delete RAW files that have no same-name JPG/HEIC next to "
-                        "them (and their .xmp sidecars), then exit; no tagging — "
-                        "combine with --dry-run to preview")
+                   help="move RAW files that have no same-name JPG/HEIC companion "
+                        "anywhere in the tree (and their .xmp sidecars) to the OS "
+                        "Trash, then exit; no tagging. Add --rm to delete outright, "
+                        "or --dry-run to preview")
+    p.add_argument("--rm", action="store_true",
+                   help="with --prune-raw: permanently delete orphans (rm) instead "
+                        "of moving them to the OS Trash (the default)")
     p.add_argument("--dry-run", action="store_true",
                    help="locate + report only; write nothing")
     p.add_argument("--verbose", "-v", action="store_true",
@@ -173,18 +177,19 @@ def validate_prune_mode(args: argparse.Namespace) -> str | None:
     return None
 
 
-def run_prune_raw(photos: list[Path], dry_run: bool) -> int:
-    """Delete RAWs from ``photos`` lacking a JPG/HEIC companion. Exit code."""
+def run_prune_raw(photos: list[Path], dry_run: bool, hard: bool = False) -> int:
+    """Trash (or delete with ``hard``) RAWs lacking a JPG/HEIC companion. Exit code."""
     n_raw = sum(1 for p in photos if p.suffix.lower() in RAW_EXTS)
     orphans = pruner.find_orphan_raws(photos)
     logger.info("%d of %d RAW file(s) have no same-name JPG/HEIC companion",
                 len(orphans), n_raw)
+    verb, past = ("delete", "Deleted") if hard else ("move to Trash", "Trashed")
     for raw in orphans:
         if dry_run:
-            logger.info("Would delete %s", raw)
+            logger.info("Would %s %s", verb, raw)
         else:
-            for path in pruner.delete_raw(raw):
-                logger.info("Deleted %s", path)
+            for path in pruner.delete_raw(raw, hard=hard):
+                logger.info("%s %s", past, path)
     return 0
 
 
@@ -310,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Resolved %d photo(s)", len(photos))
 
     if args.prune_raw:
-        return run_prune_raw(photos, args.dry_run)
+        return run_prune_raw(photos, args.dry_run, args.rm)
 
     if args.map is not None:
         return run_map(photos, args.map, args.map_dpi, args.map_clusters,

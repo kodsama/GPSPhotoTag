@@ -11,6 +11,11 @@ import 'info_command.dart' show cliVersion;
 /// command, its options, the `--json` event shapes, and the exit codes, then
 /// drive the tool with `--json`.
 class SchemaCommand extends Command<int> {
+  /// Creates the command. [sink] overrides stdout (for tests).
+  SchemaCommand({IOSink? sink}) : _out = sink ?? stdout;
+
+  final IOSink _out;
+
   @override
   String get name => 'schema';
 
@@ -20,7 +25,7 @@ class SchemaCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    stdout.writeln(const JsonEncoder.withIndent('  ').convert(_schema));
+    _out.writeln(const JsonEncoder.withIndent('  ').convert(_schema));
     return 0;
   }
 }

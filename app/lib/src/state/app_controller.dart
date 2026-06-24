@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:path/path.dart' as p;
 
+import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
 import 'input_summary.dart';
@@ -23,13 +24,13 @@ class AppController extends ChangeNotifier {
   /// Creates a controller. Inject a fake [runner] and/or a [pickFolder] override
   /// in tests; both default to the real implementations.
   AppController({
-    IsolateRunner? runner,
+    EngineRunner? runner,
     Future<String?> Function()? pickFolder,
   })  : _pickFolder = pickFolder ?? getDirectoryPath {
     _runner = runner;
   }
 
-  IsolateRunner? _runner;
+  EngineRunner? _runner;
   final Future<String?> Function() _pickFolder;
 
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
@@ -38,7 +39,7 @@ class AppController extends ChangeNotifier {
   final McpService mcp = McpService();
 
   /// The runner, lazily built once exiftool availability is known.
-  IsolateRunner get _engine =>
+  EngineRunner get _engine =>
       _runner ??= IsolateRunner(exiftoolAvailable: exiftoolAvailable);
 
   // --- Theme ---------------------------------------------------------------

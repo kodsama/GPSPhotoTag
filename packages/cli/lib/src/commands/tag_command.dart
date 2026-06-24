@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
@@ -7,8 +9,9 @@ import '../source_loader.dart';
 
 /// `tag` — write GPS EXIF into photos from GPX and/or Google location history.
 class TagCommand extends Command<int> {
-  /// Registers the `tag` flags.
-  TagCommand() {
+  /// Registers the `tag` flags. [sink] overrides stdout (for tests).
+  // ignore: prefer_initializing_formals
+  TagCommand({IOSink? sink}) : _sink = sink {
     argParser
       ..addMultiOption('photo',
           abbr: 'p', help: 'Photo file or directory (repeatable, recursive).')
@@ -34,6 +37,8 @@ class TagCommand extends Command<int> {
           negatable: false, help: 'Report only; write nothing.');
   }
 
+  final IOSink? _sink;
+
   @override
   String get name => 'tag';
 
@@ -44,7 +49,7 @@ class TagCommand extends Command<int> {
   @override
   Future<int> run() async {
     final json = globalResults!.flag('json');
-    final out = CliOutput(json: json);
+    final out = CliOutput(json: json, sink: _sink, errorSink: _sink);
 
     final photos = Collectors.photos(argResults!.multiOption('photo'));
     if (photos.isEmpty) {

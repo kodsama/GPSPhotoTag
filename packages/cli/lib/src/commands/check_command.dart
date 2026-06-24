@@ -6,6 +6,11 @@ import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
 /// `check` — probe external tools (exiftool, libheif, package manager).
 class CheckCommand extends Command<int> {
+  /// Creates the command. [sink] overrides stdout (for tests).
+  CheckCommand({IOSink? sink}) : _out = sink ?? stdout;
+
+  final IOSink _out;
+
   @override
   String get name => 'check';
 
@@ -17,14 +22,14 @@ class CheckCommand extends Command<int> {
   Future<int> run() async {
     final tools = await ToolkitChecker(const SystemProcessRunner()).check();
     if (globalResults!.flag('json')) {
-      stdout.writeln(jsonEncode({'tools': [for (final t in tools) t.toJson()]}));
+      _out.writeln(jsonEncode({'tools': [for (final t in tools) t.toJson()]}));
     } else {
       for (final t in tools) {
         final mark = t.present ? '✓' : '✗';
         final ver = t.version == null ? '' : ' (${t.version})';
-        stdout.writeln('$mark ${t.name}$ver — ${t.purpose}');
+        _out.writeln('$mark ${t.name}$ver — ${t.purpose}');
         if (!t.present && t.installCommand != null) {
-          stdout.writeln('    install: ${t.installCommand}');
+          _out.writeln('    install: ${t.installCommand}');
         }
       }
     }

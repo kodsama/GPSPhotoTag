@@ -63,18 +63,28 @@ const mapProviders = [
   },
 ];
 
-void _print(bool json, String key, List<Map<String, Object?>> items) {
+void _print(
+  IOSink out,
+  bool json,
+  String key,
+  List<Map<String, Object?>> items,
+) {
   if (json) {
-    stdout.writeln(jsonEncode({key: items}));
+    out.writeln(jsonEncode({key: items}));
   } else {
     for (final i in items) {
-      stdout.writeln('${i['id']}\t${i['name']}  (${i['kind']})');
+      out.writeln('${i['id']}\t${i['name']}  (${i['kind']})');
     }
   }
 }
 
 /// `list-sources` — enumerate supported location sources.
 class ListSourcesCommand extends Command<int> {
+  /// Creates the command. [sink] overrides stdout (for tests).
+  ListSourcesCommand({IOSink? sink}) : _out = sink ?? stdout;
+
+  final IOSink _out;
+
   @override
   String get name => 'list-sources';
 
@@ -83,7 +93,7 @@ class ListSourcesCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    _print(globalResults!.flag('json'), 'sources',
+    _print(_out, globalResults!.flag('json'), 'sources',
         locationSources.cast<Map<String, Object?>>());
     return 0;
   }
@@ -91,6 +101,11 @@ class ListSourcesCommand extends Command<int> {
 
 /// `list-providers` — enumerate tile/geocoder providers.
 class ListProvidersCommand extends Command<int> {
+  /// Creates the command. [sink] overrides stdout (for tests).
+  ListProvidersCommand({IOSink? sink}) : _out = sink ?? stdout;
+
+  final IOSink _out;
+
   @override
   String get name => 'list-providers';
 
@@ -99,7 +114,7 @@ class ListProvidersCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    _print(globalResults!.flag('json'), 'providers',
+    _print(_out, globalResults!.flag('json'), 'providers',
         mapProviders.cast<Map<String, Object?>>());
     return 0;
   }

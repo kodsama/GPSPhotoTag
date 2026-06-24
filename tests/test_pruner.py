@@ -53,24 +53,47 @@ def test_non_raw_photos_are_ignored(tmp_path):
     assert pruner.find_orphan_raws([jpg]) == []
 
 
-def test_companions_only_match_within_same_directory(tmp_path):
-    sub = tmp_path / "sub"
+def test_companion_in_another_directory_protects_raw(tmp_path):
+    """RAWs in a subfolder are protected by a JPG sitting elsewhere in the tree."""
+    sub = tmp_path / "RAF"
     sub.mkdir()
     raw = _touch(sub / "y.raf")
-    _touch(tmp_path / "y.jpg")  # same stem, different directory
-    assert pruner.find_orphan_raws([raw]) == [raw]
+    jpg = _touch(tmp_path / "y.jpg")  # same stem, different directory
+    # The collector hands both to find_orphan_raws (recursive scan of origin).
+    assert pruner.find_orphan_raws([raw, jpg]) == []
 
 
-def test_delete_raw_removes_file(tmp_path):
+def test_orphan_in_subfolder_is_found(tmp_path):
+    sub = tmp_path / "RAF"
+    sub.mkdir()
+    orphan = _touch(sub / "lonely.raf")
+    paired = _touch(sub / "kept.raf")
+    jpg = _touch(tmp_path / "kept.jpg")
+    assert pruner.find_orphan_raws([orphan, paired, jpg]) == [orphan]
+
+
+def test_delete_raw_trashes_by_default(tmp_path, monkeypatch):
+    import send2trash
+    trashed: list[str] = []
+    monkeypatch.setattr(send2trash, "send2trash", trashed.append)
     raw = _touch(tmp_path / "z.raf")
-    deleted = pruner.delete_raw(raw)
+    sidecar = _touch(tmp_path / "z.raf.xmp")
+    affected = pruner.delete_raw(raw)
+    assert set(affected) == {raw, sidecar}
+    assert set(trashed) == {str(raw), str(sidecar)}
+    assert raw.exists() and sidecar.exists()  # trash was mocked, nothing removed
+
+
+def test_delete_raw_hard_removes_file(tmp_path):
+    raw = _touch(tmp_path / "z.raf")
+    deleted = pruner.delete_raw(raw, hard=True)
     assert deleted == [raw]
     assert not raw.exists()
 
 
-def test_delete_raw_takes_xmp_sidecar_along(tmp_path):
+def test_delete_raw_hard_takes_xmp_sidecar_along(tmp_path):
     raw = _touch(tmp_path / "z.raf")
     sidecar = _touch(tmp_path / "z.raf.xmp")
-    deleted = pruner.delete_raw(raw)
+    deleted = pruner.delete_raw(raw, hard=True)
     assert set(deleted) == {raw, sidecar}
     assert not raw.exists() and not sidecar.exists()

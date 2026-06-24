@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
@@ -6,8 +8,9 @@ import '../source_loader.dart';
 
 /// `fix-dates` — realign file timestamps and EXIF capture dates.
 class FixDatesCommand extends Command<int> {
-  /// Registers the `fix-dates` flags.
-  FixDatesCommand() {
+  /// Registers the `fix-dates` flags. [sink] overrides stdout (for tests).
+  // ignore: prefer_initializing_formals
+  FixDatesCommand({IOSink? sink}) : _sink = sink {
     argParser
       ..addMultiOption('photo',
           abbr: 'p', help: 'Photo file or directory (repeatable, recursive).')
@@ -19,6 +22,8 @@ class FixDatesCommand extends Command<int> {
           negatable: false, help: 'Report only; change nothing.');
   }
 
+  final IOSink? _sink;
+
   @override
   String get name => 'fix-dates';
 
@@ -28,7 +33,8 @@ class FixDatesCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final out = CliOutput(json: globalResults!.flag('json'));
+    final out = CliOutput(
+        json: globalResults!.flag('json'), sink: _sink, errorSink: _sink);
     final photos = Collectors.photos(argResults!.multiOption('photo'));
     if (photos.isEmpty) {
       out.add(const ErrorEvent('no photos found for --photo', code: 'bad_input'));

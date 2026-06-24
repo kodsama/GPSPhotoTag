@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 
@@ -6,8 +8,9 @@ import '../source_loader.dart';
 
 /// `map` — render a density heatmap PNG of where photos were taken (read-only).
 class MapCommand extends Command<int> {
-  /// Registers the `map` flags.
-  MapCommand() {
+  /// Registers the `map` flags. [sink] overrides stdout (for tests).
+  // ignore: prefer_initializing_formals
+  MapCommand({IOSink? sink}) : _sink = sink {
     argParser
       ..addMultiOption('photo',
           abbr: 'p', help: 'Photo file or directory (repeatable, recursive).')
@@ -20,6 +23,8 @@ class MapCommand extends Command<int> {
           help: 'Cluster selection: "all" (default) or e.g. "1,2".');
   }
 
+  final IOSink? _sink;
+
   @override
   String get name => 'map';
 
@@ -29,7 +34,8 @@ class MapCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final out = CliOutput(json: globalResults!.flag('json'));
+    final out = CliOutput(
+        json: globalResults!.flag('json'), sink: _sink, errorSink: _sink);
 
     final photos = Collectors.photos(argResults!.multiOption('photo'));
     if (photos.isEmpty) {

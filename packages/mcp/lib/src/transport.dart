@@ -12,7 +12,7 @@ Future<void> serveStdio(McpServer server) async {
   final lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
   await for (final line in lines) {
     if (line.trim().isEmpty) continue;
-    final response = await _process(server, line);
+    final response = await processLine(server, line);
     if (response != null) {
       stdout.writeln(jsonEncode(response));
       await stdout.flush();
@@ -46,7 +46,7 @@ Future<ServerSocket> serveTcp(
         for (final raw in parts) {
           for (final line in splitter.convert(raw)) {
             if (line.trim().isEmpty) continue;
-            final response = await _process(server, line);
+            final response = await processLine(server, line);
             if (response != null) client.writeln(jsonEncode(response));
           }
         }
@@ -60,8 +60,12 @@ Future<ServerSocket> serveTcp(
 }
 
 /// Decodes one line, dispatches it, and returns the response map (or null for a
-/// notification). Malformed JSON yields a JSON-RPC parse error.
-Future<Map<String, Object?>?> _process(McpServer server, String line) async {
+/// notification). Malformed JSON yields a JSON-RPC parse error; a non-object
+/// payload yields an invalid-request error.
+///
+/// Shared by both [serveStdio] and [serveTcp] so the parse/dispatch logic has a
+/// single, transport-independent implementation that can be tested directly.
+Future<Map<String, Object?>?> processLine(McpServer server, String line) async {
   final Object? decoded;
   try {
     decoded = jsonDecode(line);
