@@ -1,285 +1,132 @@
 <p align="center">
-  <img src="assets/logo.png" alt="GPSPhotoTag" width="160"/>
+  <img src="app/assets/icon_1024.png" alt="GPSPhotoTag" width="140"/>
 </p>
 
 <h1 align="center">GPSPhotoTag</h1>
 
 <p align="center">
-  <i>Tag photos with GPS EXIF from GPX tracks or Google location history.</i>
+  <i>Tag photos with GPS from GPX tracks or Google location history —
+  a cross-platform desktop app and a headless, LLM-friendly CLI,
+  both powered by one pure-Dart engine.</i>
 </p>
 
 ---
 
 ## What it does
 
-You take photos. Sometimes you also have a GPX track from a watch, app,
-or handheld GPS. When you don't, your phone's Google location history
-covers you. **GPSPhotoTag** writes accurate GPS EXIF into your photos using
-the first source that has a match for the photo's timestamp:
+You take photos. Sometimes you also have a GPX track (watch, phone, handheld
+GPS); when you don't, your Google location history covers you. GPSPhotoTag writes
+accurate GPS EXIF into your photos by matching each photo's capture time against
+the first source that has a fix — GPX first (most precise), then Google.
 
-1. **GPX tracks** you provide (best precision).
-2. **Google location history** as a fallback: Takeout `Records.json` or
-   per-day Timeline JSON / KML exports — both auto-detected.
+It also: renders a **density heatmap** of where photos were taken, **prunes**
+RAW files that have no JPG/HEIC companion, and **fixes dates** between EXIF and
+the filesystem.
 
-If nothing matches within the time threshold, the photo is reported and
-left untouched.
+Two front-ends, one engine:
 
-**Supported formats:**
+- **Desktop app** (macOS / Linux / Windows) — a guided, stepped walkthrough.
+- **CLI** — scriptable, with a JSON event stream and a self-describing `schema`
+  command for agents.
 
-| Family | Extensions | Write strategy |
+## Supported formats
+
+| Family | Extensions | GPS write strategy |
 |---|---|---|
-| JPEG | `.jpg`, `.jpeg` | lossless via `piexif` |
-| HEIC | `.heic`, `.heif` | Pillow + `pillow-heif` (re-encodes) |
-| PNG  | `.png` | Pillow (re-encodes, writes `eXIf` chunk) |
-| RAW  | `.raf .nef .nrw .cr2 .cr3 .crw .arw .sr2 .srf .dng .rw2 .orf .pef .ptx .raw .rwl .srw .x3f .iiq .3fr .erf` | XMP sidecar (default) or `exiftool` embed |
+| JPEG | `.jpg .jpeg` | inline, **lossless**, pure Dart |
+| PNG | `.png` | inline (re-encode) |
+| RAW | `.raf .nef .cr2 .cr3 .dng .arw .orf …` | XMP sidecar (default) or exiftool embed |
+| HEIC | `.heic .heif` | via exiftool |
 
-## Install
+RAW timestamp reading for Fuji `.RAF` / Canon `.CR3`, RAW **embed**, and HEIC use
+the external **exiftool** binary; HEIC decode uses **libheif**. The app's toolkit
+checker detects these and offers one-click install. The pure-Dart JPEG/PNG path
+always works with no external tools.
 
-```bash
-# inside a fresh venv
-pip install -r requirements.txt
-pip install -e .
+## The desktop app
 
-# or with extras:
-pip install -e ".[dev]"
-```
+A stepped, collapsible walkthrough — one step open at a time, auto-advancing,
+completed steps collapse with a check and stay tappable:
 
-Python 3.10+.
+1. **Toolkit** — checks exiftool / libheif / your package manager, with Install
+   buttons; never claims "ready" when it isn't.
+2. **Photos** — native folder picker; shows a parsed summary.
+3. **Review** — per-format include/exclude checklist.
+4. **Options** — every option, smart defaults pre-selected.
+5. **Output** — in place, or copy to a destination folder.
+6. **Run** — global + per-item progress; errors surfaced in the UI.
+7. **Result** — summary, plus one-click **heatmap**, **prune RAW**, **fix dates**.
 
-## Quickstart
-
-```bash
-# Tag every JPEG in a directory with a single GPX, in place:
-gpsphototag --photo ~/Pictures/Trip/ --gps trip.gpx --overwrite
-
-# Glob + dir, write to a separate output folder:
-gpsphototag --photo "DSC*.jpg" ~/Pictures/Trip/ \
-         --gps tracks/ \
-         --out tagged/
-
-# GPX + Google fallback, replacing any existing GPS bytes:
-gpsphototag --photo ~/Pictures/2024/ \
-         --gps tracks/ \
-         --maps-history takeout/Records.json timeline_export/ \
-         --out tagged/ --replace
-
-# Dry run — see what would happen without touching files:
-gpsphototag --photo ~/Pictures/Trip/ --gps trip.gpx --dry-run
-```
-
-## CLI reference
-
-| Flag | Description |
-|---|---|
-| `--photo / -p PATH ...` | Photo file, glob, or directory (recursive). Repeatable. **Required.** |
-| `--gps / -g PATH ...` | GPX file, glob, or directory. Repeatable. |
-| `--maps-history / -m PATH ...` | Google Takeout `Records.json` or Timeline JSON/KML. Auto-detected. Repeatable. |
-| `--out / -o DIR` | Write tagged photos here (originals untouched). |
-| `--overwrite` | Modify originals in place. Required when `--out` is absent. |
-| `--replace` | Overwrite existing GPS bytes inside the photo (otherwise such photos are skipped). |
-| `--raw-mode {auto,sidecar,embed}` | RAW write strategy. `auto` (default) embeds GPS into the RAW via `exiftool` when available, else writes `photo.raf.xmp`. `sidecar` always writes the XMP sidecar (never touches the RAW). `embed` forces `exiftool`. |
-| `--fix-dates {exif,file}` | Also fix dates. `exif`: set the file's created/modified date from the EXIF timestamp. `file`: write EXIF `DateTimeOriginal` from the file's created date. Runs standalone (no GPS source required). See [Fixing dates](#fixing-dates---fix-dates). |
-| `--map PNG` | **Read-only.** Render a heatmap PNG of where the photos were taken (from GPS already in the photos) and exit — no tagging. See [Heatmap](#heatmap---map). |
-| `--map-dpi DPI` | Resolution of the `--map` PNG (30–1200). Default `200`. |
-| `--map-clusters SEL` | When photos span multiple locations, which to include: `all`, or comma-separated cluster numbers (e.g. `1,2`). If omitted you're prompted interactively. |
-| `--map-names` | Label each area on the map with its filename range (e.g. `DSCF0795-0801`). |
-| `--prune-raw` | **Standalone.** Delete RAW files that have no same-name JPG/HEIC next to them (and their `.xmp` sidecars), then exit — no tagging. For RAW+JPEG shooters: cull the JPGs in a viewer, then prune the leftover RAWs. Combine with `--dry-run` to preview. |
-| `--max-time-diff SECONDS` | Max gap between photo time and GPS point(s). Default `300`. |
-| `--timezone TZ` | IANA tz used when EXIF lacks `OffsetTimeOriginal`. Default: system local. |
-| `--dry-run` | Locate + report only; write nothing. |
-| `--verbose / -v` | DEBUG-level console logging. |
-| `--log-file PATH` | Also write INFO+ logs to this file. |
-
-### `--replace` vs `--overwrite` — what's the difference?
-
-They are independent guards.
-
-- `--overwrite` = *"yes, modify the original file"* (file-safety guard).
-  Required when `--out` is not given.
-- `--replace` = *"yes, overwrite the GPS bytes already inside the file"*
-  (data-loss guard). Without it, photos that already carry GPS are
-  reported as `already_tagged` and left alone.
-
-| `--out` | `--overwrite` | `--replace` | Result |
-|:---:|:---:|:---:|---|
-| set | – | – | Tag into `out/`; already-tagged photos copied unchanged |
-| set | – | ✓ | Tag into `out/`; existing GPS overwritten |
-| – | ✓ | – | Tag in place; already-tagged photos skipped |
-| – | ✓ | ✓ | Tag in place; existing GPS overwritten |
-| – | – | – | **error**: refuse to write — pass `--out` or `--overwrite` |
-| – | – | ✓ | error — `--replace` needs a destination |
-| set | ✓ | * | error — pick one destination |
-
-## Fixing dates (`--fix-dates`)
-
-Two directions, in addition to (or instead of) GPS tagging. It runs
-standalone — you don't need a GPS source.
-
-- **`--fix-dates exif`** — set the *file's* created/modified date **from**
-  the photo's EXIF `DateTimeOriginal`. Useful after copies/edits scrambled
-  the filesystem timestamps. Works for every supported format, including
-  RAW (read via `exifread`).
-- **`--fix-dates file`** — write the EXIF `DateTimeOriginal` **from** the
-  file's created date (birthtime, falling back to modified time). Useful
-  for scans or exports that never had an EXIF date.
+A floating activity-log button (bottom-right) opens a panel with the full event
+log. Heavy work runs in **worker isolates**, so the UI stays responsive.
 
 ```bash
-# realign file dates to the EXIF capture time, in place:
-gpsphototag --photo ~/Pictures/Trip/ --overwrite --fix-dates exif
-
-# stamp EXIF from the filesystem date, writing copies to out/:
-gpsphototag --photo ~/Scans/ --out dated/ --fix-dates file
+cd app
+flutter run -d macos     # or -d linux / -d windows
+flutter build macos      # package the .app
 ```
 
-Notes:
-
-- On macOS the Finder **"Date Created"** (birthtime) is set via the
-  `SetFile` tool (Xcode command-line tools). If `SetFile` isn't installed,
-  only the modified/accessed time is set and a warning is logged.
-- `--fix-dates file` for **RAW** writes the capture date into the file via
-  `exiftool` (works under the default `auto` mode when exiftool is present,
-  or with `--raw-mode embed`). Under `--raw-mode sidecar` it's skipped with
-  a note, since a capture date can't go into an XMP sidecar.
-- Combine freely with GPS tagging — the row shows the GPS status plus a
-  date note; standalone date runs report the `dates_fixed` status.
-
-## Heatmap (`--map`)
-
-Render a modern density heatmap of *where* your photos were taken — a
-Google-Photos-style warm glow over a clean light basemap, with a crisp dot per
-photo on top so every individual location stays visible (even a single shot far
-from any cluster). It's **read-only**: it reads the GPS already in the photos
-and writes a single PNG; it never tags.
+## The CLI
 
 ```bash
-# Heatmap of an already-tagged trip, high resolution:
-gpsphototag --photo ~/Pictures/Trip/ --map trip.png --map-dpi 300
+# from the repo root
+dart run gpsphototag_cli --version
+# or compile a standalone binary:
+dart compile exe packages/cli/bin/gpsphototag.dart -o gpsphototag
 ```
 
-- **Auto-zoom.** The map fits the bounding box of the photos — tight for a
-  single neighbourhood, wide for a road trip. When the photos are spread far
-  apart, an overview is written *plus* a zoomed-in PNG per dense sub-area
-  (`trip.png`, `trip-zoom1.png`, `trip-zoom2.png`, …) so detail isn't lost.
-- **Filename labels.** With `--map-names`, each area is labelled with its
-  collapsed filename range — `DSCF0795, DSCF0796, DSCF0797` becomes
-  `DSCF0795-0797`; gaps show as `DSCF0820-0822, 0825`.
-- **Multiple locations.** If your photos fall into geographically distinct
-  groups (e.g. a trip plus a stray shot from the departure airport), the tool
-  lists the clusters — reverse-geocoded to place names — and asks which to
-  include. Pass `--map-clusters all` or `--map-clusters 1,2` to choose
-  non-interactively.
-- **Install.** Map rendering needs the optional extra:
-  `pip install 'gpsphototag[map]'` (adds `matplotlib`, `contextily`, `geopy`).
-  Basemap tiles are fetched from CARTO, so an internet connection is required
-  when generating.
-- **Privacy.** Generating a map makes two kinds of network requests: basemap
-  tiles are fetched from CARTO for the photos' bounding box, and cluster names
-  come from OpenStreetMap Nominatim reverse geocoding (cluster centroids only,
-  never individual photo coordinates). Nothing else leaves your machine, and
-  tagging itself (`--gps` / `--maps-history`) is fully offline.
+Commands: `tag`, `map`, `prune-raw`, `fix-dates`, `check`, `info`,
+`list-sources`, `list-providers`, `schema`.
 
-```text
-Photos span 2 distinct locations:
-  [1] Tirana, Albania — 70 photo(s)
-  [2] Tårnby Municipality, Denmark — 1 photo(s)
-Which location(s) to map? [number(s) e.g. 1,2 — or 'all']:
+```bash
+# Tag a folder from a GPX track, in place:
+gpsphototag tag -p ~/Pictures/Trip -g trip.gpx --overwrite
+
+# Heatmap PNG of an already-tagged trip:
+gpsphototag map -p ~/Pictures/Trip -o trip.png
+
+# Remove RAW files with no JPG/HEIC companion (to Trash):
+gpsphototag prune-raw -p ~/Pictures/Trip
+
+# Preview anything without writing:
+gpsphototag tag -p ~/Pictures/Trip -g trip.gpx --dry-run
 ```
 
-## Getting Google location data
+### For agents / scripting
 
-Google's live Timeline API was deprecated in 2024; the data now lives on
-your phone or in Takeout.
+`--json` emits one JSON event per line; `schema` describes every command,
+option, event, and exit code. See [AGENTS.md](AGENTS.md) for the full contract.
 
-- **Takeout `Records.json`** — your *entire* history.
-  Go to <https://takeout.google.com>, deselect everything, then select
-  "Location History (Timeline)" and export. Unzip; pass the `Records.json`
-  file to `--maps-history`.
-- **Per-day Timeline export** — useful for a single trip.
-  Google Maps app → your profile → Your Timeline → ⋯ → "Export Timeline data".
-  Pass the resulting folder to `--maps-history`; GPSPhotoTag auto-detects
-  JSON and KML files inside.
+```bash
+gpsphototag schema                       # discover the surface
+gpsphototag --json check                 # probe the environment
+gpsphototag --json tag -p ./Trip -g t.gpx --overwrite
+```
 
-## RAW workflow
+Exit codes: `0` ok · `2` partial (some no-match) · `3` bad input · `4` missing
+toolkit · `5` internal.
 
-**Reading RAW timestamps.** GPSPhotoTag reads EXIF from TIFF-based RAW
-(`.nef/.cr2/.dng/.arw/.orf/.pef/.rw2`, …) with pure-Python `exifread`.
-Containers exifread can't parse — **Fujifilm `.RAF`**, **Canon `.CR3`**,
-`.crw`, `.x3f` — are read via `exiftool` instead, so install it
-(`brew install exiftool`) to tag those. Without exiftool, GPSPhotoTag logs a
-clear warning and leaves such photos untouched.
+## Project layout
 
-**Writing GPS to RAW.** By default GPSPhotoTag writes *into* the RAW file
-itself when it can. Three `--raw-mode` values:
+```
+packages/engine/   pure-Dart, Flutter-free engine (domain → data → services → app)
+packages/cli/      headless CLI over the engine
+app/               Flutter desktop GUI over the engine
+```
 
-- **`auto` (default)** — embed GPS directly into the RAW via `exiftool`
-  when it's available; otherwise fall back to an XMP sidecar. This means
-  you get tags inside the file whenever possible, with a graceful fallback.
-- **`embed`** — force embedding via `exiftool` (errors if it's missing).
-- **`sidecar`** — always write `your-photo.raf.xmp` next to the RAW and
-  never touch the RAW bytes. Pure Python, no external binary. Lightroom,
-  darktable, and digiKam read these natively. Use this if you'd rather keep
-  RAW files pristine.
-
-Install exiftool for embedding: `brew install exiftool` (macOS) /
-`apt install libimage-exiftool-perl` (Debian/Ubuntu). When writing to
-`--out`, the RAW is copied there first, so originals stay untouched in
-every mode.
-
-If a photo has either inline GPS *or* a sibling `.xmp` sidecar, it's
-considered already tagged (skipped unless you pass `--replace`).
-
-## Caveats
-
-- **HEIC/HEIF re-encodes** — JPEG is written losslessly via `piexif`.
-  HEIC and PNG go through Pillow, which re-encodes pixel data on save.
-  Use `--out` if you care about preserving originals.
-- **RAW writes default to embedding** (`--raw-mode auto`) via `exiftool`,
-  modifying the RAW's metadata in place. Use `--raw-mode sidecar` to keep
-  RAW files byte-for-byte pristine (writes a separate `.xmp` instead), or
-  `--out DIR` to embed into copies and leave originals untouched.
-- **Threshold tuning** — `--max-time-diff` defaults to 5 minutes. For
-  sparse data (Google location history often samples every ~5–15 min),
-  bump to e.g. `--max-time-diff 900`. For tight GPX tracks (every 1–5 s),
-  the default is generous already.
-- **Timezone** — most modern cameras and phones write `OffsetTimeOriginal`.
-  If yours doesn't, set `--timezone Europe/Paris` (or whichever IANA name).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-pytest -q                  # run tests
-ruff check gpsphototag tests  # lint
+flutter pub get                       # resolves the whole workspace
+dart analyze packages                 # engine + cli
+dart test packages/engine packages/cli
+cd app && flutter analyze && flutter test
 ```
-
-Layout:
-
-```
-gpsphototag/
-  cli.py            argparse + main
-  collectors.py     resolve --photo / --gps / --maps-history paths
-  exif.py           read DateTimeOriginal, write GPS + datetime (JPEG/HEIC/PNG; dispatches RAW)
-  raw_writer.py     RAW: exifread reads, XMP sidecar writes, exiftool subprocess
-  pruner.py         --prune-raw: delete RAWs lacking a same-name JPG/HEIC
-  dates.py          --fix-dates: read/set filesystem timestamps (SetFile on macOS)
-  gpx_source.py     gpxpy → TimedPoint list (sorted, UTC)
-  google_source.py  Records.json / Timeline JSON / KML → TimedPoints
-  locator.py        GPX > Google, exact-or-linear-interpolated
-  tagger.py         per-photo orchestration honoring out/overwrite/replace
-  display.py        rich-based live status + summary
-  types.py          TimedPoint, LocationResult, PhotoRow, Status
-tests/
-  conftest.py       generates real tiny JPEG/PNG/HEIC + GPX/JSON/KML
-  test_*.py         per-module tests, including AC suite + RAW round-trip
-```
-
-Test fixtures are *generated* (not committed) so binary files don't sit
-in git.
 
 ## License
 
-Copyright © 2026 Kodsama (Alexandre Martins).
-
-GPSPhotoTag is free software, licensed under the **GNU General Public
-License v3.0 or later (GPL-3.0-or-later)** — see [LICENSE](LICENSE). It comes
-with no warranty, to the extent permitted by law.
+Copyright © 2026 Kodsama (Alexandre Martins). GPSPhotoTag is free software under
+the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see
+[LICENSE](LICENSE). It comes with no warranty, to the extent permitted by law.
