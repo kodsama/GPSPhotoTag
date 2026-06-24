@@ -1,6 +1,4 @@
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_engine/src/data/sources/gpx_source.dart';
-import 'package:gpsphototag_engine/src/services/locator.dart';
 import 'package:test/test.dart';
 
 const _gpx = '''
