@@ -509,14 +509,24 @@ class _IfdEntry {
 
   int get _typeSize {
     switch (type) {
-      case JpegExifBackend._typeShort:
+      case 1: // BYTE
+      case 2: // ASCII
+      case 6: // SBYTE
+      case 7: // UNDEFINED
+        return 1;
+      case 3: // SHORT
+      case 8: // SSHORT
         return 2;
-      case JpegExifBackend._typeLong:
+      case 4: // LONG
+      case 9: // SLONG
+      case 11: // FLOAT
         return 4;
-      case JpegExifBackend._typeRational:
+      case 5: // RATIONAL
+      case 10: // SRATIONAL
+      case 12: // DOUBLE
         return 8;
       default:
-        return 1; // BYTE / ASCII / UNDEFINED / SBYTE.
+        return 1; // Unknown type: treat as bytes.
     }
   }
 

@@ -111,6 +111,85 @@ void main() {
       expect(img.decodeJpg(File(path).readAsBytesSync()), isNotNull);
     });
   });
+
+  // Integration regression for the external-data offset bug: when the source
+  // JPEG already carries Exif sub-IFD tags stored OUTSIDE the 4-byte value
+  // field (RATIONAL/SRATIONAL like FNumber, ExposureTime, ShutterSpeedValue),
+  // the re-serialized TIFF must rewrite each preserved entry's value-offset to
+  // its freshly-assigned position. Carrying over the old offset produces
+  // "Invalid offset"/"Suspicious offset" warnings and makes exiftool refuse to
+  // edit the file. `img.encodeJpg` never emits external-data tags, so this case
+  // needs a real EXIF fixture built with exiftool.
+  group('JpegExifBackend exiftool round-trip', () {
+    const backend = JpegExifBackend();
+    late Directory tmp;
+    late String fixture;
+
+    setUp(() {
+      tmp = Directory.systemTemp.createTempSync('jpeg_exif_exiftool');
+      fixture = '${tmp.path}/fuji.jpg';
+      File(fixture)
+          .writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+      // Inject rich EXIF including external-data (S)RATIONAL tags.
+      Process.runSync('exiftool', <String>[
+        '-overwrite_original',
+        '-Make=FUJIFILM',
+        '-Model=X-E5',
+        '-FNumber=2.8',
+        '-ExposureTime=1/250',
+        '-ShutterSpeedValue=1/250',
+        '-ISO=200',
+        '-DateTimeOriginal=2026:06:22 12:43:38',
+        fixture,
+      ]);
+    });
+
+    tearDown(() {
+      if (tmp.existsSync()) tmp.deleteSync(recursive: true);
+    });
+
+    test('writeGps preserves external-data EXIF tags with valid offsets',
+        () async {
+      await backend.writeGps(fixture, latitude: 42.7077, longitude: 18.3441);
+
+      // 1. The written TIFF must have valid value-offsets for every entry.
+      final validate =
+          Process.runSync('exiftool', <String>['-warning', '-validate', fixture]);
+      final validateOut = '${validate.stdout}${validate.stderr}';
+      expect(validateOut, isNot(contains('Invalid offset')),
+          reason: 'preserved Exif sub-IFD entries have corrupt value-offsets');
+      expect(validateOut, isNot(contains('Suspicious')),
+          reason: 'preserved Exif sub-IFD entries have suspicious offsets');
+
+      // 2. exiftool must be able to write GPS into our file (exit code 0).
+      final edit = Process.runSync('exiftool', <String>[
+        '-overwrite_original',
+        '-GPSLatitude=1',
+        '-GPSLongitude=1',
+        '-GPSLatitudeRef=N',
+        '-GPSLongitudeRef=E',
+        fixture,
+      ]);
+      expect(edit.exitCode, 0,
+          reason: 'exiftool refused to edit our file: '
+              '${edit.stdout}${edit.stderr}');
+
+      // 3. Our own reader still sees the preserved capture time and GPS.
+      // (Re-read after exiftool's edit, which only touches GPS.)
+      final meta = await backend.read(fixture);
+      expect(meta.captureNaive, DateTime(2026, 6, 22, 12, 43, 38));
+      expect(meta.hasGps, isTrue);
+    }, skip: _exiftoolAvailable() ? false : 'exiftool not on PATH');
+  });
+}
+
+/// Whether `exiftool` can be invoked in this environment.
+bool _exiftoolAvailable() {
+  try {
+    return Process.runSync('exiftool', <String>['-ver']).exitCode == 0;
+  } on ProcessException {
+    return false;
+  }
 }
 
 /// Reads back the GPS latitude/longitude as signed decimal degrees.
