@@ -1,47 +1,54 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <title>Stunda</title>
-  <!-- Stunda mark: a map PIN (a place, a moment "you were here") whose head is a
-       glowing camera LENS holding the light of the moment, with a sparkle for
-       beauty, over faint map contours. -->
+  <!-- Stunda mark: a map pin whose lens frames a tiny landscape —
+       "a photo of a place". Cartographic paper background with contour arcs. -->
   <defs>
-    <clipPath id="bg"><rect width="1024" height="1024" rx="224"/></clipPath>
-    <radialGradient id="lens" cx="42%" cy="38%" r="68%">
-      <stop offset="0%" stop-color="#F6D58A"/>
-      <stop offset="42%" stop-color="#E0A33A"/>
-      <stop offset="100%" stop-color="#BE5230"/>
-    </radialGradient>
+    <clipPath id="bg">
+      <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224"/>
+    </clipPath>
+    <clipPath id="lens">
+      <circle cx="512" cy="424" r="150"/>
+    </clipPath>
   </defs>
 
-  <!-- paper + faint topographic contours -->
+  <!-- Paper background -->
   <g clip-path="url(#bg)">
-    <rect width="1024" height="1024" fill="#F3EDE1"/>
-    <g fill="none" stroke="#DDD2BD" stroke-width="9">
-      <circle cx="150" cy="170" r="120"/>
-      <circle cx="150" cy="170" r="185"/>
-      <circle cx="880" cy="880" r="150"/>
-      <circle cx="880" cy="880" r="220"/>
+    <rect x="0" y="0" width="1024" height="1024" fill="#F3EDE1"/>
+    <!-- faint topographic contour arcs -->
+    <g fill="none" stroke="#DDD2BD" stroke-width="10">
+      <circle cx="170" cy="180" r="120"/>
+      <circle cx="170" cy="180" r="180"/>
+      <circle cx="880" cy="900" r="140"/>
+      <circle cx="880" cy="900" r="210"/>
     </g>
   </g>
 
-  <!-- soft ground shadow -->
-  <ellipse cx="512" cy="900" rx="116" ry="24" fill="#23201A" opacity="0.12"/>
+  <!-- Soft drop shadow under the pin tip -->
+  <ellipse cx="512" cy="892" rx="120" ry="26" fill="#23201A" opacity="0.12"/>
 
-  <!-- pin body -->
-  <path d="M512 904 C512 904 288 612 288 424 A224 224 0 1 1 736 424
-           C736 612 512 904 512 904 Z" fill="#C25A3A"/>
-  <path d="M512 904 C512 904 288 612 288 424 A224 224 0 1 1 736 424
-           C736 612 512 904 512 904 Z" fill="none" stroke="#A4472B"
-        stroke-width="10" opacity="0.45"/>
+  <!-- Pin body -->
+  <path d="M512 902
+           C512 902 286 612 286 424
+           A226 226 0 1 1 738 424
+           C738 612 512 902 512 902 Z"
+        fill="#C25A3A"/>
+  <path d="M512 902
+           C512 902 286 612 286 424
+           A226 226 0 1 1 738 424
+           C738 612 512 902 512 902 Z"
+        fill="none" stroke="#A4472B" stroke-width="10" opacity="0.5"/>
 
-  <!-- lens: paper frame, teal rim, warm glowing glass -->
-  <circle cx="512" cy="424" r="162" fill="#FBF7EF"/>
-  <circle cx="512" cy="424" r="128" fill="url(#lens)"/>
-  <circle cx="512" cy="424" r="162" fill="none" stroke="#2E6F6A" stroke-width="22"/>
-  <!-- glassy highlight -->
-  <path d="M442 372 A104 104 0 0 1 556 332" fill="none" stroke="#FBF7EF"
-        stroke-width="16" stroke-linecap="round" opacity="0.8"/>
-
-  <!-- sparkle: the beautiful moment -->
-  <path d="M624 300 Q636 324 660 336 Q636 348 624 372 Q612 348 588 336
-           Q612 324 624 300 Z" fill="#FBF7EF"/>
+  <!-- Lens / photo -->
+  <circle cx="512" cy="424" r="158" fill="#FBF7EF"/>
+  <g clip-path="url(#lens)">
+    <rect x="362" y="274" width="300" height="300" fill="#EAF0EC"/>
+    <!-- sky -->
+    <rect x="362" y="274" width="300" height="190" fill="#CFE3DD"/>
+    <!-- sun -->
+    <circle cx="452" cy="356" r="34" fill="#E0A33A"/>
+    <!-- mountains (contour teal) -->
+    <path d="M362 520 L470 392 L548 486 L600 430 L662 520 Z" fill="#2E6F6A"/>
+    <path d="M362 540 L520 452 L662 540 Z" fill="#3A7D6E"/>
+  </g>
+  <!-- lens rim -->
+  <circle cx="512" cy="424" r="158" fill="none" stroke="#A4472B" stroke-width="20"/>
 </svg>
