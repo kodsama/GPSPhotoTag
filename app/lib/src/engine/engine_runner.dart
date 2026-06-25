@@ -6,10 +6,16 @@ import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 /// isolate; tests inject a fake that returns canned [EngineEvent] streams
 /// without spawning isolates. Method signatures mirror the engine's services.
 abstract interface class EngineRunner {
-  /// Tags [photos] using GPS read from [gpxFiles] and [googleFiles].
+  /// Recursively scans [roots], streaming [ScanProgressEvent]s then a final
+  /// [ScanDoneEvent] carrying the [FolderScanResult].
+  Stream<ScanEvent> scan(List<String> roots);
+
+  /// Tags [photos] using GPS read from [gpxFiles], [kmlFiles] and
+  /// [googleFiles] (all pooled inside the worker, off the UI isolate).
   Stream<EngineEvent> tag({
     required List<String> photos,
     required List<String> gpxFiles,
+    required List<String> kmlFiles,
     required List<String> googleFiles,
     required TagOptions options,
   });

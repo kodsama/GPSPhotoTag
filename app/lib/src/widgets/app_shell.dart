@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../branding/logo_mark.dart';
 import '../engine/mcp_service.dart';
+import '../screens/action_screen.dart';
+import '../screens/scanning_screen.dart';
+import '../screens/welcome_screen.dart';
+import '../screens/workspace_screen.dart';
+import '../state/app_screen.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
-import 'walkthrough.dart';
 import 'warning_banner.dart';
 
-/// The app frame: a header bar (logo, wordmark, theme toggle), the centred
-/// scrollable walkthrough, a floating activity-log button with an unread badge,
-/// and the right-side log slide-over.
+/// The app frame: a header bar (logo, wordmark, MCP chip, theme toggle), the
+/// active screen (welcome → scanning → workspace ⇄ action), a floating
+/// activity-log button with an unread badge, and the right-side log slide-over.
 class AppShell extends StatefulWidget {
   /// Creates the shell.
   const AppShell({super.key});
@@ -37,15 +41,10 @@ class _AppShellState extends State<AppShell> {
             children: [
               const _Header(),
               const WarningBanner(),
-              Expanded(
+              const Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 720),
-                      child: const Walkthrough(),
-                    ),
-                  ),
+                  padding: EdgeInsets.fromLTRB(24, 24, 24, 96),
+                  child: _ScreenBody(),
                 ),
               ),
             ],
@@ -60,6 +59,22 @@ class _AppShellState extends State<AppShell> {
           ? null
           : _LogButton(unread: controller.unreadCount, onPressed: _toggleLog),
     );
+  }
+}
+
+/// Renders the screen for the controller's current [AppScreen].
+class _ScreenBody extends StatelessWidget {
+  const _ScreenBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = ControllerScope.of(context);
+    return switch (controller.screen) {
+      AppScreen.welcome => const WelcomeScreen(),
+      AppScreen.scanning => const ScanningScreen(),
+      AppScreen.workspace => const WorkspaceScreen(),
+      AppScreen.action => const ActionScreen(),
+    };
   }
 }
 

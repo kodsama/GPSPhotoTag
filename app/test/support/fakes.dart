@@ -11,10 +11,15 @@ import 'package:path/path.dart' as p;
 /// it was called so tests can assert the wiring, and yields whatever events the
 /// constructor was handed (defaulting to a one-item success run).
 class FakeEngineRunner implements EngineRunner {
-  FakeEngineRunner({List<EngineEvent>? events, this.keepOpen = false})
-    : _events = events ?? _success();
+  FakeEngineRunner({
+    List<EngineEvent>? events,
+    List<ScanEvent>? scanEvents,
+    this.keepOpen = false,
+  }) : _events = events ?? _success(),
+       _scanEvents = scanEvents ?? _scanSuccess();
 
   final List<EngineEvent> _events;
+  final List<ScanEvent> _scanEvents;
 
   /// When true the returned stream stays open after the scripted events, so the
   /// controller's `running` state (and the live progress UI) persists for
@@ -51,8 +56,22 @@ class FakeEngineRunner implements EngineRunner {
     const DoneEvent({'tagged': 1}),
   ];
 
+  static List<ScanEvent> _scanSuccess() => [
+    const ScanProgressEvent(ScanProgress(files: 1, photos: 1)),
+    ScanDoneEvent(fakeScan(photos: const ['/library/a.jpg'])),
+  ];
+
   Stream<EngineEvent> _emit() async* {
     for (final event in _events) {
+      yield event;
+    }
+    if (keepOpen) await _gate.future;
+  }
+
+  @override
+  Stream<ScanEvent> scan(List<String> roots) async* {
+    calls.add('scan');
+    for (final event in _scanEvents) {
       yield event;
     }
     if (keepOpen) await _gate.future;
@@ -62,6 +81,7 @@ class FakeEngineRunner implements EngineRunner {
   Stream<EngineEvent> tag({
     required List<String> photos,
     required List<String> gpxFiles,
+    required List<String> kmlFiles,
     required List<String> googleFiles,
     required TagOptions options,
   }) {
@@ -110,9 +130,14 @@ class ThrowingEngineRunner implements EngineRunner {
       Stream<EngineEvent>.error(StateError('stream blew up'));
 
   @override
+  Stream<ScanEvent> scan(List<String> roots) =>
+      Stream<ScanEvent>.error(StateError('scan blew up'));
+
+  @override
   Stream<EngineEvent> tag({
     required List<String> photos,
     required List<String> gpxFiles,
+    required List<String> kmlFiles,
     required List<String> googleFiles,
     required TagOptions options,
   }) => _boom();
@@ -137,8 +162,53 @@ class ThrowingEngineRunner implements EngineRunner {
   }) => _boom();
 }
 
+/// Builds a [FolderScanResult] for tests with controllable tallies.
+///
+/// Defaults to a tiny library with one JPG and no GPS sources. Pass explicit
+/// path/count lists to exercise readiness and content-panel rendering.
+FolderScanResult fakeScan({
+  List<String> photos = const ['/library/a.jpg'],
+  List<String> gpxFiles = const [],
+  List<String> kmlFiles = const [],
+  List<String> googleFiles = const [],
+  List<UnsupportedFile> unsupported = const [],
+  int dirs = 1,
+}) {
+  final byExt = <String, int>{};
+  for (final path in photos) {
+    final ext = PhotoFormats.extOf(path);
+    byExt.update(ext, (n) => n + 1, ifAbsent: () => 1);
+  }
+  final unsByExt = <String, int>{};
+  final unsByCat = <UnsupportedCategory, int>{};
+  for (final u in unsupported) {
+    final dot = u.path.lastIndexOf('.');
+    final ext = dot < 0 ? '' : u.path.substring(dot + 1).toLowerCase();
+    unsByExt.update(ext, (n) => n + 1, ifAbsent: () => 1);
+    unsByCat.update(u.category, (n) => n + 1, ifAbsent: () => 1);
+  }
+  return FolderScanResult(
+    files:
+        photos.length +
+        gpxFiles.length +
+        kmlFiles.length +
+        googleFiles.length +
+        unsupported.length,
+    dirs: dirs,
+    byExtension: byExt,
+    photos: photos,
+    gpxFiles: gpxFiles,
+    kmlFiles: kmlFiles,
+    googleFiles: googleFiles,
+    unsupported: unsupported,
+    unsupportedByExtension: unsByExt,
+    unsupportedByCategory: unsByCat,
+    unsupportedTotal: unsupported.length,
+  );
+}
+
 /// Writes a tiny synthetic JPEG carrying [dateTimeOriginal] and returns its
-/// path. Used so [AppController.pickInput] / parseInput find a real photo.
+/// path. Used so tagging finds a real photo on disk.
 Future<String> writeJpegWithDate(
   Directory dir,
   String name, {

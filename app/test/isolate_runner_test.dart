@@ -29,6 +29,7 @@ void main() {
         .tag(
           photos: [jpg],
           gpxFiles: [gpx],
+          kmlFiles: const [],
           googleFiles: const [],
           options: const TagOptions(overwrite: true, replace: true),
         )
@@ -121,6 +122,7 @@ void main() {
         .tag(
           photos: [jpg],
           gpxFiles: const [],
+          kmlFiles: const [],
           googleFiles: [google],
           options: const TagOptions(overwrite: true, replace: true),
         )
@@ -144,6 +146,7 @@ void main() {
         .tag(
           photos: [jpg],
           gpxFiles: [gpx],
+          kmlFiles: const [],
           googleFiles: const [],
           options: const TagOptions(overwrite: true, replace: true),
         )
@@ -164,15 +167,32 @@ void main() {
       final events = await runner
           .tag(
             photos: [jpg],
-            gpxFiles: ['${tmp.path}/does-not-exist.gpx'],
+            gpxFiles: const [],
+            kmlFiles: const [],
             googleFiles: const [],
             options: const TagOptions(overwrite: true),
           )
           .toList();
 
-      // _loadGpx throws on the unreadable file; the worker converts it to an
-      // ErrorEvent and still sends the sentinel, so the stream closes cleanly.
-      expect(events.whereType<ErrorEvent>(), isNotEmpty);
+      // With no GPS sources the photo is reported with no location; the worker
+      // still terminates cleanly with a DoneEvent (poolSources skips bad files
+      // rather than throwing, so a missing GPX no longer aborts the run).
+      expect(events.whereType<DoneEvent>(), isNotEmpty);
     },
   );
+
+  test('scan runs on a worker isolate and reports the tree', () async {
+    final jpg = await writeJpegWithDate(tmp, 'a.jpg');
+    writeGpx(tmp, 'track.gpx', DateTime(2026));
+    File('${tmp.path}/notes.txt').writeAsStringSync('hello');
+
+    const runner = IsolateRunner();
+    final events = await runner.scan([tmp.path]).toList();
+
+    final done = events.whereType<ScanDoneEvent>().single.result;
+    expect(done.photos, contains(jpg));
+    expect(done.gpxCount, 1);
+    expect(done.unsupportedCount, greaterThanOrEqualTo(1));
+    expect(events.whereType<ScanProgressEvent>(), isNotEmpty);
+  });
 }

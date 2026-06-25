@@ -8,22 +8,23 @@ import 'package:path/path.dart' as p;
 import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
-import 'input_summary.dart';
+import 'app_screen.dart';
+import 'library_action.dart';
 import 'log_entry.dart';
-import 'wizard_step.dart';
 
 /// The single source of truth for the GPSPhotoTag GUI.
 ///
-/// Holds the wizard position, toolkit results, the parsed input, all tag
-/// options, live progress, the activity log, and the last run summary. Every
-/// engine operation runs through an [IsolateRunner] (off the UI isolate) and
-/// streams events back here, which are folded into observable state. Methods are
-/// deliberately small; tests drive state directly via the test-only setters at
-/// the bottom rather than spinning real isolates.
+/// Models the app as a hub-and-spoke workspace: the user picks a photo library
+/// ([AppScreen.welcome]), watches it scan ([AppScreen.scanning]), lands on the
+/// hub ([AppScreen.workspace]), then opens a focused action ([AppScreen.action])
+/// and returns. The scan result, the selected [LibraryAction], all tag options,
+/// live run progress, the activity log, and the last run summary live here.
+/// Every engine operation runs through an [EngineRunner] (off the UI isolate)
+/// and streams events back, which are folded into observable state. Tests drive
+/// state directly via the test-only setters at the bottom.
 class AppController extends ChangeNotifier {
   /// Creates a controller. Inject a fake [runner], a [pickFolder] override,
-  /// and/or a [probeToolkit] override in tests; all default to the real
-  /// implementations.
+  /// and/or a [probeToolkit] override in tests; all default to real impls.
   AppController({
     EngineRunner? runner,
     Future<String?> Function()? pickFolder,
@@ -51,8 +52,7 @@ class AppController extends ChangeNotifier {
   final String? _exiftoolBundleDir;
 
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
-  /// only spawns its isolate when [McpService.start] is called from `main` — so
-  /// tests that build an [AppController] never start a real server.
+  /// only spawns its isolate when [McpService.start] is called from `main`.
   final McpService mcp;
 
   /// Whether a bundled exiftool is present on disk.
@@ -74,9 +74,7 @@ class AppController extends ChangeNotifier {
   /// Sets the theme to light or dark explicitly.
   ///
   /// The header passes the *currently displayed* brightness so the first tap
-  /// always flips what the user sees — even when starting from
-  /// [ThemeMode.system] (where a naive dark↔light toggle could pick the mode
-  /// that already matches the OS and appear to do nothing).
+  /// always flips what the user sees — even from [ThemeMode.system].
   void setDark(bool dark) {
     final target = dark ? ThemeMode.dark : ThemeMode.light;
     if (_themeMode == target) return;
@@ -84,52 +82,48 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Wizard --------------------------------------------------------------
+  // --- Screen navigation ---------------------------------------------------
 
-  WizardStep _step = WizardStep.input;
-  final Set<WizardStep> _completed = {};
+  AppScreen _screen = AppScreen.welcome;
+  LibraryAction? _action;
 
-  /// The currently expanded step.
-  WizardStep get step => _step;
+  /// The screen currently shown.
+  AppScreen get screen => _screen;
 
-  /// Steps the user has finished (collapsed with a check).
-  Set<WizardStep> get completedSteps => Set.unmodifiable(_completed);
+  /// The action whose focused panel is open (only on [AppScreen.action]).
+  LibraryAction? get action => _action;
 
-  /// Whether [step] has been completed.
-  bool isCompleted(WizardStep step) => _completed.contains(step);
-
-  /// Jumps to a previously visited [target] (only completed steps are tappable).
-  void goTo(WizardStep target) {
-    if (target == _step) return;
-    if (target.isBefore(_step) || _completed.contains(target)) {
-      _step = target;
-      notifyListeners();
-    }
-  }
-
-  /// Marks the current step complete and advances to the next one.
-  void completeAndAdvance() {
-    if (!isStepSatisfied(_step)) return;
-    _completed.add(_step);
-    final next = _step.next;
-    if (next != null) _step = next;
+  /// Opens the focused panel for [action] (resets any prior run state).
+  void openAction(LibraryAction action) {
+    _action = action;
+    _resetRun();
+    _screen = AppScreen.action;
     notifyListeners();
   }
 
-  /// Whether [step]'s Continue action should be enabled.
-  bool isStepSatisfied(WizardStep step) => switch (step) {
-    WizardStep.input => _summary.hasPhotos,
-    WizardStep.review => includedCount > 0,
-    WizardStep.options => true,
-    WizardStep.output => _outputValid,
-    WizardStep.run => _lastSummary != null,
-    WizardStep.result => true,
-  };
+  /// Returns from an action panel to the workspace hub.
+  void backToLibrary() {
+    _action = null;
+    _resetRun();
+    _screen = AppScreen.workspace;
+    notifyListeners();
+  }
+
+  /// Drops the current library and returns to the welcome screen.
+  void changeLibrary() {
+    _sub?.cancel();
+    _scan = null;
+    _action = null;
+    _resetRun();
+    _scanProgress = null;
+    _running = false;
+    _screen = AppScreen.welcome;
+    notifyListeners();
+  }
 
   // --- Environment self-check ----------------------------------------------
 
-  /// User-facing message shown when exiftool couldn't start; the bundled copy
-  /// (when present) is preferred over a misleading "missing on PATH".
+  /// User-facing message shown when exiftool couldn't start.
   static const _exiftoolWarning =
       "ExifTool couldn't start, so RAW-embed, HEIC, and Fuji/Canon RAW "
       'timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.';
@@ -137,8 +131,7 @@ class AppController extends ChangeNotifier {
   List<ToolStatus> _toolkit = const [];
   bool _checked = false;
 
-  /// Whether exiftool is available (gates RAW-embed & HEIC), per the last
-  /// [checkEnvironment]. False until the check has run.
+  /// Whether exiftool is available (gates RAW-embed & HEIC).
   bool get exiftoolAvailable =>
       _toolkit.any((t) => t.id == 'exiftool' && t.present);
 
@@ -159,10 +152,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Runs the silent startup environment probe once: launches exiftool `-ver`
-  /// through the engine runner (the bundled copy when present). On success
-  /// [environmentWarning] is null; on failure it is set to a clear, calm note.
-  /// Idempotent — repeat calls are no-ops.
+  /// Runs the silent startup environment probe once.
   Future<void> checkEnvironment() async {
     if (_checked) return;
     _checked = true;
@@ -178,69 +168,74 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Input ---------------------------------------------------------------
+  // --- Library scan --------------------------------------------------------
 
-  InputSummary _summary = const InputSummary.empty();
-  bool _parsing = false;
-  final Map<String, bool> _included = {};
+  String? _folder;
+  FolderScanResult? _scan;
+  ScanProgress? _scanProgress;
+  StreamSubscription<ScanEvent>? _scanSub;
 
-  /// The parsed folder summary.
-  InputSummary get summary => _summary;
+  /// The picked library folder, or null when none is chosen.
+  String? get folder => _folder;
 
-  /// Whether the folder is being scanned.
-  bool get parsing => _parsing;
+  /// The library folder's basename, for compact display.
+  String? get folderName => _folder == null ? null : p.basename(_folder!);
 
-  /// Whether [path] is currently included in the run.
-  bool isIncluded(String path) => _included[path] ?? true;
+  /// The completed scan result, or null until a scan finishes.
+  FolderScanResult? get scan => _scan;
 
-  /// Number of photos currently included.
-  int get includedCount => _summary.photos.where(isIncluded).length;
+  /// Live running totals while a scan is in flight, or null otherwise.
+  ScanProgress? get scanProgress => _scanProgress;
 
-  /// The included photo paths, in order.
-  List<String> get includedPhotos =>
-      _summary.photos.where(isIncluded).toList(growable: false);
-
-  /// Opens a directory picker, then scans it.
-  Future<void> pickInput() async {
-    final folder = await _pickFolder();
-    if (folder == null) return;
-    await parseInput(folder);
+  /// Opens the folder picker; if one is chosen, starts scanning it.
+  Future<void> pickLibrary() async {
+    final picked = await _pickFolder();
+    if (picked == null) return;
+    await startScan(picked);
   }
 
-  /// Scans [folder] for photos and GPS sources off the UI isolate-light path.
-  Future<void> parseInput(String folder) async {
-    _parsing = true;
+  /// Scans [folder] off the UI isolate, folding progress in, then lands on the
+  /// workspace when the [ScanDoneEvent] arrives.
+  Future<void> startScan(String folder) async {
+    await _scanSub?.cancel();
+    _folder = folder;
+    _scan = null;
+    _scanProgress = const ScanProgress();
+    _screen = AppScreen.scanning;
+    _log('Scanning $folder…');
     notifyListeners();
-    final photos = Collectors.photos([folder]);
-    final gpx = Collectors.gpx([folder]);
-    final google = Collectors.googleHistory([folder]);
-    _summary = InputSummary.from(
-      folder: folder,
-      photos: photos,
-      gpxFiles: gpx,
-      googleFiles: google,
-    );
-    _included
-      ..clear()
-      ..addEntries(photos.map((path) => MapEntry(path, true)));
-    _parsing = false;
-    _log(
-      'Scanned $folder: ${photos.length} photo(s), '
-      '${gpx.length} GPX, ${google.length} Google file(s)',
-    );
-    notifyListeners();
+
+    final completer = Completer<void>();
+    _scanSub = _engine
+        .scan([folder])
+        .listen(
+          _handleScanEvent,
+          onError: (Object e) {
+            _log('Scan error: $e', level: LogLevel.error);
+            if (!completer.isCompleted) completer.complete();
+          },
+          onDone: () {
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+    return completer.future;
   }
 
-  /// Includes or excludes a single [path] from the run.
-  void setIncluded(String path, bool included) {
-    _included[path] = included;
-    notifyListeners();
-  }
-
-  /// Includes or excludes every photo of [ext] at once.
-  void setFormatIncluded(String ext, bool included) {
-    for (final path in _summary.photos) {
-      if (PhotoFormats.extOf(path) == ext) _included[path] = included;
+  void _handleScanEvent(ScanEvent event) {
+    switch (event) {
+      case ScanProgressEvent(:final progress):
+        _scanProgress = progress;
+      case ScanDoneEvent(:final result):
+        _scan = result;
+        _scanProgress = null;
+        _screen = AppScreen.workspace;
+        _log(
+          'Scan done: ${result.photoCount} photos, '
+          '${result.trackCount} tracks, ${result.googleCount} Timeline, '
+          '${result.unsupportedCount} unsupported',
+        );
+      case ScanLogEvent(:final message):
+        _log(message, level: LogLevel.debug);
     }
     notifyListeners();
   }
@@ -327,7 +322,7 @@ class AppController extends ChangeNotifier {
   }
 
   /// Whether the chosen output is valid for a run.
-  bool get _outputValid => _copyToFolder ? _outDir != null : true;
+  bool get outputValid => _copyToFolder ? _outDir != null : true;
 
   /// Builds [TagOptions] from the current selections.
   TagOptions buildTagOptions() => TagOptions(
@@ -396,43 +391,48 @@ class AppController extends ChangeNotifier {
 
   // --- Operations ----------------------------------------------------------
 
-  /// Tags the included photos, streaming events into state.
-  Future<void> runTag() => _consume(
-    _engine.tag(
-      photos: includedPhotos,
-      gpxFiles: _summary.gpxFiles,
-      googleFiles: _summary.googleFiles,
-      options: buildTagOptions(),
-    ),
-    startMessage: 'Tagging $includedCount photo(s)…',
-    total: includedCount,
-    onDone: () {
-      if (_lastSummary != null && _step == WizardStep.run) {
-        _completed.add(WizardStep.run);
-        _step = WizardStep.result;
-      }
-    },
-  );
+  /// Number of photos the tag run will process.
+  int get photoCount => _scan?.photoCount ?? 0;
 
-  /// Renders a heatmap PNG into the picked folder; returns its path or null.
-  Future<String?> renderMap() async {
-    final folder = _summary.folder;
-    if (folder == null) return null;
+  /// Tags every scanned photo, pooling all GPS sources inside the worker.
+  Future<void> runTag() {
+    final scan = _scan;
+    if (scan == null) return Future.value();
+    return _consume(
+      _engine.tag(
+        photos: scan.photos,
+        gpxFiles: scan.gpxFiles,
+        kmlFiles: scan.kmlFiles,
+        googleFiles: scan.googleFiles,
+        options: buildTagOptions(),
+      ),
+      startMessage: _dryRun
+          ? 'Previewing ${scan.photoCount} photo(s)…'
+          : 'Tagging ${scan.photoCount} photo(s)…',
+      total: scan.photoCount,
+    );
+  }
+
+  /// Renders a heatmap PNG into the library folder; returns its path or null.
+  Future<String?> renderMap({int? dpi}) async {
+    final folder = _folder;
+    final scan = _scan;
+    if (folder == null || scan == null) return null;
     final out = p.join(folder, 'gpsphototag-heatmap.png');
     await _consume(
       _engine.map(
-        photos: _summary.photos,
-        options: MapOptions(outputPng: out),
+        photos: scan.photos,
+        options: MapOptions(outputPng: out, dpi: dpi ?? 200),
       ),
       startMessage: 'Rendering heatmap…',
-      total: _summary.photos.length,
+      total: scan.photoCount,
     );
     return _errorMessage == null ? out : null;
   }
 
-  /// Prunes orphan RAW files under the picked folder.
+  /// Prunes orphan RAW files under the library folder.
   Future<void> runPrune({bool dryRun = false}) {
-    final folder = _summary.folder;
+    final folder = _folder;
     if (folder == null) return Future.value();
     return _consume(
       _engine.prune(
@@ -444,29 +444,12 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  /// Fixes capture/file dates for the picked photos in [mode].
-  Future<void> runFixDates(FixDatesMode mode, {bool dryRun = false}) =>
-      _consume(
-        _engine.fixDates(files: includedPhotos, mode: mode, dryRun: dryRun),
-        startMessage: 'Fixing dates (${mode.name})…',
-        total: includedCount,
-      );
-
-  /// Resets the run for a fresh folder, returning to the input step.
-  void tagAnother() {
-    _summary = const InputSummary.empty();
-    _included.clear();
+  void _resetRun() {
     _rows.clear();
     _lastSummary = null;
     _errorMessage = null;
     _done = 0;
     _total = 0;
-    _completed.remove(WizardStep.result);
-    _completed.remove(WizardStep.run);
-    _completed.remove(WizardStep.input);
-    _completed.remove(WizardStep.review);
-    _step = WizardStep.input;
-    notifyListeners();
   }
 
   /// Subscribes to [events], resetting run state and folding each event in.
@@ -474,7 +457,6 @@ class AppController extends ChangeNotifier {
     Stream<EngineEvent> events, {
     required String startMessage,
     required int total,
-    void Function()? onDone,
   }) async {
     await _sub?.cancel();
     _running = true;
@@ -482,6 +464,7 @@ class AppController extends ChangeNotifier {
     _done = 0;
     _total = total;
     _rows.clear();
+    _lastSummary = null;
     _log(startMessage);
     notifyListeners();
 
@@ -493,10 +476,7 @@ class AppController extends ChangeNotifier {
         _log('$e', level: LogLevel.error);
         _finish(completer);
       },
-      onDone: () {
-        onDone?.call();
-        _finish(completer);
-      },
+      onDone: () => _finish(completer),
     );
     return completer.future;
   }
@@ -532,6 +512,7 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _scanSub?.cancel();
     _sub?.cancel();
     mcp.dispose();
     super.dispose();
@@ -546,25 +527,21 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Injects a parsed input summary directly (tests only).
+  /// Lands the app on the workspace with [scan] as the library (tests only).
   @visibleForTesting
-  void debugSetSummary(InputSummary summary) {
-    _summary = summary;
-    _included
-      ..clear()
-      ..addEntries(summary.photos.map((path) => MapEntry(path, true)));
+  void debugSetScan(FolderScanResult scan, {String folder = '/library'}) {
+    _folder = folder;
+    _scan = scan;
+    _scanProgress = null;
+    _screen = AppScreen.workspace;
     notifyListeners();
   }
 
-  /// Forces the active step (tests only).
+  /// Forces the active screen and optional action (tests only).
   @visibleForTesting
-  void debugSetStep(WizardStep step, {Set<WizardStep>? completed}) {
-    _step = step;
-    if (completed != null) {
-      _completed
-        ..clear()
-        ..addAll(completed);
-    }
+  void debugSetScreen(AppScreen screen, {LibraryAction? action}) {
+    _screen = screen;
+    _action = action;
     notifyListeners();
   }
 

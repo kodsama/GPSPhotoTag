@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:isolate';
 
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
@@ -26,11 +25,22 @@ class IsolateRunner implements EngineRunner {
   /// On-disk dir of the bundled exiftool, or null to use `PATH`.
   final String? exiftoolBundleDir;
 
-  /// Tags [photos] using GPS read from [gpxFiles] and [googleFiles].
+  /// Scans [roots] on a worker isolate, streaming [ScanEvent]s back.
+  @override
+  Stream<ScanEvent> scan(List<String> roots) => _spawn(
+    _scanEntry,
+    (port) => _ScanRequest(port: port, roots: roots),
+    onSpawnError: ScanLogEvent.new,
+  );
+
+  /// Tags [photos] using GPS pooled from [gpxFiles], [kmlFiles] and
+  /// [googleFiles]. Pooling (parsing all source files) happens inside the
+  /// worker, so the UI isolate stays free.
   @override
   Stream<EngineEvent> tag({
     required List<String> photos,
     required List<String> gpxFiles,
+    required List<String> kmlFiles,
     required List<String> googleFiles,
     required TagOptions options,
   }) => _spawn(
@@ -39,11 +49,13 @@ class IsolateRunner implements EngineRunner {
       port: port,
       photos: photos,
       gpxFiles: gpxFiles,
+      kmlFiles: kmlFiles,
       googleFiles: googleFiles,
       options: options,
       exiftoolAvailable: exiftoolAvailable,
       bundleDir: exiftoolBundleDir,
     ),
+    onSpawnError: ErrorEvent.new,
   );
 
   /// Renders a heatmap PNG from the GPS already embedded in [photos].
@@ -60,6 +72,7 @@ class IsolateRunner implements EngineRunner {
       exiftoolAvailable: exiftoolAvailable,
       bundleDir: exiftoolBundleDir,
     ),
+    onSpawnError: ErrorEvent.new,
   );
 
   /// Prunes orphan RAW files under [roots].
@@ -70,6 +83,7 @@ class IsolateRunner implements EngineRunner {
   }) => _spawn(
     _pruneEntry,
     (port) => _PruneRequest(port: port, roots: roots, options: options),
+    onSpawnError: ErrorEvent.new,
   );
 
   /// Fixes capture/file dates for [files] in the given [mode].
@@ -88,15 +102,18 @@ class IsolateRunner implements EngineRunner {
       exiftoolAvailable: exiftoolAvailable,
       bundleDir: exiftoolBundleDir,
     ),
+    onSpawnError: ErrorEvent.new,
   );
 
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
-  /// by [makeRequest], and re-emits everything it sends until the null sentinel.
-  Stream<EngineEvent> _spawn<R>(
+  /// by [makeRequest], and re-emits every event of type [E] it sends until the
+  /// null sentinel. A spawn failure is surfaced via [onSpawnError].
+  Stream<E> _spawn<E, R>(
     void Function(R) entry,
-    R Function(SendPort) makeRequest,
-  ) {
-    final controller = StreamController<EngineEvent>.broadcast();
+    R Function(SendPort) makeRequest, {
+    required E Function(String message) onSpawnError,
+  }) {
+    final controller = StreamController<E>.broadcast();
     final receive = ReceivePort();
     Isolate? isolate;
 
@@ -107,13 +124,13 @@ class IsolateRunner implements EngineRunner {
         isolate?.kill(priority: Isolate.immediate);
         return;
       }
-      if (message is EngineEvent) controller.add(message);
+      if (message is E) controller.add(message);
     });
 
     Isolate.spawn(entry, makeRequest(receive.sendPort)).then(
       (spawned) => isolate = spawned,
       onError: (Object e, StackTrace _) {
-        controller.add(ErrorEvent('failed to start worker: $e'));
+        controller.add(onSpawnError('failed to start worker: $e'));
         controller.close();
         receive.close();
       },
@@ -125,11 +142,19 @@ class IsolateRunner implements EngineRunner {
 
 // --- Request payloads (plain data, isolate-sendable) ----------------------
 
+class _ScanRequest {
+  const _ScanRequest({required this.port, required this.roots});
+
+  final SendPort port;
+  final List<String> roots;
+}
+
 class _TagRequest {
   const _TagRequest({
     required this.port,
     required this.photos,
     required this.gpxFiles,
+    required this.kmlFiles,
     required this.googleFiles,
     required this.options,
     required this.exiftoolAvailable,
@@ -139,6 +164,7 @@ class _TagRequest {
   final SendPort port;
   final List<String> photos;
   final List<String> gpxFiles;
+  final List<String> kmlFiles;
   final List<String> googleFiles;
   final TagOptions options;
   final bool? exiftoolAvailable;
@@ -209,37 +235,35 @@ ProcessRunner _buildRunner(String? bundleDir) => bundleDir == null
         ExiftoolInvocation.resolve(bundleDir),
       );
 
-/// Reads and parses every GPX file into a flat, time-sorted point list.
-List<TimedPoint> _loadGpx(List<String> files) {
-  final points = <TimedPoint>[];
-  for (final path in files) {
-    points.addAll(parseGpx(File(path).readAsStringSync()));
-  }
-  points.sort();
-  return points;
-}
-
-/// Reads and parses every Google history file into a flat point list.
-List<TimedPoint> _loadGoogle(List<String> files) {
-  final points = <TimedPoint>[];
-  for (final path in files) {
-    points.addAll(parseGoogleAuto(File(path).readAsStringSync()));
-  }
-  points.sort();
-  return points;
-}
-
-/// Pipes [events] to [port], then sends the null sentinel; converts a thrown
-/// error into an [ErrorEvent] before the sentinel.
-Future<void> _pump(SendPort port, Stream<EngineEvent> events) async {
+/// Pipes [events] to [port], then sends the null sentinel. A thrown error is
+/// converted by [onError] (an [ErrorEvent] or [ScanLogEvent]) before the
+/// sentinel, so the consumer's stream always closes cleanly.
+Future<void> _pump<E>(
+  SendPort port,
+  Stream<E> events, {
+  required E Function(String message) onError,
+}) async {
   try {
     await for (final event in events) {
       port.send(event);
     }
   } on Object catch (e) {
-    port.send(ErrorEvent('$e'));
+    port.send(onError('$e'));
   } finally {
     port.send(null);
+  }
+}
+
+Future<void> _scanEntry(_ScanRequest req) async {
+  try {
+    await _pump(
+      req.port,
+      FolderScanner().scan(req.roots),
+      onError: ScanLogEvent.new,
+    );
+  } on Object catch (e) {
+    req.port.send(ScanLogEvent('$e'));
+    req.port.send(null);
   }
 }
 
@@ -252,12 +276,20 @@ Future<void> _tagEntry(_TagRequest req) async {
       rawMode: req.options.rawMode,
       exiftoolAvailable: exiftool,
     );
-    final gpx = _loadGpx(req.gpxFiles);
-    final google = _loadGoogle(req.googleFiles);
-    final stream = TagService(
-      registry: registry,
-    ).tag(photos: req.photos, gpx: gpx, google: google, options: req.options);
-    await _pump(req.port, stream);
+    // Pool every GPS source found in the scan (gpx + kml → track, json →
+    // google), inside the worker so parsing never touches the UI isolate.
+    final pool = poolSources(
+      gpxFiles: req.gpxFiles,
+      kmlFiles: req.kmlFiles,
+      googleJsonFiles: req.googleFiles,
+    );
+    final stream = TagService(registry: registry).tag(
+      photos: req.photos,
+      gpx: pool.track,
+      google: pool.google,
+      options: req.options,
+    );
+    await _pump(req.port, stream, onError: ErrorEvent.new);
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));
     req.port.send(null);
@@ -271,7 +303,11 @@ Future<void> _mapEntry(_MapRequest req) async {
       runner: _buildRunner(req.bundleDir),
       exiftoolAvailable: exiftool,
     );
-    await _pump(req.port, service.render(req.photos, req.options));
+    await _pump(
+      req.port,
+      service.render(req.photos, req.options),
+      onError: ErrorEvent.new,
+    );
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));
     req.port.send(null);
@@ -281,7 +317,11 @@ Future<void> _mapEntry(_MapRequest req) async {
 Future<void> _pruneEntry(_PruneRequest req) async {
   try {
     final pruner = Pruner(trash: const SystemTrash());
-    await _pump(req.port, pruner.prune(req.roots, req.options));
+    await _pump(
+      req.port,
+      pruner.prune(req.roots, req.options),
+      onError: ErrorEvent.new,
+    );
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));
     req.port.send(null);
@@ -300,6 +340,7 @@ Future<void> _fixDatesEntry(_FixDatesRequest req) async {
     await _pump(
       req.port,
       dater.fixDates(req.files, req.mode, dryRun: req.dryRun),
+      onError: ErrorEvent.new,
     );
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));

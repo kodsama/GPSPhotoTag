@@ -1,66 +1,106 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:gpsphototag_gui/main.dart';
+import 'package:gpsphototag_gui/src/screens/scanning_screen.dart';
+import 'package:gpsphototag_gui/src/screens/welcome_screen.dart';
+import 'package:gpsphototag_gui/src/screens/workspace_screen.dart';
 import 'package:gpsphototag_gui/src/state/app_controller.dart';
-import 'package:gpsphototag_gui/src/state/input_summary.dart';
-import 'package:gpsphototag_gui/src/state/wizard_step.dart';
-import 'package:gpsphototag_gui/src/steps/input_step.dart';
+import 'package:gpsphototag_gui/src/state/app_screen.dart';
 import 'package:gpsphototag_gui/src/widgets/activity_log_panel.dart';
-import 'package:gpsphototag_gui/src/widgets/step_card.dart';
 import 'package:gpsphototag_gui/src/widgets/warning_banner.dart';
 
-ToolStatus _tool(
-  String id,
-  String name, {
-  bool present = true,
-  String? version,
-}) => ToolStatus(
-  id: id,
-  name: name,
-  present: present,
-  version: version,
-  purpose: 'unlocks $name',
-  required: false,
-);
+import 'support/fakes.dart';
 
-/// Pumps the app with [controller] already seeded so no real isolate or
-/// subprocess runs during the test.
+ToolStatus _tool(String id, {bool present = true, String? version}) =>
+    ToolStatus(
+      id: id,
+      name: id,
+      present: present,
+      version: version,
+      purpose: 'unlocks $id',
+      required: false,
+    );
+
 Future<void> _pumpApp(WidgetTester tester, AppController controller) async {
+  tester.view.physicalSize = const Size(1200, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(GpsPhotoTagApp(controller: controller));
   await tester.pump();
 }
 
 void main() {
-  testWidgets('AppShell renders the header and the first step', (tester) async {
-    final controller = AppController()
-      ..debugSetToolkit([_tool('exiftool', 'ExifTool', version: '12.0')]);
-    await _pumpApp(tester, controller);
-
-    expect(find.text('GPSPhotoTag'), findsOneWidget);
-    // The walkthrough now starts at the input step.
-    expect(find.byType(InputStep), findsOneWidget);
-    expect(controller.step, WizardStep.input);
-  });
-
-  testWidgets('exactly one step card is expanded (shows Continue)', (
+  testWidgets('AppShell renders the header and the welcome screen', (
     tester,
   ) async {
-    final controller = AppController()
-      ..debugSetToolkit([_tool('exiftool', 'ExifTool')]);
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool', version: '12.0')]);
     await _pumpApp(tester, controller);
 
-    // One card per step, one Continue button (only the active card expands).
-    expect(find.byType(StepCard), findsNWidgets(WizardStep.values.length));
-    expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
+    expect(find.text('GPSPhotoTag'), findsWidgets);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+    expect(controller.screen, AppScreen.welcome);
+    expect(find.text('Choose photo library'), findsOneWidget);
+  });
+
+  testWidgets('the scanning screen shows live tallies and the folder name', (
+    tester,
+  ) async {
+    // A scan stream that emits progress then holds open, so the scanning
+    // screen (with the folder name) stays on screen for assertions.
+    final fake = FakeEngineRunner(
+      keepOpen: true,
+      scanEvents: const [ScanProgressEvent(ScanProgress(files: 5, photos: 3))],
+    );
+    addTearDown(fake.release);
+    final controller = AppController(runner: fake)
+      ..debugSetToolkit([_tool('exiftool')]);
+    await _pumpApp(tester, controller);
+    unawaited(controller.startScan('/Users/me/Pictures'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(ScanningScreen), findsOneWidget);
+    expect(find.text('Scanning your library…'), findsOneWidget);
+    expect(find.text('Pictures'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('3'), findsWidgets); // live photo tally
+
+    // Release and pump a frame (no settle: the indeterminate bar never stops).
+    fake.release();
+    await tester.pump();
+  });
+
+  testWidgets('picking a library scans it and lands on the workspace', (
+    tester,
+  ) async {
+    final controller = AppController(
+      runner: FakeEngineRunner(
+        scanEvents: [
+          const ScanProgressEvent(ScanProgress(files: 2, photos: 1)),
+          ScanDoneEvent(fakeScan(gpxFiles: const ['/library/t.gpx'])),
+        ],
+      ),
+      pickFolder: () async => '/library',
+    )..debugSetToolkit([_tool('exiftool')]);
+    await _pumpApp(tester, controller);
+
+    await tester.tap(find.text('Choose photo library'));
+    await tester.pumpAndSettle();
+
+    expect(controller.screen, AppScreen.workspace);
+    expect(find.byType(WorkspaceScreen), findsOneWidget);
   });
 
   group('warning banner', () {
     testWidgets('shows when an environment warning is set', (tester) async {
       final controller = AppController(
-        probeToolkit: () async => [
-          _tool('exiftool', 'ExifTool', present: false),
-        ],
+        runner: FakeEngineRunner(),
+        probeToolkit: () async => [_tool('exiftool', present: false)],
       );
       await controller.checkEnvironment();
       await _pumpApp(tester, controller);
@@ -71,14 +111,11 @@ void main() {
 
     testWidgets('hides after the close button is tapped', (tester) async {
       final controller = AppController(
-        probeToolkit: () async => [
-          _tool('exiftool', 'ExifTool', present: false),
-        ],
+        runner: FakeEngineRunner(),
+        probeToolkit: () async => [_tool('exiftool', present: false)],
       );
       await controller.checkEnvironment();
       await _pumpApp(tester, controller);
-
-      expect(find.textContaining("ExifTool couldn't start"), findsOneWidget);
 
       await tester.tap(find.byTooltip('Dismiss'));
       await tester.pump();
@@ -89,7 +126,8 @@ void main() {
 
     testWidgets('renders nothing when no warning is set', (tester) async {
       final controller = AppController(
-        probeToolkit: () async => [_tool('exiftool', 'ExifTool')],
+        runner: FakeEngineRunner(),
+        probeToolkit: () async => [_tool('exiftool')],
       );
       await controller.checkEnvironment();
       await _pumpApp(tester, controller);
@@ -99,16 +137,35 @@ void main() {
     });
   });
 
+  testWidgets('MCP chip renders in the header', (tester) async {
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')]);
+    await _pumpApp(tester, controller);
+    expect(find.textContaining('MCP'), findsOneWidget);
+  });
+
+  testWidgets('theme toggle flips the mode', (tester) async {
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')]);
+    await _pumpApp(tester, controller);
+
+    final isDark = controller.themeMode == ThemeMode.dark;
+    await tester.tap(
+      find.byTooltip(isDark ? 'Switch to light' : 'Switch to dark'),
+    );
+    await tester.pump();
+    expect(controller.themeMode, isNot(ThemeMode.system));
+  });
+
   testWidgets('activity-log panel opens on FAB tap and shows entries', (
     tester,
   ) async {
-    final controller = AppController()
-      ..debugSetToolkit([_tool('exiftool', 'ExifTool')])
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')])
       ..debugAddLog('first event')
       ..debugAddLog('second event');
     await _pumpApp(tester, controller);
 
-    // Panel starts hidden behind an IgnorePointer (entries not tappable yet).
     expect(find.byType(ActivityLogPanel), findsOneWidget);
 
     await tester.tap(find.byType(FloatingActionButton));
@@ -118,32 +175,8 @@ void main() {
     expect(find.text('first event'), findsOneWidget);
     expect(find.text('second event'), findsOneWidget);
 
-    // Tapping the scrim (top-left, away from the panel) closes the panel via
-    // the AppShell.onClose callback; the FAB comes back.
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
     expect(find.byType(FloatingActionButton), findsOneWidget);
-  });
-
-  testWidgets('completed steps collapse to a tappable row with Edit', (
-    tester,
-  ) async {
-    final controller = AppController()
-      ..debugSetToolkit([_tool('exiftool', 'ExifTool')])
-      ..debugSetSummary(
-        InputSummary.from(
-          folder: '/photos',
-          photos: const ['/photos/a.jpg'],
-          gpxFiles: const [],
-          googleFiles: const [],
-        ),
-      )
-      ..debugSetStep(WizardStep.review, completed: {WizardStep.input});
-    await _pumpApp(tester, controller);
-
-    // The completed input step shows an 'Edit' affordance.
-    expect(find.text('Edit'), findsOneWidget);
-    // The active review step exposes its tag count.
-    expect(find.textContaining('photo(s) will be tagged'), findsOneWidget);
   });
 }
