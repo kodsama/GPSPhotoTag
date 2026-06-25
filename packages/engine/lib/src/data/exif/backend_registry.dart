@@ -44,7 +44,7 @@ class BackendRegistry {
     final ext = PhotoFormats.extOf(path);
     if (PhotoFormats.jpeg.contains(ext)) return _jpeg;
     if (PhotoFormats.png.contains(ext)) return _png;
-    if (PhotoFormats.heic.contains(ext)) {
+    if (PhotoFormats.heic.contains(ext) || PhotoFormats.webp.contains(ext)) {
       return exiftoolAvailable ? _exiftool : null;
     }
     if (PhotoFormats.raw.contains(ext)) {
@@ -61,7 +61,7 @@ class BackendRegistry {
     final ext = PhotoFormats.extOf(path);
     if (PhotoFormats.jpeg.contains(ext)) return _jpeg;
     if (PhotoFormats.png.contains(ext)) return _png;
-    if (PhotoFormats.heic.contains(ext)) {
+    if (PhotoFormats.heic.contains(ext) || PhotoFormats.webp.contains(ext)) {
       return exiftoolAvailable ? _exiftool : null;
     }
     if (PhotoFormats.raw.contains(ext)) {

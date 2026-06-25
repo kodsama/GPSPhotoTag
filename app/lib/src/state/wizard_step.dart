@@ -7,7 +7,7 @@ enum WizardStep {
   input('Photos', 'Choose the folder of photos to geotag.'),
 
   /// Review the parsed summary and include/exclude items.
-  review('Review', 'Confirm what was found and what will be tagged.'),
+  review('Review', 'Confirm what was found and what will be used.'),
 
   /// Configure all tag options.
   options('Options', 'Tune how GPS is written into your photos.'),

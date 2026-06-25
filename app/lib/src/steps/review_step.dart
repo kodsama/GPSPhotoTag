@@ -45,7 +45,7 @@ class ReviewStep extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Text(
-          '${controller.includedCount} photo(s) will be tagged.',
+          '${controller.includedCount} photo(s) will be used.',
           style: text.titleMedium?.copyWith(color: scheme.primary),
         ),
       ],

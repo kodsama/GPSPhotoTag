@@ -86,6 +86,24 @@ String _freshJpeg(Directory dir, String name) {
 
 Future<List<EngineEvent>> _collect(Stream<EngineEvent> s) => s.toList();
 
+/// Records exiftool calls and answers reads with no GPS / a fixed capture date.
+class _RecordingRunner implements ProcessRunner {
+  _RecordingRunner(this._captureDate);
+
+  final String _captureDate;
+  final List<(String, List<String>)> calls = [];
+
+  @override
+  Future<ProcResult> run(String executable, List<String> args) async {
+    calls.add((executable, args));
+    // A read invocation includes -json; answer with capture date and no GPS.
+    if (args.contains('-json')) {
+      return ProcResult(0, '[{"DateTimeOriginal":"$_captureDate"}]', '');
+    }
+    return const ProcResult(0, '', '');
+  }
+}
+
 void main() {
   late Directory tmp;
   setUp(() => tmp = Directory.systemTemp.createTempSync('tagsvc'));
@@ -300,6 +318,76 @@ void main() {
     final item = events.whereType<ItemEvent>().single;
     expect(item.row.timestamp, DateTime.utc(2026, 6, 22, 10));
     expect(item.row.location!.method, GpsMethod.exact);
+  });
+
+  test('webp is tagged via exiftool with the expected GPS args', () async {
+    // captureNaive 12:43:38 local matches `onTime` (no offset in the read).
+    final runner = _RecordingRunner('2026:06:22 12:43:38');
+    final service = TagService(
+      registry: BackendRegistry(runner: runner, exiftoolAvailable: true),
+    );
+    final webp = p.join(tmp.path, 'a.webp');
+    File(webp).writeAsBytesSync([0, 1, 2]);
+
+    final events = await _collect(
+      service.tag(
+        photos: [webp],
+        gpx: [onTime],
+        options: const TagOptions(overwrite: true, replace: true),
+      ),
+    );
+
+    final item = events.whereType<ItemEvent>().single;
+    expect(
+      item.row.status,
+      anyOf(PhotoStatus.tagged, PhotoStatus.interpolated),
+    );
+
+    // A write invocation (no -json) carrying the GPS args on the webp file.
+    final write = runner.calls.firstWhere(
+      (c) => c.$1 == 'exiftool' && !c.$2.contains('-json'),
+    );
+    expect(write.$2, contains('-overwrite_original'));
+    expect(write.$2, contains('-GPSLatitude=42.5'));
+    expect(write.$2, contains('-GPSLatitudeRef=N'));
+    expect(write.$2, contains('-GPSLongitude=18.1'));
+    expect(write.$2, contains('-GPSLongitudeRef=E'));
+    expect(write.$2.last, webp);
+  });
+
+  test('filename date fallback tags an EXIF-less phone shot', () async {
+    // A real JPEG with NO EXIF date, named with a Pixel timestamp matching the
+    // GPX point's local time. The filename fallback must supply the timestamp.
+    final path = _freshJpeg(tmp, 'PXL_20260622_124338000.jpg');
+    final events = await _collect(
+      _service().tag(
+        photos: [path],
+        gpx: [onTime],
+        options: const TagOptions(overwrite: true, replace: true),
+      ),
+    );
+    final item = events.whereType<ItemEvent>().single;
+    expect(
+      item.row.status,
+      anyOf(PhotoStatus.tagged, PhotoStatus.interpolated),
+      reason: 'filename PXL_20260622_124338 matched the on-time GPX point',
+    );
+    expect(item.row.timestamp, naive.toUtc());
+  });
+
+  test('no EXIF and no filename pattern -> noTimestamp', () async {
+    final path = _freshJpeg(tmp, 'vacation.jpg');
+    final events = await _collect(
+      _service().tag(
+        photos: [path],
+        gpx: [onTime],
+        options: const TagOptions(overwrite: true),
+      ),
+    );
+    expect(
+      events.whereType<ItemEvent>().single.row.status,
+      PhotoStatus.noTimestamp,
+    );
   });
 
   test('dry run reports a would-be fix but writes nothing', () async {

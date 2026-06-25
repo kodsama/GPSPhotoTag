@@ -13,6 +13,7 @@ void main() {
       expect(PhotoFormats.isPhoto('a.jpg'), isTrue);
       expect(PhotoFormats.isPhoto('a.png'), isTrue);
       expect(PhotoFormats.isPhoto('a.heic'), isTrue);
+      expect(PhotoFormats.isPhoto('a.webp'), isTrue);
       expect(PhotoFormats.isPhoto('a.raf'), isTrue);
       expect(PhotoFormats.isPhoto('a.txt'), isFalse);
       expect(PhotoFormats.isPhoto('a.gpx'), isFalse);

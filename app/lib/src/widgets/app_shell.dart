@@ -89,7 +89,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text('GPSPhotoTag', style: text.headlineSmall),
                 Text(
-                  'Geotag your photos from GPX & Google location history',
+                  'Tag photos & map trips from GPX, KML & Google location history',
                   style: text.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),

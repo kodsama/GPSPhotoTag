@@ -32,6 +32,11 @@ void main() {
       expect(registry(exiftool: false).readerFor('a.heic'), isNull);
     });
 
+    test('webp reads via exiftool when present, null when absent', () {
+      expect(registry().readerFor('a.webp'), isA<ExiftoolBackend>());
+      expect(registry(exiftool: false).readerFor('a.webp'), isNull);
+    });
+
     test('raw reads via exiftool when present, sidecar when absent', () {
       expect(registry().readerFor('a.raf'), isA<ExiftoolBackend>());
       expect(
@@ -55,6 +60,11 @@ void main() {
     test('heic writes via exiftool when present, null when absent', () {
       expect(registry().writerFor('a.heic'), isA<ExiftoolBackend>());
       expect(registry(exiftool: false).writerFor('a.heic'), isNull);
+    });
+
+    test('webp writes via exiftool when present, null when absent', () {
+      expect(registry().writerFor('a.webp'), isA<ExiftoolBackend>());
+      expect(registry(exiftool: false).writerFor('a.webp'), isNull);
     });
 
     test('raw embed mode requires exiftool', () {

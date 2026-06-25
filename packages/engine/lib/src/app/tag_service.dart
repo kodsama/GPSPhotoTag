@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import '../data/exif/backend_registry.dart';
 import '../data/exif/exif_backend.dart';
+import '../data/filename_date.dart';
 import '../domain/engine_event.dart';
 import '../domain/location_result.dart';
 import '../domain/options.dart';
@@ -71,7 +72,7 @@ class TagService {
       }
 
       final meta = await reader.read(path);
-      final captureUtc = _toUtc(meta, options.timezone);
+      final captureUtc = _toUtc(meta, options.timezone, path);
       if (captureUtc == null) {
         return PhotoRow(path: path, status: PhotoStatus.noTimestamp);
       }
@@ -150,8 +151,12 @@ class TagService {
   /// host's local timezone as a fallback. (Full IANA [tz] support is a later
   /// enhancement; when [tz] is set but no offset is present we still fall back
   /// to local, which matches the original tool's default behaviour.)
-  DateTime? _toUtc(PhotoMeta meta, String? tz) {
-    final n = meta.captureNaive;
+  ///
+  /// When EXIF carries no capture time, falls back to parsing a naive timestamp
+  /// from the filename ([timestampFromFilename]) so phone shots without EXIF
+  /// (e.g. `PXL_20260622_104338000.jpg`) still match a track.
+  DateTime? _toUtc(PhotoMeta meta, String? tz, String path) {
+    final n = meta.captureNaive ?? timestampFromFilename(path);
     if (n == null) return null;
     final offset = meta.offset;
     if (offset != null) {

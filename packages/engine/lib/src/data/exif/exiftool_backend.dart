@@ -36,10 +36,10 @@ const Set<String> kRawExtensions = {
 class ExiftoolBackend implements ExifBackend {
   /// Creates a backend driven by [_runner].
   ///
-  /// [extensions] overrides the default supported set (RAW + HEIC/HEIF); pass
-  /// it lower-cased and without leading dots.
+  /// [extensions] overrides the default supported set (RAW + HEIC/HEIF +
+  /// WebP); pass it lower-cased and without leading dots.
   ExiftoolBackend(this._runner, {Set<String>? extensions})
-    : _extensions = extensions ?? {...kRawExtensions, 'heic', 'heif'};
+    : _extensions = extensions ?? {...kRawExtensions, 'heic', 'heif', 'webp'};
 
   final ProcessRunner _runner;
   final Set<String> _extensions;

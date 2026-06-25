@@ -13,6 +13,9 @@ abstract final class PhotoFormats {
   /// HEIC/HEIF files (handled via exiftool).
   static const heic = {'heic', 'heif'};
 
+  /// WebP files (GPS read/written via exiftool, like HEIC).
+  static const webp = {'webp'};
+
   /// RAW containers (XMP sidecar by default, or exiftool embed).
   static const raw = {
     'raf',
@@ -42,7 +45,7 @@ abstract final class PhotoFormats {
   static const companion = {'jpg', 'jpeg', 'heic', 'heif'};
 
   /// Every taggable photo extension.
-  static final Set<String> all = {...jpeg, ...png, ...heic, ...raw};
+  static final Set<String> all = {...jpeg, ...png, ...heic, ...webp, ...raw};
 
   /// The lower-case extension of [path] without the dot (e.g. `raf`).
   static String extOf(String path) {
