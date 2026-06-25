@@ -1,10 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// The GPSPhotoTag logo drawn as a crisp vector — a map pin whose lens frames a
-/// tiny landscape. Used in the in-app header; mirrors `assets/logo.svg` (the app
-/// icon source) so brand and app stay consistent.
+/// The Stunda logo drawn as a crisp vector — a camera aperture (the instant the
+/// shutter opens) with a warm "moment" of light caught in the iris. Mirrors
+/// `assets/logo.svg` (the app-icon source) so brand and app stay consistent.
 class LogoMark extends StatelessWidget {
   /// Draws the mark at [size] square.
   const LogoMark({super.key, this.size = 40});
@@ -21,67 +23,51 @@ class _LogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width;
-    canvas.scale(s / 100); // author at a 100x100 grid
-
-    // Pin body (teardrop).
-    final pin = Path()
-      ..moveTo(50, 92)
-      ..cubicTo(50, 92, 18, 60, 18, 40)
-      ..arcToPoint(
-        const Offset(82, 40),
-        radius: const Radius.circular(32),
-        clockwise: true,
-      )
-      ..cubicTo(82, 60, 50, 92, 50, 92)
-      ..close();
-    canvas.drawPath(pin, Paint()..color = AppColors.terracotta);
-
-    // Lens disc.
-    canvas.drawCircle(
-      const Offset(50, 40),
-      22,
-      Paint()..color = AppColors.paperRaised,
-    );
-
-    // Tiny landscape clipped to the lens.
-    canvas.save();
-    canvas.clipPath(
-      Path()
-        ..addOval(Rect.fromCircle(center: const Offset(50, 40), radius: 21)),
-    );
-    canvas.drawRect(
-      const Rect.fromLTWH(29, 19, 42, 42),
-      Paint()..color = const Color(0xFFCFE3DD),
-    );
-    canvas.drawRect(
-      const Rect.fromLTWH(29, 42, 42, 19),
-      Paint()..color = const Color(0xFFEAF0EC),
-    );
-    canvas.drawCircle(
-      const Offset(42, 31),
-      5,
-      Paint()..color = const Color(0xFFE0A33A),
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(29, 52)
-        ..lineTo(45, 33)
-        ..lineTo(57, 47)
-        ..lineTo(64, 39)
-        ..lineTo(71, 52)
-        ..close(),
-      Paint()..color = AppColors.contour,
-    );
-    canvas.restore();
+    canvas.scale(s / 100); // author on a 100x100 grid
+    const c = Offset(50, 50);
+    const r = 40.0;
 
     // Lens rim.
     canvas.drawCircle(
-      const Offset(50, 40),
-      22,
+      c,
+      r,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = AppColors.terracottaDark,
+        ..strokeWidth = 4.5
+        ..color = AppColors.terracotta,
+    );
+
+    // Six aperture blades forming a flat-top hexagonal opening.
+    final hex = Path();
+    for (var i = 0; i < 6; i++) {
+      final a = i * math.pi / 3;
+      final p = Offset(50 + r * math.cos(a), 50 + r * math.sin(a));
+      i == 0 ? hex.moveTo(p.dx, p.dy) : hex.lineTo(p.dx, p.dy);
+    }
+    hex.close();
+    canvas.drawPath(
+      hex,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeJoin = StrokeJoin.round
+        ..color = AppColors.contour,
+    );
+
+    // The caught moment: a warm spark at the centre.
+    canvas.drawCircle(
+      c,
+      11,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFFF4C36B), Color(0xFFE0A33A), AppColors.terracotta],
+          stops: [0, 0.55, 1],
+        ).createShader(Rect.fromCircle(center: c, radius: 11)),
+    );
+    canvas.drawCircle(
+      const Offset(46.5, 46.5),
+      3,
+      Paint()..color = AppColors.paperRaised.withValues(alpha: 0.85),
     );
   }
 
