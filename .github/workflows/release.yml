@@ -65,8 +65,8 @@ jobs:
       - name: Compile Dart CLI/MCP binaries (linux x64)
         run: |
           mkdir -p dist/bin
-          dart compile exe packages/cli/bin/gpsphototag.dart -o dist/bin/gpsphototag-linux-x64
-          dart compile exe packages/mcp/bin/gpsphototag_mcp.dart -o dist/bin/gpsphototag_mcp-linux-x64
+          dart compile exe packages/cli/bin/stunda.dart -o dist/bin/stunda-linux-x64
+          dart compile exe packages/mcp/bin/stunda_mcp.dart -o dist/bin/stunda_mcp-linux-x64
 
       - name: Collect artifacts
         run: |
@@ -128,7 +128,7 @@ jobs:
             fi
             rm -rf Payload && mkdir -p Payload
             cp -R "$APP_PATH" Payload/
-            ( cd "$(dirname Payload)" && zip -qr dist/gpsphototag-unsigned.ipa Payload )
+            ( cd "$(dirname Payload)" && zip -qr dist/stunda-unsigned.ipa Payload )
             rm -rf Payload
           fi
 
@@ -177,21 +177,21 @@ jobs:
         working-directory: app
         run: |
           mkdir -p dist
-          APP="build/macos/Build/Products/Release/GPSPhotoTag.app"
+          APP="build/macos/Build/Products/Release/Stunda.app"
           create-dmg \
-            --volname "GPSPhotoTag" \
+            --volname "Stunda" \
             --window-size 600 400 \
             --icon-size 100 \
             --app-drop-link 450 150 \
-            "dist/GPSPhotoTag-macos.dmg" \
+            "dist/Stunda-macos.dmg" \
             "$APP" \
-          || create-dmg "dist/GPSPhotoTag-macos.dmg" "$APP"
+          || create-dmg "dist/Stunda-macos.dmg" "$APP"
 
       - name: Compile Dart CLI/MCP binaries (macOS)
         run: |
           mkdir -p app/dist/bin
-          dart compile exe packages/cli/bin/gpsphototag.dart -o app/dist/bin/gpsphototag-macos
-          dart compile exe packages/mcp/bin/gpsphototag_mcp.dart -o app/dist/bin/gpsphototag_mcp-macos
+          dart compile exe packages/cli/bin/stunda.dart -o app/dist/bin/stunda-macos
+          dart compile exe packages/mcp/bin/stunda_mcp.dart -o app/dist/bin/stunda_mcp-macos
 
       - uses: actions/upload-artifact@v4
         with:
@@ -239,7 +239,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path build/windows/x64/runner/Release/* `
-            -DestinationPath dist/GPSPhotoTag-windows-x64.zip -Force
+            -DestinationPath dist/Stunda-windows-x64.zip -Force
 
       # Inno Setup .exe installer. Compile-and-build via flutter_distributor,
       # which wraps the Inno Setup compiler (iscc). distribute_options.yaml
@@ -266,7 +266,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           candle.exe -arch x64 ..\packaging\windows\product.wxs -out dist\product.wixobj `
             -dSourceDir=build\windows\x64\runner\Release
-          light.exe dist\product.wixobj -out dist\GPSPhotoTag-windows-x64.msi
+          light.exe dist\product.wixobj -out dist\Stunda-windows-x64.msi
         continue-on-error: true
 
       - name: Collect installer artifacts
@@ -333,8 +333,8 @@ jobs:
       - name: Compile Dart CLI/MCP binaries (linux x64)
         run: |
           mkdir -p app/dist/bin
-          dart compile exe packages/cli/bin/gpsphototag.dart -o app/dist/bin/gpsphototag-linux-x64
-          dart compile exe packages/mcp/bin/gpsphototag_mcp.dart -o app/dist/bin/gpsphototag_mcp-linux-x64
+          dart compile exe packages/cli/bin/stunda.dart -o app/dist/bin/stunda-linux-x64
+          dart compile exe packages/mcp/bin/stunda_mcp.dart -o app/dist/bin/stunda_mcp-linux-x64
 
       - name: Collect distributor outputs
         run: |
@@ -386,8 +386,8 @@ jobs:
       - name: Build flatpak bundle
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: gpsphototag.flatpak
-          manifest-path: packaging/flatpak/ai.kodsama.GPSPhotoTag.yml
+          bundle: stunda.flatpak
+          manifest-path: packaging/flatpak/ai.kodsama.Stunda.yml
           cache-key: flatpak-builder-${{ github.sha }}
 
       # NOTE: publishing to Flathub is a separate PR-based submission to the
@@ -395,7 +395,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-flatpak
-          path: gpsphototag.flatpak
+          path: stunda.flatpak
           if-no-files-found: warn
 
   # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 import 'package:path/path.dart' as p;
 
 import '../theme/app_colors.dart';

@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:gpsphototag_engine/src/data/exif/exiftool_backend.dart';
-import 'package:gpsphototag_engine/src/data/exif/png_exif_backend.dart';
-import 'package:gpsphototag_engine/src/data/exif/xmp_sidecar_backend.dart';
-import 'package:gpsphototag_engine/src/data/ports/process_runner.dart';
 import 'package:image/image.dart' as img;
+import 'package:stunda_engine/src/data/exif/exiftool_backend.dart';
+import 'package:stunda_engine/src/data/exif/png_exif_backend.dart';
+import 'package:stunda_engine/src/data/exif/xmp_sidecar_backend.dart';
+import 'package:stunda_engine/src/data/ports/process_runner.dart';
 import 'package:test/test.dart';
 import 'package:xml/xml.dart';
 
@@ -244,6 +244,6 @@ void main() {
 
 /// Mirrors the backend's tEXt-stored EXIF reload, for assertion in tests.
 img.ExifData _reloadExif(img.Image image) {
-  final stored = image.textData?['gpsphototag:exif'];
+  final stored = image.textData?['stunda:exif'];
   return img.ExifData.fromInputBuffer(img.InputBuffer(base64Decode(stored!)));
 }

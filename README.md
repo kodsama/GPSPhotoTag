@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="app/assets/icon_1024.png" alt="GPSPhotoTag" width="140"/>
+  <img src="app/assets/icon_1024.png" alt="Stunda" width="140"/>
 </p>
 
-<h1 align="center">GPSPhotoTag</h1>
+<h1 align="center">Stunda</h1>
 
 <p align="center">
   <i>Tag photos with GPS from GPX tracks or Google location history —
@@ -12,10 +12,18 @@
 
 ---
 
+## The name
+
+**Stunda** comes from the Swedish **stund** — *a moment, a little while*.
+
+Your photos are **stunder**: thousands of small moments dropped into folders and forgotten. Stunda is where each one gets its moment again — placed on the map, tied to its track and timeline, de-duplicated, tidied, and kept.
+
+> Why *Stunda* and not just *stund*? Because `stund` is already a STUN-server daemon, and we'd rather sort your photos than your network packets. Besides — point it at a shambolic library and it'll have the whole thing tagged, mapped, and tidy in a *stund*. ⏱️
+
 ## What it does
 
 You take photos. Sometimes you also have a GPX track (watch, phone, handheld
-GPS); when you don't, your Google location history covers you. GPSPhotoTag writes
+GPS); when you don't, your Google location history covers you. Stunda writes
 accurate GPS EXIF into your photos by matching each photo's capture time against
 the first source that has a fix — GPX first (most precise), then Google.
 
@@ -70,9 +78,9 @@ flutter build macos      # package the .app
 
 ```bash
 # from the repo root
-dart run gpsphototag_cli --version
+dart run stunda_cli --version
 # or compile a standalone binary:
-dart compile exe packages/cli/bin/gpsphototag.dart -o gpsphototag
+dart compile exe packages/cli/bin/stunda.dart -o stunda
 ```
 
 Commands: `tag`, `map`, `prune-raw`, `fix-dates`, `check`, `info`,
@@ -80,16 +88,16 @@ Commands: `tag`, `map`, `prune-raw`, `fix-dates`, `check`, `info`,
 
 ```bash
 # Tag a folder from a GPX track, in place:
-gpsphototag tag -p ~/Pictures/Trip -g trip.gpx --overwrite
+stunda tag -p ~/Pictures/Trip -g trip.gpx --overwrite
 
 # Heatmap PNG of an already-tagged trip:
-gpsphototag map -p ~/Pictures/Trip -o trip.png
+stunda map -p ~/Pictures/Trip -o trip.png
 
 # Remove RAW files with no JPG/HEIC companion (to Trash):
-gpsphototag prune-raw -p ~/Pictures/Trip
+stunda prune-raw -p ~/Pictures/Trip
 
 # Preview anything without writing:
-gpsphototag tag -p ~/Pictures/Trip -g trip.gpx --dry-run
+stunda tag -p ~/Pictures/Trip -g trip.gpx --dry-run
 ```
 
 ### For agents / scripting
@@ -99,7 +107,7 @@ Two ways to drive it as an LLM:
 - **MCP server** — a standard Model Context Protocol server (JSON-RPC 2.0) with
   tools `tag_photos`, `render_heatmap`, `prune_raw`, `fix_dates`,
   `check_toolkit`, `get_capabilities`. Runs over **stdio** (build
-  `packages/mcp/bin/gpsphototag_mcp.dart`), **and** the desktop app keeps an **always-on TCP** endpoint at
+  `packages/mcp/bin/stunda_mcp.dart`), **and** the desktop app keeps an **always-on TCP** endpoint at
   `127.0.0.1:8787` whenever it's open.
 - **CLI JSON contract** — `--json` emits one JSON event per line; `schema`
   describes every command, option, event, and exit code.
@@ -107,9 +115,9 @@ Two ways to drive it as an LLM:
 See [AGENTS.md](AGENTS.md) and [docs/mcp-client-config.json](docs/mcp-client-config.json).
 
 ```bash
-gpsphototag schema                       # discover the surface
-gpsphototag --json check                 # probe the environment
-gpsphototag --json tag -p ./Trip -g t.gpx --overwrite
+stunda schema                       # discover the surface
+stunda --json check                 # probe the environment
+stunda --json tag -p ./Trip -g t.gpx --overwrite
 ```
 
 Exit codes: `0` ok · `2` partial (some no-match) · `3` bad input · `4` missing
@@ -137,6 +145,6 @@ cd app && flutter analyze && flutter test
 
 ## License
 
-Copyright © 2026 Kodsama (Alexandre Martins). GPSPhotoTag is free software under
+Copyright © 2026 Kodsama (Alexandre Martins). Stunda is free software under
 the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see
 [LICENSE](LICENSE). It comes with no warranty, to the extent permitted by law.

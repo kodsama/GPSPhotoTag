@@ -1,6 +1,6 @@
-import 'package:gpsphototag_cli/src/cli_output.dart';
-import 'package:gpsphototag_cli/src/exit_codes.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_cli/src/cli_output.dart';
+import 'package:stunda_cli/src/exit_codes.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 import 'package:test/test.dart';
 
 /// Feeds [events] through a CliOutput and returns the derived exit code.

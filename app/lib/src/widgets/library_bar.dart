@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 import '../state/controller_scope.dart';
 import '../theme/app_theme.dart';

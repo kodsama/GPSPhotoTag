@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# GPSPhotoTag pre-commit hook — mirrors the CI lint/test gate so problems are
+# Stunda pre-commit hook — mirrors the CI lint/test gate so problems are
 # caught locally before they ever reach GitHub Actions.
 #
 # Enable with:  bash tool/setup-hooks.sh

@@ -1,6 +1,6 @@
-name: gpsphototag_engine
+name: stunda_engine
 description: >-
-  Flutter-free engine that powers both the GPSPhotoTag desktop GUI and CLI:
+  Flutter-free engine that powers both the Stunda desktop GUI and CLI:
   GPS EXIF tagging from GPX / Google location history, RAW pruning, date fixing,
   and heatmap rendering.
 version: 2.0.0

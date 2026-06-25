@@ -1,6 +1,6 @@
 # Architecture
 
-GPSPhotoTag is a Dart **pub workspace** with three packages. A single pure-Dart
+Stunda is a Dart **pub workspace** with three packages. A single pure-Dart
 engine holds all logic; the CLI and the Flutter GUI are thin adapters over it.
 
 ```

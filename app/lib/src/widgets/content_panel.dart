@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 import '../theme/app_theme.dart';
 
@@ -39,7 +39,7 @@ class ContentPanel extends StatelessWidget {
               _SectionLabel('Found but not used', muted: true),
               const SizedBox(height: 6),
               Text(
-                'Detected in the folder but not processed by GPSPhotoTag.',
+                'Detected in the folder but not processed by Stunda.',
                 style: text.bodySmall,
               ),
               const SizedBox(height: 10),

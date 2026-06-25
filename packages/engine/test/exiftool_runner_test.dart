@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/src/data/ports/exiftool_runner.dart';
-import 'package:gpsphototag_engine/src/data/ports/process_runner.dart';
+import 'package:stunda_engine/src/data/ports/exiftool_runner.dart';
+import 'package:stunda_engine/src/data/ports/process_runner.dart';
 import 'package:test/test.dart';
 
 /// Records the (executable, args) of every call and returns a canned result.

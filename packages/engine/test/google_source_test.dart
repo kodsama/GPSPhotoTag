@@ -1,5 +1,5 @@
-import 'package:gpsphototag_engine/src/data/sources/google_source.dart';
-import 'package:gpsphototag_engine/src/domain/timed_point.dart';
+import 'package:stunda_engine/src/data/sources/google_source.dart';
+import 'package:stunda_engine/src/domain/timed_point.dart';
 import 'package:test/test.dart';
 
 bool _isSorted(List<TimedPoint> points) {

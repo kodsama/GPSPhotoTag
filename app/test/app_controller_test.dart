@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_gui/src/state/app_controller.dart';
-import 'package:gpsphototag_gui/src/state/app_screen.dart';
-import 'package:gpsphototag_gui/src/state/library_action.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/state/app_controller.dart';
+import 'package:stunda/src/state/app_screen.dart';
+import 'package:stunda/src/state/library_action.dart';
 
 import 'support/fakes.dart';
 
@@ -223,7 +223,7 @@ void main() {
         ..debugSetScan(fakeScan(), folder: tmp.path);
       final path = await c.renderMap(dpi: 300);
       expect(fake.calls, contains('map'));
-      expect(path, endsWith('gpsphototag-heatmap.png'));
+      expect(path, endsWith('stunda-heatmap.png'));
     });
 
     test('opening prune classifies the library and pre-selects orphans', () {

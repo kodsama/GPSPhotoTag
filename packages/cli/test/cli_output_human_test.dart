@@ -1,5 +1,5 @@
-import 'package:gpsphototag_cli/src/cli_output.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_cli/src/cli_output.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 import 'package:test/test.dart';
 
 import '_capture.dart';

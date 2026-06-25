@@ -1,9 +1,9 @@
-name: gpsphototag
+name: stunda
 base: core22
 version: '2.0.0'
 summary: Tag photos with GPS coordinates from GPX or Google location history
 description: |
-  GPSPhotoTag writes GPS EXIF coordinates into your photos by matching their
+  Stunda writes GPS EXIF coordinates into your photos by matching their
   timestamps against a GPX track or a Google location history export. It can
   also prune orphan RAW files, fix photo dates, and render a heatmap of where
   your photos were taken.
@@ -15,8 +15,8 @@ confinement: strict
 
 # The snapcraft Flutter extension wires the GTK runtime + Flutter toolchain.
 apps:
-  gpsphototag:
-    command: gpsphototag_gui
+  stunda:
+    command: stunda
     extensions: [gnome]
     plugs:
       - home
@@ -24,7 +24,7 @@ apps:
       - network
 
 parts:
-  gpsphototag:
+  stunda:
     source: .
     plugin: flutter
     flutter-target: app/lib/main.dart

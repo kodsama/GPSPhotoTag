@@ -1,8 +1,8 @@
 # flutter_distributor .rpm config.
-display_name: GPSPhotoTag
-package_name: gpsphototag
+display_name: Stunda
+package_name: stunda
 license: GPLv3+
-url: https://github.com/kodsama/GPSPhotoTag
+url: https://github.com/kodsama/Stunda
 icon: ../../../../packaging/linux/icon_256.png
 generic_name: Photo GPS Tagger
 keywords:

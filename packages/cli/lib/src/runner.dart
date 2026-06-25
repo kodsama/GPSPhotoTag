@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 import 'commands/check_command.dart';
 import 'commands/fix_dates_command.dart';
@@ -12,7 +12,7 @@ import 'commands/prune_command.dart';
 import 'commands/schema_command.dart';
 import 'commands/tag_command.dart';
 
-/// Builds the GPSPhotoTag command runner with every subcommand registered.
+/// Builds the Stunda command runner with every subcommand registered.
 ///
 /// Global flags (`--json`, `--verbose`) live on the runner and are read by each
 /// command via `globalResults`.
@@ -29,7 +29,7 @@ CommandRunner<int> buildRunner({
 }) {
   final runner =
       CommandRunner<int>(
-          'gpsphototag',
+          'stunda',
           'Tag photos with GPS from GPX tracks or Google location history.',
         )
         ..argParser.addFlag(

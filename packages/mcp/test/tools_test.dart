@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_mcp/gpsphototag_mcp.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-// `image` resolves transitively via gpsphototag_engine; used here only to mint
+// `image` resolves transitively via stunda_engine; used here only to mint
 // tiny decodable JPEG fixtures.
 // ignore: depend_on_referenced_packages
 import 'package:image/image.dart' as img;
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda_mcp/stunda_mcp.dart';
 import 'package:test/test.dart';
 
 /// Returns canned results so tools that probe exiftool don't shell out.

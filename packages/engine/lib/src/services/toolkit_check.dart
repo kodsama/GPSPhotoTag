@@ -48,7 +48,7 @@ class ToolStatus {
   };
 }
 
-/// Probes the machine for exiftool, the one external tool GPSPhotoTag can use.
+/// Probes the machine for exiftool, the one external tool Stunda can use.
 ///
 /// The pure-Dart JPEG/PNG tagging path always works without any tools. ExifTool
 /// unlocks RAW-embed and HEIC; the desktop app bundles its own copy, so a probe

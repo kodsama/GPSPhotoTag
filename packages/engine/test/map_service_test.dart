@@ -1,13 +1,13 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/src/data/ports/process_runner.dart';
-import 'package:gpsphototag_engine/src/domain/engine_event.dart';
-import 'package:gpsphototag_engine/src/domain/options.dart';
-import 'package:gpsphototag_engine/src/services/map_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
+import 'package:stunda_engine/src/data/ports/process_runner.dart';
+import 'package:stunda_engine/src/domain/engine_event.dart';
+import 'package:stunda_engine/src/domain/options.dart';
+import 'package:stunda_engine/src/services/map_service.dart';
 import 'package:test/test.dart';
 
 /// A [ProcessRunner] that returns a canned [ProcResult] for every call.

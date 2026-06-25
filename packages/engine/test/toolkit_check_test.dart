@@ -1,5 +1,5 @@
-import 'package:gpsphototag_engine/src/data/ports/process_runner.dart';
-import 'package:gpsphototag_engine/src/services/toolkit_check.dart';
+import 'package:stunda_engine/src/data/ports/process_runner.dart';
+import 'package:stunda_engine/src/services/toolkit_check.dart';
 import 'package:test/test.dart';
 
 /// A [ProcessRunner] that returns canned results keyed by executable name.

@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_mcp/gpsphototag_mcp.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda_mcp/stunda_mcp.dart';
 
 /// Runs the MCP server on a localhost TCP socket in a dedicated worker isolate,
 /// started automatically when the app launches — so an LLM always has a live
-/// endpoint while GPSPhotoTag is open, without ever touching the UI isolate.
+/// endpoint while Stunda is open, without ever touching the UI isolate.
 class McpService extends ChangeNotifier {
   /// Creates the service. [exiftoolBundleDir] is the on-disk dir of the bundled
   /// exiftool, forwarded into the server isolate so its tools use it.

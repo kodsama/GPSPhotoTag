@@ -1,5 +1,5 @@
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:http/http.dart' as http;
+import 'package:stunda_engine/stunda_engine.dart';
 
 import 'event_collector.dart';
 
@@ -30,7 +30,7 @@ class McpTool {
 List<String> _strList(Object? v) =>
     v is List ? v.map((e) => '$e').toList() : const [];
 
-/// Builds the GPSPhotoTag tool catalog over the engine.
+/// Builds the Stunda tool catalog over the engine.
 ///
 /// [exiftoolAvailable] gates RAW-embed/HEIC; pass the result of a one-time
 /// [ToolkitChecker] probe so each call doesn't re-probe.

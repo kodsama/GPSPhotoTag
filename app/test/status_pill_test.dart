@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_gui/src/theme/app_colors.dart';
-import 'package:gpsphototag_gui/src/widgets/status_pill.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/theme/app_colors.dart';
+import 'package:stunda/src/widgets/status_pill.dart';
 
 Future<Color> _pillTextColor(WidgetTester tester, PhotoStatus status) async {
   await tester.pumpWidget(

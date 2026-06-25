@@ -22,7 +22,7 @@ class WelcomeScreen extends StatelessWidget {
             const LogoMark(size: 88),
             const SizedBox(height: 24),
             Text(
-              'GPSPhotoTag',
+              'Stunda',
               style: text.displaySmall,
               textAlign: TextAlign.center,
             ),

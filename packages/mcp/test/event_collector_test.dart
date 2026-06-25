@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_mcp/gpsphototag_mcp.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda_mcp/stunda_mcp.dart';
 import 'package:test/test.dart';
 
 void main() {

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 /// Loaded location sources, ready for the [TagService].
 class LoadedSources {

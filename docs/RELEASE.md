@@ -1,4 +1,4 @@
-# Releasing GPSPhotoTag
+# Releasing Stunda
 
 Releases are tag-driven. Pushing a tag matching `v*` (e.g. `v2.0.0`) to the
 repository triggers `.github/workflows/release.yml`, which builds every platform
@@ -40,13 +40,13 @@ flutter symbolize -i <stack_trace.txt> -d build/symbols/<platform>/app.<arch>.sy
 | -------- | ------------ | ---------------------------------------------------------------- |
 | Android  | `android`    | `*.apk`, `*.aab`, Linux CLI/MCP binaries, `android-symbols`      |
 | iOS      | `ios`        | unsigned `*.ipa`, `ios-symbols`                                  |
-| macOS    | `macos`      | `GPSPhotoTag-macos.dmg`, macOS CLI/MCP binaries, `macos-symbols` |
+| macOS    | `macos`      | `Stunda-macos.dmg`, macOS CLI/MCP binaries, `macos-symbols` |
 | Windows  | `windows`    | `*.exe` installer (Inno Setup), `*.msi` (WiX), raw Release `.zip`, `windows-symbols` |
 | Linux    | `linux`      | `*.AppImage`, `*.deb`, `*.rpm`, Linux CLI/MCP binaries, `linux-symbols` |
 | Linux    | `linux-snap` | `*.snap`                                                         |
-| Linux    | `linux-flatpak` | `gpsphototag.flatpak`                                         |
+| Linux    | `linux-flatpak` | `stunda.flatpak`                                         |
 
-The two Dart binaries (`gpsphototag`, `gpsphototag_mcp`) are compiled per-OS
+The two Dart binaries (`stunda`, `stunda_mcp`) are compiled per-OS
 with `dart compile exe` and shipped alongside the GUI.
 
 ## What is UNSIGNED and needs secrets
@@ -63,7 +63,7 @@ documented in comments in `release.yml`.
 | macOS (notarized) | Developer ID cert + notarization | `MACOS_CERTIFICATE_BASE64`, `MACOS_CERTIFICATE_PWD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` |
 | Windows (signed installer) | Code-signing cert | `WINDOWS_CERT_BASE64`, `WINDOWS_CERT_PASSWORD` |
 | Snap Store | Store login token | `SNAPCRAFT_STORE_CREDENTIALS` (publish via `snapcore/action-publish@v1`) |
-| Flathub | PR-based submission to `flathub/ai.kodsama.GPSPhotoTag` (not done from this repo) | — |
+| Flathub | PR-based submission to `flathub/ai.kodsama.Stunda` (not done from this repo) | — |
 
 Without signing:
 
@@ -78,10 +78,10 @@ Without signing:
 | ---- | ------- |
 | `distribute_options.yaml` | flutter_distributor release config (linux appimage/deb/rpm; optional windows/macos) |
 | `app/packaging/linux/{appimage,deb,rpm}/make_config.yaml` | per-target name, icon, categories |
-| `packaging/linux/ai.kodsama.GPSPhotoTag.desktop` | Linux `.desktop` entry |
+| `packaging/linux/ai.kodsama.Stunda.desktop` | Linux `.desktop` entry |
 | `packaging/linux/icon_256.png` | 256px icon (derived from `app/assets/icon_1024.png`) |
-| `packaging/flatpak/ai.kodsama.GPSPhotoTag.yml` | flatpak manifest (freedesktop 23.08 runtime) |
-| `packaging/flatpak/ai.kodsama.GPSPhotoTag.metainfo.xml` | AppStream metadata |
+| `packaging/flatpak/ai.kodsama.Stunda.yml` | flatpak manifest (freedesktop 23.08 runtime) |
+| `packaging/flatpak/ai.kodsama.Stunda.metainfo.xml` | AppStream metadata |
 | `packaging/windows/product.wxs` | WiX v3 manifest for the `.msi` |
 | `snap/snapcraft.yaml` | snap build (core22, gnome extension, strict confinement) |
 

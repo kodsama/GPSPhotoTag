@@ -1,6 +1,6 @@
 # flutter_distributor .deb config.
-display_name: GPSPhotoTag
-package_name: gpsphototag
+display_name: Stunda
+package_name: stunda
 maintainer:
   name: Kodsama
   email: support@kodsama.ai

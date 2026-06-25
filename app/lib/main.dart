@@ -6,18 +6,17 @@ import 'src/state/controller_scope.dart';
 import 'src/theme/app_theme.dart';
 import 'src/widgets/app_shell.dart';
 
-void main() =>
-    runApp(GpsPhotoTagApp(exiftoolBundleDir: locateBundledExiftool()));
+void main() => runApp(StundaApp(exiftoolBundleDir: locateBundledExiftool()));
 
-/// Root of the GPSPhotoTag desktop GUI.
+/// Root of the Stunda desktop GUI.
 ///
 /// Owns the single [AppController], publishes it to the tree via
 /// [ControllerScope], and rebuilds [MaterialApp] when the theme mode changes.
-class GpsPhotoTagApp extends StatefulWidget {
+class StundaApp extends StatefulWidget {
   /// Creates the app, optionally with an injected [controller] (tests). When no
   /// controller is injected, builds one wired to the bundled [exiftoolBundleDir]
   /// located in `main`.
-  const GpsPhotoTagApp({super.key, this.controller, this.exiftoolBundleDir});
+  const StundaApp({super.key, this.controller, this.exiftoolBundleDir});
 
   /// The controller to use; a fresh one is created when null.
   final AppController? controller;
@@ -27,10 +26,10 @@ class GpsPhotoTagApp extends StatefulWidget {
   final String? exiftoolBundleDir;
 
   @override
-  State<GpsPhotoTagApp> createState() => _GpsPhotoTagAppState();
+  State<StundaApp> createState() => _StundaAppState();
 }
 
-class _GpsPhotoTagAppState extends State<GpsPhotoTagApp> {
+class _StundaAppState extends State<StundaApp> {
   late final AppController _controller =
       widget.controller ??
       AppController(exiftoolBundleDir: widget.exiftoolBundleDir);
@@ -61,7 +60,7 @@ class _GpsPhotoTagAppState extends State<GpsPhotoTagApp> {
       child: ListenableBuilder(
         listenable: _controller,
         builder: (context, _) => MaterialApp(
-          title: 'GPSPhotoTag',
+          title: 'Stunda',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,

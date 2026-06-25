@@ -10,7 +10,7 @@ import 'exif_backend.dart';
 /// The `image` package's PNG encoder does not (yet) emit a native `eXIf`
 /// chunk, so the EXIF TIFF block is base64-encoded into a textual chunk that
 /// the encoder and decoder both round-trip faithfully.
-const String _kExifTextKey = 'gpsphototag:exif';
+const String _kExifTextKey = 'stunda:exif';
 
 /// An [ExifBackend] for PNG files, implemented entirely in-process with the
 /// `image` package.

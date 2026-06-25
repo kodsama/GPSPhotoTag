@@ -1,5 +1,5 @@
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_mcp/gpsphototag_mcp.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda_mcp/stunda_mcp.dart';
 import 'package:test/test.dart';
 
 /// Returns canned results so tools that probe exiftool don't shell out.
@@ -39,10 +39,7 @@ void main() {
       (result['capabilities'] as Map<String, Object?>).containsKey('tools'),
       isTrue,
     );
-    expect(
-      (result['serverInfo'] as Map<String, Object?>)['name'],
-      'gpsphototag',
-    );
+    expect((result['serverInfo'] as Map<String, Object?>)['name'], 'stunda');
   });
 
   test('notifications (no id) get no response', () async {

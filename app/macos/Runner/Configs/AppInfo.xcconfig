@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = GPSPhotoTag
+PRODUCT_NAME = Stunda
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = ai.kodsama.gpsphototagGui
+PRODUCT_BUNDLE_IDENTIFIER = ai.kodsama.stunda
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 Kodsama. All rights reserved.

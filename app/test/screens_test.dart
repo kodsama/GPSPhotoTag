@@ -3,16 +3,16 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_gui/main.dart';
-import 'package:gpsphototag_gui/src/actions/map_action.dart';
-import 'package:gpsphototag_gui/src/actions/prune_action.dart';
-import 'package:gpsphototag_gui/src/actions/tag_action.dart';
-import 'package:gpsphototag_gui/src/state/app_controller.dart';
-import 'package:gpsphototag_gui/src/state/app_screen.dart';
-import 'package:gpsphototag_gui/src/state/library_action.dart';
-import 'package:gpsphototag_gui/src/widgets/action_card.dart';
-import 'package:gpsphototag_gui/src/widgets/status_pill.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/main.dart';
+import 'package:stunda/src/actions/map_action.dart';
+import 'package:stunda/src/actions/prune_action.dart';
+import 'package:stunda/src/actions/tag_action.dart';
+import 'package:stunda/src/state/app_controller.dart';
+import 'package:stunda/src/state/app_screen.dart';
+import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/widgets/action_card.dart';
+import 'package:stunda/src/widgets/status_pill.dart';
 
 import 'support/fakes.dart';
 
@@ -29,7 +29,7 @@ Future<void> _pump(WidgetTester tester, AppController controller) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(GpsPhotoTagApp(controller: controller));
+  await tester.pumpWidget(StundaApp(controller: controller));
   await tester.pump();
 }
 
@@ -270,7 +270,7 @@ void main() {
       await tester.pump();
 
       expect(fake.calls, contains('map'));
-      expect(File('${tmp.path}/gpsphototag-heatmap.png').existsSync(), isTrue);
+      expect(File('${tmp.path}/stunda-heatmap.png').existsSync(), isTrue);
       expect(find.text('Heatmap'), findsOneWidget);
       expect(find.byType(Image), findsWidgets);
 

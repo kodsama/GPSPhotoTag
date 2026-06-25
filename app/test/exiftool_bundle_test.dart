@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_gui/src/engine/exiftool_bundle.dart';
+import 'package:stunda/src/engine/exiftool_bundle.dart';
 
 void main() {
   test('locateBundledExiftool returns null when no bundle sits next to the '

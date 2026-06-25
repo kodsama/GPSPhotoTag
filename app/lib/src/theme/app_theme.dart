@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// Builds the light and dark [ThemeData] for GPSPhotoTag.
+/// Builds the light and dark [ThemeData] for Stunda.
 ///
 /// The look is intentionally non-default: warm paper surfaces, square-ish cards
 /// with hairline contour borders, a terracotta primary, and a typographic scale

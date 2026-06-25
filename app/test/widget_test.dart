@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_gui/main.dart';
-import 'package:gpsphototag_gui/src/screens/scanning_screen.dart';
-import 'package:gpsphototag_gui/src/screens/welcome_screen.dart';
-import 'package:gpsphototag_gui/src/screens/workspace_screen.dart';
-import 'package:gpsphototag_gui/src/state/app_controller.dart';
-import 'package:gpsphototag_gui/src/state/app_screen.dart';
-import 'package:gpsphototag_gui/src/widgets/activity_log_panel.dart';
-import 'package:gpsphototag_gui/src/widgets/warning_banner.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/main.dart';
+import 'package:stunda/src/screens/scanning_screen.dart';
+import 'package:stunda/src/screens/welcome_screen.dart';
+import 'package:stunda/src/screens/workspace_screen.dart';
+import 'package:stunda/src/state/app_controller.dart';
+import 'package:stunda/src/state/app_screen.dart';
+import 'package:stunda/src/widgets/activity_log_panel.dart';
+import 'package:stunda/src/widgets/warning_banner.dart';
 
 import 'support/fakes.dart';
 
@@ -29,7 +29,7 @@ Future<void> _pumpApp(WidgetTester tester, AppController controller) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(GpsPhotoTagApp(controller: controller));
+  await tester.pumpWidget(StundaApp(controller: controller));
   await tester.pump();
 }
 
@@ -41,7 +41,7 @@ void main() {
       ..debugSetToolkit([_tool('exiftool', version: '12.0')]);
     await _pumpApp(tester, controller);
 
-    expect(find.text('GPSPhotoTag'), findsWidgets);
+    expect(find.text('Stunda'), findsWidgets);
     expect(find.byType(WelcomeScreen), findsOneWidget);
     expect(controller.screen, AppScreen.welcome);
     expect(find.text('Choose photo library'), findsOneWidget);

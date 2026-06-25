@@ -22,7 +22,7 @@ class InfoCommand extends Command<int> {
   @override
   Future<int> run() async {
     final info = {
-      'name': 'gpsphototag',
+      'name': 'stunda',
       'version': cliVersion,
       'platform': Platform.operatingSystem,
       'formats': {
@@ -36,7 +36,7 @@ class InfoCommand extends Command<int> {
     if (globalResults!.flag('json')) {
       _out.writeln(jsonEncode(info));
     } else {
-      _out.writeln('gpsphototag $cliVersion on ${Platform.operatingSystem}');
+      _out.writeln('stunda $cliVersion on ${Platform.operatingSystem}');
       _out.writeln(
         'formats: jpeg, png, raw (sidecar/exiftool), heic (exiftool)',
       );

@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:path/path.dart' as p;
+import 'package:stunda_engine/stunda_engine.dart';
 import 'package:test/test.dart';
 
 const _gpx = '''

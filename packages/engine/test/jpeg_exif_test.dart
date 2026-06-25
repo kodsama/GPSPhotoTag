@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:gpsphototag_engine/src/data/exif/jpeg_exif_backend.dart';
 import 'package:image/image.dart' as img;
+import 'package:stunda_engine/src/data/exif/jpeg_exif_backend.dart';
 import 'package:test/test.dart';
 
 void main() {

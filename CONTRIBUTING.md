@@ -1,15 +1,15 @@
-# Contributing to GPSPhotoTag
+# Contributing to Stunda
 
-GPSPhotoTag is a Dart pub **workspace**: a Flutter-free engine, a CLI, an MCP
+Stunda is a Dart pub **workspace**: a Flutter-free engine, a CLI, an MCP
 server, and a Flutter desktop/mobile GUI all resolve together from one root
 lockfile.
 
 | Package           | Path               | What it is                         |
 | ----------------- | ------------------ | ---------------------------------- |
-| `gpsphototag_engine` | `packages/engine` | Pure-Dart engine library           |
-| `gpsphototag_cli`    | `packages/cli`    | CLI binary `gpsphototag`           |
-| `gpsphototag_mcp`    | `packages/mcp`    | MCP server binary `gpsphototag_mcp`|
-| `gpsphototag_gui`    | `app`             | Flutter desktop + mobile app       |
+| `stunda_engine` | `packages/engine` | Pure-Dart engine library           |
+| `stunda_cli`    | `packages/cli`    | CLI binary `stunda`           |
+| `stunda_mcp`    | `packages/mcp`    | MCP server binary `stunda_mcp`|
+| `stunda`    | `app`             | Flutter desktop + mobile app       |
 
 Toolchain: **Flutter 3.44.3 / Dart 3.12.2** (pinned in CI).
 

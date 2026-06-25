@@ -1,4 +1,4 @@
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 /// One line in the rolling activity log shown in the slide-over panel.
 class LogEntry {

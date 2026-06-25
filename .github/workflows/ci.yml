@@ -1,6 +1,6 @@
 name: CI
 
-# Lint + test gate for the GPSPhotoTag pub workspace (engine, cli, mcp, app).
+# Lint + test gate for the Stunda pub workspace (engine, cli, mcp, app).
 # Mirrors .githooks/pre-commit, plus a per-package ≥95% line-coverage gate.
 
 on:

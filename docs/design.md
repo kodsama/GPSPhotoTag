@@ -1,4 +1,4 @@
-# GPSPhotoTag — Design Spec
+# Stunda — Design Spec
 
 **Date:** 2026-05-28
 **Status:** Implemented — kept as the historical v0 design. Features shipped
@@ -44,7 +44,7 @@ Out of scope (YAGNI):
 ## 3. CLI
 
 ```
-gpsphototag --photo PHOTO [PHOTO ...] [--photo ...]
+stunda --photo PHOTO [PHOTO ...] [--photo ...]
          [--gps GPX [GPX ...] [--gps ...]]
          [--maps-history PATH [PATH ...]]
          [--out DIR]

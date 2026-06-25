@@ -1,4 +1,4 @@
-import 'package:gpsphototag_engine/src/services/raw_pairing.dart';
+import 'package:stunda_engine/src/services/raw_pairing.dart';
 import 'package:test/test.dart';
 
 void main() {

@@ -1,4 +1,4 @@
-/// GPSPhotoTag engine: the Flutter-free core shared by the desktop GUI and CLI.
+/// Stunda engine: the Flutter-free core shared by the desktop GUI and CLI.
 ///
 /// Exposes the domain models, data backends/sources, services, and high-level
 /// orchestrators for tagging photos with GPS, pruning orphan RAW files, fixing

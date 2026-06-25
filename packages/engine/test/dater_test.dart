@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/src/data/exif/exif_backend.dart';
-import 'package:gpsphototag_engine/src/data/ports/process_runner.dart';
-import 'package:gpsphototag_engine/src/domain/engine_event.dart';
-import 'package:gpsphototag_engine/src/domain/options.dart';
-import 'package:gpsphototag_engine/src/domain/status.dart';
-import 'package:gpsphototag_engine/src/services/dater.dart';
 import 'package:path/path.dart' as p;
+import 'package:stunda_engine/src/data/exif/exif_backend.dart';
+import 'package:stunda_engine/src/data/ports/process_runner.dart';
+import 'package:stunda_engine/src/domain/engine_event.dart';
+import 'package:stunda_engine/src/domain/options.dart';
+import 'package:stunda_engine/src/domain/status.dart';
+import 'package:stunda_engine/src/services/dater.dart';
 import 'package:test/test.dart';
 
 /// Returns a fixed [PhotoMeta]; never reads from disk.

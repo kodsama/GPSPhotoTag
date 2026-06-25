@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Minimal WiX v3 manifest for the GPSPhotoTag .msi installer.
+  Minimal WiX v3 manifest for the Stunda .msi installer.
 
   Compile from app/ after building the Windows Release. Invoke candle.exe with
   -arch x64, the path to this file, -out product.wixobj and a -dSourceDir
   pointing at build\windows\x64\runner\Release, then run light.exe on the
-  product.wixobj to emit GPSPhotoTag-windows-x64.msi. The exact command is in
+  product.wixobj to emit Stunda-windows-x64.msi. The exact command is in
   docs/RELEASE.md and the release.yml "Build .msi (WiX v3)" step.
 
   IMPORTANT: replace the UpgradeCode GUID below with a stable, project-owned
@@ -15,7 +15,7 @@
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
-           Name="GPSPhotoTag"
+           Name="Stunda"
            Language="1033"
            Version="2.0.0.0"
            Manufacturer="Kodsama"
@@ -24,29 +24,29 @@
     <Package InstallerVersion="500"
              Compressed="yes"
              InstallScope="perMachine"
-             Description="GPSPhotoTag installer" />
+             Description="Stunda installer" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of GPSPhotoTag is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Stunda is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <!-- Harvest the whole Release folder. SourceDir is passed via -d on candle. -->
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="GPSPhotoTag" />
+        <Directory Id="INSTALLFOLDER" Name="Stunda" />
       </Directory>
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="GPSPhotoTag" />
+        <Directory Id="ApplicationProgramsFolder" Name="Stunda" />
       </Directory>
     </Directory>
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="MainExecutable" Guid="B2C3D4E5-F6A7-48B9-AC0D-2E3F40516273">
-        <File Id="GPSPhotoTagExe"
-              Source="$(var.SourceDir)\gpsphototag_gui.exe"
+        <File Id="StundaExe"
+              Source="$(var.SourceDir)\stunda.exe"
               KeyPath="yes">
           <Shortcut Id="StartMenuShortcut"
                     Directory="ApplicationProgramsFolder"
-                    Name="GPSPhotoTag"
+                    Name="Stunda"
                     WorkingDirectory="INSTALLFOLDER"
                     Advertise="yes" />
         </File>
@@ -64,7 +64,7 @@
       -->
     </ComponentGroup>
 
-    <Feature Id="MainFeature" Title="GPSPhotoTag" Level="1">
+    <Feature Id="MainFeature" Title="Stunda" Level="1">
       <ComponentRef Id="MainExecutable" />
       <ComponentGroupRef Id="AppFiles" />
     </Feature>

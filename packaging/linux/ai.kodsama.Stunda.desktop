@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=GPSPhotoTag
+Name=Stunda
 GenericName=Photo GPS Tagger
 Comment=Tag photos with GPS coordinates from GPX or Google location history
-Exec=gpsphototag_gui
-Icon=ai.kodsama.GPSPhotoTag
+Exec=stunda
+Icon=ai.kodsama.Stunda
 Terminal=false
 Categories=Graphics;Photography;
 Keywords=GPS;EXIF;Photo;Geotag;GPX;
-StartupWMClass=gpsphototag_gui
+StartupWMClass=stunda

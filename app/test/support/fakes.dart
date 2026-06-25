@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_gui/src/engine/engine_runner.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/engine/engine_runner.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 

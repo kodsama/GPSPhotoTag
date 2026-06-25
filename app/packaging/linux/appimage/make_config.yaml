@@ -1,5 +1,5 @@
 # flutter_distributor AppImage config.
-display_name: GPSPhotoTag
+display_name: Stunda
 icon: ../../../../packaging/linux/icon_256.png
 keywords:
   - GPS

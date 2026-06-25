@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>ai.kodsama.GPSPhotoTag</id>
+  <id>ai.kodsama.Stunda</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <name>GPSPhotoTag</name>
+  <name>Stunda</name>
   <summary>Tag photos with GPS coordinates from GPX or Google location history</summary>
   <developer id="ai.kodsama">
     <name>Kodsama</name>
   </developer>
   <description>
     <p>
-      GPSPhotoTag writes GPS EXIF coordinates into your photos by matching their
+      Stunda writes GPS EXIF coordinates into your photos by matching their
       timestamps against a GPX track or a Google location history export. It can
       also prune orphan RAW files, fix photo dates, and render a heatmap of where
       your photos were taken.
     </p>
   </description>
-  <launchable type="desktop-id">ai.kodsama.GPSPhotoTag.desktop</launchable>
+  <launchable type="desktop-id">ai.kodsama.Stunda.desktop</launchable>
   <categories>
     <category>Graphics</category>
     <category>Photography</category>
   </categories>
   <content_rating type="oars-1.1" />
-  <url type="homepage">https://github.com/kodsama/GPSPhotoTag</url>
+  <url type="homepage">https://github.com/kodsama/Stunda</url>
   <releases>
     <release version="2.0.0" date="2026-06-24" />
   </releases>

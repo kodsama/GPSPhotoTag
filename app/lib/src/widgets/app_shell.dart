@@ -102,7 +102,7 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('GPSPhotoTag', style: text.headlineSmall),
+                Text('Stunda', style: text.headlineSmall),
                 Text(
                   'Tag photos & map trips from GPX, KML & Google location history',
                   style: text.bodySmall,

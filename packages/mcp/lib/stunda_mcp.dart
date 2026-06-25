@@ -1,4 +1,4 @@
-/// MCP (Model Context Protocol) server for GPSPhotoTag.
+/// MCP (Model Context Protocol) server for Stunda.
 ///
 /// Exposes the engine's operations as MCP tools over JSON-RPC 2.0, on either
 /// stdio (client-spawned) or a localhost TCP socket (the desktop app's

@@ -1,7 +1,7 @@
-# Root of the GPSPhotoTag 2.0 pub workspace.
+# Root of the Stunda 2.0 pub workspace.
 # The Flutter-free engine, the CLI, and the Flutter GUI all resolve together so a
 # single `dart pub get` wires the whole monorepo with one shared lockfile.
-name: gpsphototag_workspace
+name: stunda_workspace
 publish_to: none
 
 environment:

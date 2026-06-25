@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 import 'engine_runner.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 /// Whether an action can run against the current library, plus a short reason.
 ///

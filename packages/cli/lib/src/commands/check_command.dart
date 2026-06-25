@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 /// `check` — probe for exiftool (RAW-embed / HEIC via exiftool).
 class CheckCommand extends Command<int> {

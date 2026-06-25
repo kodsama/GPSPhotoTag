@@ -4,7 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_gui/src/engine/mcp_service.dart';
+import 'package:stunda/src/engine/mcp_service.dart';
 
 void main() {
   test('start binds a localhost port, then stop tears it down', () async {

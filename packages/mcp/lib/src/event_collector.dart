@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 
 /// Drains an [EngineEvent] stream into a single structured result map suitable
 /// for an MCP `tools/call` response: `{summary, items, logs, [error, code]}`.

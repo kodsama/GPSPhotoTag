@@ -4,8 +4,8 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
-import 'package:gpsphototag_gui/src/engine/isolate_runner.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/engine/isolate_runner.dart';
 
 import 'support/fakes.dart';
 

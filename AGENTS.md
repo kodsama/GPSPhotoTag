@@ -1,4 +1,4 @@
-# GPSPhotoTag for agents
+# Stunda for agents
 
 > **Two ways to drive this tool as an LLM:**
 > 1. **MCP server** (recommended) — a standard Model Context Protocol server, see
@@ -8,17 +8,17 @@
 
 
 
-`gpsphototag` is a headless, scriptable CLI for writing GPS EXIF into photos
+`stunda` is a headless, scriptable CLI for writing GPS EXIF into photos
 from GPX tracks or Google location history, plus pruning orphan RAW files,
 fixing dates, and rendering heatmaps. This document is the contract for driving
 it programmatically.
 
 ## Discovery flow
 
-1. **Read the schema.** Run `gpsphototag schema` — it prints a JSON document
+1. **Read the schema.** Run `stunda schema` — it prints a JSON document
    describing every command, its options, the event shapes, and the exit codes.
    Parse it; do not hard-code command knowledge.
-2. **Probe the environment.** Run `gpsphototag --json check` to learn which
+2. **Probe the environment.** Run `stunda --json check` to learn which
    external tools are present (exiftool unlocks RAW-embed + HEIC; libheif unlocks
    HEIC decode). Each entry includes an `installCommand` when missing.
 3. **Pick a command and run it with `--json`.** Every run streams newline-
@@ -60,18 +60,18 @@ One JSON object per line on stdout. The `event` field discriminates:
 
 ```bash
 # Discover, then tag a folder from a GPX track, machine-readable:
-gpsphototag schema
-gpsphototag --json check
-gpsphototag --json tag -p ~/Pictures/Trip -g trip.gpx --overwrite
+stunda schema
+stunda --json check
+stunda --json tag -p ~/Pictures/Trip -g trip.gpx --overwrite
 
 # Preview only (writes nothing):
-gpsphototag --json tag -p ~/Pictures/Trip -g trip.gpx --dry-run
+stunda --json tag -p ~/Pictures/Trip -g trip.gpx --dry-run
 
 # Remove RAW files with no JPG/HEIC companion (to Trash):
-gpsphototag --json prune-raw -p ~/Pictures/Trip
+stunda --json prune-raw -p ~/Pictures/Trip
 
 # Realign file dates from EXIF:
-gpsphototag --json fix-dates -p ~/Pictures/Trip --mode exif
+stunda --json fix-dates -p ~/Pictures/Trip --mode exif
 ```
 
 Parse `done.summary` for the final tally; treat exit `2` as "completed, review
@@ -80,7 +80,7 @@ output — it is not stable; the `--json` stream is.
 
 ## MCP (Model Context Protocol)
 
-GPSPhotoTag ships a standard MCP server (JSON-RPC 2.0) exposing the engine as
+Stunda ships a standard MCP server (JSON-RPC 2.0) exposing the engine as
 tools. It speaks the usual lifecycle: `initialize` → `notifications/initialized`
 → `tools/list` → `tools/call`.
 
@@ -92,8 +92,8 @@ block **and** a `structuredContent` object: `{ ok, summary, count, items[], logs
 **Two transports, same tools:**
 
 - **stdio** (recommended for clients that spawn a subprocess) — run the compiled
-  binary `gpsphototag_mcp` (build it with
-  `dart compile exe packages/mcp/bin/gpsphototag_mcp.dart -o gpsphototag_mcp`).
+  binary `stunda_mcp` (build it with
+  `dart compile exe packages/mcp/bin/stunda_mcp.dart -o stunda_mcp`).
 - **TCP** — the desktop app starts the server on `127.0.0.1:8787` (next free
   port up to 8796) **whenever the app is open**; newline-delimited JSON-RPC. Run
   the binary the same way with `--tcp [--port N]`.
@@ -103,7 +103,7 @@ block **and** a `structuredContent` object: `{ ok, summary, count, items[], logs
 ```json
 {
   "mcpServers": {
-    "gpsphototag": { "command": "/absolute/path/to/gpsphototag_mcp" }
+    "stunda": { "command": "/absolute/path/to/stunda_mcp" }
   }
 }
 ```

@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:gpsphototag_engine/src/data/ports/trash.dart';
-import 'package:gpsphototag_engine/src/domain/engine_event.dart';
-import 'package:gpsphototag_engine/src/domain/options.dart';
-import 'package:gpsphototag_engine/src/domain/status.dart';
-import 'package:gpsphototag_engine/src/services/pruner.dart';
 import 'package:path/path.dart' as p;
+import 'package:stunda_engine/src/data/ports/trash.dart';
+import 'package:stunda_engine/src/domain/engine_event.dart';
+import 'package:stunda_engine/src/domain/options.dart';
+import 'package:stunda_engine/src/domain/status.dart';
+import 'package:stunda_engine/src/services/pruner.dart';
 import 'package:test/test.dart';
 
 /// Records paths instead of touching the real OS Trash.

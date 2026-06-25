@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:gpsphototag_cli/src/exit_codes.dart';
-import 'package:gpsphototag_cli/src/runner.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
 import 'package:path/path.dart' as p;
+import 'package:stunda_cli/src/exit_codes.dart';
+import 'package:stunda_cli/src/runner.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 import 'package:test/test.dart';
 
 import '_capture.dart';
@@ -68,7 +68,7 @@ void main() {
       final code = await run(['--json', 'info']);
       expect(code, ExitCodes.ok);
       final json = jsonDecode(buf.text.trim()) as Map<String, Object?>;
-      expect(json['name'], 'gpsphototag');
+      expect(json['name'], 'stunda');
       expect(json['version'], isA<String>());
       expect(json['platform'], isA<String>());
       expect(json['formats'], isA<Map<String, Object?>>());
@@ -78,7 +78,7 @@ void main() {
     test('human mode prints a version line', () async {
       final code = await run(['info']);
       expect(code, ExitCodes.ok);
-      expect(buf.text, contains('gpsphototag'));
+      expect(buf.text, contains('stunda'));
     });
   });
 
@@ -112,7 +112,7 @@ void main() {
       final code = await run(['schema']);
       expect(code, ExitCodes.ok);
       final json = jsonDecode(buf.text.trim()) as Map<String, Object?>;
-      expect(json['tool'], 'gpsphototag');
+      expect(json['tool'], 'stunda');
       expect(json['commands'], isA<Map<String, Object?>>());
       expect((json['commands'] as Map).containsKey('tag'), isTrue);
       expect((json['exitCodes'] as Map)['0'], isA<String>());

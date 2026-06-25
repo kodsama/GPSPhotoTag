@@ -31,7 +31,7 @@ class SchemaCommand extends Command<int> {
 }
 
 const _schema = {
-  'tool': 'gpsphototag',
+  'tool': 'stunda',
   'version': cliVersion,
   'globalFlags': {
     '--json': 'Emit one JSON event per line on stdout.',

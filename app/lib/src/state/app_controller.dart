@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:gpsphototag_engine/gpsphototag_engine.dart';
+import 'package:stunda_engine/stunda_engine.dart';
 import 'package:path/path.dart' as p;
 
 import '../engine/engine_runner.dart';
@@ -12,7 +12,7 @@ import 'app_screen.dart';
 import 'library_action.dart';
 import 'log_entry.dart';
 
-/// The single source of truth for the GPSPhotoTag GUI.
+/// The single source of truth for the Stunda GUI.
 ///
 /// Models the app as a hub-and-spoke workspace: the user picks a photo library
 /// ([AppScreen.welcome]), watches it scan ([AppScreen.scanning]), lands on the
@@ -427,7 +427,7 @@ class AppController extends ChangeNotifier {
     final folder = _folder;
     final scan = _scan;
     if (folder == null || scan == null) return null;
-    final out = p.join(folder, 'gpsphototag-heatmap.png');
+    final out = p.join(folder, 'stunda-heatmap.png');
     await _consume(
       _engine.map(
         photos: scan.photos,

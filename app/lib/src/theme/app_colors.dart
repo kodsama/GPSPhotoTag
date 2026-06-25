@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// The GPSPhotoTag palette — a warm "field-notebook / topographic map" identity:
+/// The Stunda palette — a warm "field-notebook / topographic map" identity:
 /// aged paper, ink, a terracotta route line, and a teal contour accent. Chosen
 /// to feel like a cartographer's notebook rather than a default Material app.
 abstract final class AppColors {
