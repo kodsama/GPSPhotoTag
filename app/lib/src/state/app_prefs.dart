@@ -24,6 +24,8 @@ class AppPrefs {
     this.themeMode = ThemeMode.system,
     this.defaultRawMode = RawMode.auto,
     this.defaultMaxTimeDiffSeconds = 300,
+    this.backgroundImagePath,
+    this.backgroundVeil = 0.85,
   });
 
   /// The backing JSON file path, or null when persistence is disabled.
@@ -38,6 +40,14 @@ class AppPrefs {
   /// The max time-difference (seconds) the Tag action starts from.
   int defaultMaxTimeDiffSeconds;
 
+  /// Path to a user-chosen background image, or null to use the default
+  /// map-style background.
+  String? backgroundImagePath;
+
+  /// Opacity (0.0–1.0) of the readability veil drawn over the background; higher
+  /// is more subtle (more veil, fainter background). Defaults to a subtle 0.85.
+  double backgroundVeil;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -50,6 +60,10 @@ class AppPrefs {
       prefs.defaultRawMode = _parseRawMode(map['defaultRawMode'] as String?);
       final secs = map['defaultMaxTimeDiffSeconds'];
       if (secs is int && secs >= 0) prefs.defaultMaxTimeDiffSeconds = secs;
+      final bg = map['backgroundImagePath'];
+      if (bg is String && bg.isNotEmpty) prefs.backgroundImagePath = bg;
+      final veil = map['backgroundVeil'];
+      if (veil is num) prefs.backgroundVeil = veil.toDouble().clamp(0.0, 1.0);
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -66,6 +80,8 @@ class AppPrefs {
           'themeMode': themeMode.name,
           'defaultRawMode': defaultRawMode.name,
           'defaultMaxTimeDiffSeconds': defaultMaxTimeDiffSeconds,
+          'backgroundImagePath': backgroundImagePath,
+          'backgroundVeil': backgroundVeil,
         }),
       );
     } on Object {

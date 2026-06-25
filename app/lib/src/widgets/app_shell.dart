@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../branding/logo_mark.dart';
-import '../engine/mcp_service.dart';
 import '../screens/action_screen.dart';
 import '../screens/explore_map_screen.dart';
 import '../screens/scanning_screen.dart';
@@ -12,6 +11,8 @@ import '../state/app_screen.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
+import 'app_background.dart';
+import 'glass.dart';
 import 'licenses.dart';
 import 'settings_dialog.dart';
 import 'warning_banner.dart';
@@ -38,12 +39,22 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
+    // The header belongs only to the main pages; sub-pages carry their own
+    // back affordance (a "Library" button), so it would only be redundant.
+    final showHeader =
+        controller.screen == AppScreen.welcome ||
+        controller.screen == AppScreen.workspace;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          AppBackground(
+            imagePath: controller.backgroundImagePath,
+            veil: controller.backgroundVeil,
+          ),
           Column(
             children: [
-              const _Header(),
+              if (showHeader) const _Header(),
               const WarningBanner(),
               const Expanded(child: _ScreenBody()),
             ],
@@ -93,14 +104,10 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
-    final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    return Container(
+    return GlassSurface(
+      borderRadius: BorderRadius.zero,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(bottom: BorderSide(color: scheme.outline)),
-      ),
       child: Row(
         children: [
           const LogoMark(size: 34),
@@ -118,8 +125,6 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          _McpChip(mcp: controller.mcp),
-          const SizedBox(width: 12),
           _SettingsMenu(controller: controller),
         ],
       ),
@@ -206,62 +211,6 @@ void _showAbout(BuildContext context) {
         'Author: Kodsama\n'
         'GPL-3.0-or-later',
   );
-}
-
-/// Header chip showing the always-on MCP server status (the LLM endpoint).
-class _McpChip extends StatelessWidget {
-  const _McpChip({required this.mcp});
-
-  final McpService mcp;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return ListenableBuilder(
-      listenable: mcp,
-      builder: (context, _) {
-        final (Color color, String label, String tip) = switch (mcp) {
-          _ when mcp.running => (
-            AppColors.success,
-            'MCP :${mcp.port}',
-            'LLM endpoint live on 127.0.0.1:${mcp.port} (MCP over TCP)',
-          ),
-          _ when mcp.error != null => (
-            AppColors.danger,
-            'MCP off',
-            'MCP server failed to start: ${mcp.error}',
-          ),
-          _ => (AppColors.warning, 'MCP …', 'Starting MCP server…'),
-        };
-        return Tooltip(
-          message: tip,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: scheme.outline),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Text(label, style: Theme.of(context).textTheme.labelMedium),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// The floating activity-log button with an unread-count badge.

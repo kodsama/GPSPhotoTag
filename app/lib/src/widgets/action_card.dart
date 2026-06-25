@@ -1,8 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../state/library_action.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'glass.dart';
 
 /// One action in the workspace grid: icon, title, one-line description, and a
 /// readiness chip. Disabled when [readiness] blocks it; tapping a ready card
@@ -37,12 +40,22 @@ class _ActionCardState extends State<ActionCard> {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final enabled = widget.readiness.enabled;
-    final base = scheme.surface;
-    final color = !enabled
-        ? base
-        : _hover
-        ? Color.alphaBlend(scheme.primary.withValues(alpha: 0.06), base)
-        : base;
+    final radius = BorderRadius.circular(AppTheme.radius);
+    // Frosted fill, with a faint primary wash on hover for tactility.
+    final decoration = glassDecoration(scheme, radius).copyWith(
+      color: enabled && _hover
+          ? Color.alphaBlend(
+              scheme.primary.withValues(alpha: 0.10),
+              scheme.surface.withValues(alpha: 0.62),
+            )
+          : scheme.surface.withValues(alpha: 0.62),
+      border: Border.all(
+        color: enabled && _hover
+            ? scheme.primary
+            : scheme.outline.withValues(alpha: 0.6),
+        width: enabled && _hover ? 1.4 : 1,
+      ),
+    );
 
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -50,40 +63,43 @@ class _ActionCardState extends State<ActionCard> {
       onExit: (_) => setState(() => _hover = false),
       child: Opacity(
         opacity: enabled ? 1 : 0.55,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(AppTheme.radius),
-            border: Border.all(
-              color: enabled && _hover ? scheme.primary : scheme.outline,
-              width: enabled && _hover ? 1.4 : 1,
-            ),
-          ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppTheme.radius),
-              onTap: enabled ? widget.onOpen : null,
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(widget.action.icon, size: 28, color: scheme.primary),
-                    const SizedBox(height: 14),
-                    Text(widget.action.title, style: text.titleMedium),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.action.description,
-                      style: text.bodySmall,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: double.infinity,
+              decoration: decoration,
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  borderRadius: radius,
+                  onTap: enabled ? widget.onOpen : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          widget.action.icon,
+                          size: 28,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(height: 14),
+                        Text(widget.action.title, style: text.titleMedium),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.action.description,
+                          style: text.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Spacer(),
+                        _ReadinessChip(readiness: widget.readiness),
+                      ],
                     ),
-                    const Spacer(),
-                    _ReadinessChip(readiness: widget.readiness),
-                  ],
+                  ),
                 ),
               ),
             ),

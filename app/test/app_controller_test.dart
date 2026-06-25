@@ -477,6 +477,73 @@ void main() {
       c.setDefaultMaxTimeDiff(60);
       expect(c.maxTimeDiffSeconds, 60);
     });
+
+    test('background defaults: null image and a subtle 0.85 veil', () async {
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.backgroundImagePath, isNull);
+      expect(prefs.backgroundVeil, 0.85);
+    });
+
+    test('save then load round-trips the background prefs', () async {
+      final prefs = await AppPrefs.load(dir.path)
+        ..backgroundImagePath = '/pics/bg.png'
+        ..backgroundVeil = 0.4;
+      await prefs.save();
+
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.backgroundImagePath, '/pics/bg.png');
+      expect(reloaded.backgroundVeil, 0.4);
+    });
+
+    test('load clamps an out-of-range saved veil into 0..1', () async {
+      File(
+        '${dir.path}/preferences.json',
+      ).writeAsStringSync('{"backgroundVeil": 5.0}');
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.backgroundVeil, 1.0);
+    });
+
+    test('setBackgroundImagePath persists and notifies', () {
+      final prefs = AppPrefs();
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      var notified = 0;
+      c.addListener(() => notified++);
+
+      c.setBackgroundImagePath('/pics/bg.png');
+      expect(c.backgroundImagePath, '/pics/bg.png');
+      expect(prefs.backgroundImagePath, '/pics/bg.png');
+      expect(notified, 1);
+
+      // Reset clears it (blank/null collapse to null).
+      c.setBackgroundImagePath(null);
+      expect(c.backgroundImagePath, isNull);
+      expect(prefs.backgroundImagePath, isNull);
+      expect(notified, 2);
+    });
+
+    test('setBackgroundVeil clamps and persists and notifies', () {
+      final prefs = AppPrefs();
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      var notified = 0;
+      c.addListener(() => notified++);
+
+      c.setBackgroundVeil(0.3);
+      expect(c.backgroundVeil, 0.3);
+      expect(prefs.backgroundVeil, 0.3);
+      expect(notified, 1);
+
+      c.setBackgroundVeil(2.0);
+      expect(c.backgroundVeil, 1.0);
+    });
+
+    test('background defaults are exposed without a prefs store', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.backgroundImagePath, isNull);
+      expect(c.backgroundVeil, 0.85);
+      // Setters are no-ops on the bag but still notify without throwing.
+      c.setBackgroundVeil(0.5);
+      expect(c.backgroundVeil, 0.85);
+    });
   });
 
   group('checkEnvironment', () {

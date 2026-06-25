@@ -172,11 +172,11 @@ void main() {
     expect(scope.tileProvider, same(provider));
   });
 
-  testWidgets('MCP chip renders in the header', (tester) async {
+  testWidgets('MCP status no longer lives in the header', (tester) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
     await _pumpApp(tester, controller);
-    expect(find.textContaining('MCP'), findsOneWidget);
+    expect(find.textContaining('MCP'), findsNothing);
   });
 
   testWidgets('the settings menu appearance item flips the theme', (

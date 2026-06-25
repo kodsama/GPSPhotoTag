@@ -3,6 +3,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import '../theme/app_theme.dart';
 import 'file_list_dialog.dart';
+import 'glass.dart';
 
 /// One supported chip: a label, its files, and whether they are GPS sources.
 class _ChipSpec {
@@ -27,37 +28,34 @@ class ContentPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    return Material(
-      color: scheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTheme.radius),
-        side: BorderSide(color: scheme.outline),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          title: Text('Library contents', style: text.titleMedium),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          children: [
-            _SectionLabel('Supported — will be used'),
-            const SizedBox(height: 12),
-            _Chips(chips: _supportedChips(scan)),
-            if (scan.unsupportedCount > 0) ...[
-              const SizedBox(height: 20),
-              _SectionLabel('Found but not used', muted: true),
-              const SizedBox(height: 6),
-              Text(
-                'Detected in the folder but not processed by Stunda.',
-                style: text.bodySmall,
-              ),
-              const SizedBox(height: 10),
-              _UnsupportedGroups(scan: scan),
+    return GlassSurface(
+      borderRadius: BorderRadius.circular(AppTheme.radius),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: true,
+            title: Text('Library contents', style: text.titleMedium),
+            childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            children: [
+              _SectionLabel('Supported — will be used'),
+              const SizedBox(height: 12),
+              _Chips(chips: _supportedChips(scan)),
+              if (scan.unsupportedCount > 0) ...[
+                const SizedBox(height: 20),
+                _SectionLabel('Found but not used', muted: true),
+                const SizedBox(height: 6),
+                Text(
+                  'Detected in the folder but not processed by Stunda.',
+                  style: text.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                _UnsupportedGroups(scan: scan),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

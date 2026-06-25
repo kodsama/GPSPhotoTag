@@ -134,6 +134,31 @@ class AppController extends ChangeNotifier {
     prefs.save();
   }
 
+  // --- Background (persisted) ----------------------------------------------
+
+  /// The user-chosen background image path, or null to use the default
+  /// map-style background.
+  String? get backgroundImagePath => _prefs?.backgroundImagePath;
+
+  /// Opacity (0.0–1.0) of the readability veil over the background; higher is
+  /// more subtle. Defaults to 0.85 when no prefs store is wired.
+  double get backgroundVeil => _prefs?.backgroundVeil ?? 0.85;
+
+  /// Sets (or clears, when null/blank) the background image and persists it.
+  void setBackgroundImagePath(String? path) {
+    final value = (path == null || path.trim().isEmpty) ? null : path;
+    _prefs?.backgroundImagePath = value;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Sets the background veil opacity (clamped to 0.0–1.0) and persists it.
+  void setBackgroundVeil(double opacity) {
+    _prefs?.backgroundVeil = opacity.clamp(0.0, 1.0);
+    _persistPrefs();
+    notifyListeners();
+  }
+
   // --- Screen navigation ---------------------------------------------------
 
   AppScreen _screen = AppScreen.welcome;
