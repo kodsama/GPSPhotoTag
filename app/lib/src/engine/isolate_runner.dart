@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:stunda_engine/stunda_engine.dart';
@@ -114,18 +115,57 @@ class IsolateRunner implements EngineRunner {
     onSpawnError: ErrorEvent.new,
   );
 
-  /// Batch-reads image metadata for [paths] on a worker isolate, streaming one
-  /// [FileMeta] per path back to the UI isolate as exiftool yields each chunk.
+  /// Batch-reads image metadata for [paths], FANNED OUT across several worker
+  /// isolates (each running its own exiftool) so thousands of files fill in
+  /// quickly; results from all workers are merged into one stream and arrive as
+  /// each chunk is read. The stream closes when every worker is done.
   @override
-  Stream<FileMeta> readImageMeta(List<String> paths) => _spawn(
-    _readImageMetaEntry,
-    (port) => _ReadImageMetaRequest(
-      port: port,
-      paths: paths,
-      bundleDir: exiftoolBundleDir,
-    ),
-    onSpawnError: (_) => const FileMeta(path: ''),
-  );
+  Stream<FileMeta> readImageMeta(List<String> paths) {
+    if (paths.isEmpty) return const Stream<FileMeta>.empty();
+    // One worker per ~chunk, capped so we don't oversubscribe the CPU.
+    final cores = Platform.numberOfProcessors;
+    final workers = paths.length <= 64
+        ? 1
+        : (cores - 2).clamp(2, 6).clamp(1, (paths.length / 64).ceil());
+
+    final controller = StreamController<FileMeta>();
+    final isolates = <Isolate>[];
+    var active = workers;
+
+    void onWorkerDone() {
+      active--;
+      if (active <= 0 && !controller.isClosed) controller.close();
+    }
+
+    for (var w = 0; w < workers; w++) {
+      // Round-robin slice so progress is spread evenly across workers.
+      final slice = [for (var i = w; i < paths.length; i += workers) paths[i]];
+      final receive = ReceivePort();
+      receive.listen((message) {
+        if (message == null) {
+          receive.close();
+          onWorkerDone();
+        } else if (message is FileMeta && !controller.isClosed) {
+          controller.add(message);
+        }
+      });
+      Isolate.spawn(
+        _readImageMetaEntry,
+        _ReadImageMetaRequest(
+          port: receive.sendPort,
+          paths: slice,
+          bundleDir: exiftoolBundleDir,
+        ),
+      ).then((iso) => isolates.add(iso), onError: (_, _) => onWorkerDone());
+    }
+
+    controller.onCancel = () {
+      for (final iso in isolates) {
+        iso.kill(priority: Isolate.immediate);
+      }
+    };
+    return controller.stream;
+  }
 
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
   /// by [makeRequest], and re-emits every event of type [E] it sends until the

@@ -78,12 +78,16 @@ class FileMeta {
 Stream<FileMeta> readImageMeta(
   List<String> paths, {
   required ProcessRunner runner,
-  int chunk = 300,
+  int chunk = 64,
 }) async* {
   for (var i = 0; i < paths.length; i += chunk) {
     final end = (i + chunk < paths.length) ? i + chunk : paths.length;
     final batch = paths.sublist(i, end);
     final result = await runner.run('exiftool', [
+      // -fast2 skips MakerNotes and the trailer — without it, files with a
+      // large embedded trailer (e.g. Pixel Motion Photos *.MP.jpg) make
+      // exiftool scan the whole multi-MB file, ~30x slower.
+      '-fast2',
       '-json',
       '-n',
       '-ImageWidth',
