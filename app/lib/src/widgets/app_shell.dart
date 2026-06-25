@@ -104,7 +104,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text('Stunda', style: text.headlineSmall),
                 Text(
-                  'Tag photos & map trips from GPX, KML & Google location history',
+                  'Give every photo its moment',
                   style: text.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),

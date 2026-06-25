@@ -121,9 +121,13 @@ class AppController extends ChangeNotifier {
   /// Drops the current library and returns to the welcome screen.
   void changeLibrary() {
     _sub?.cancel();
+    _metaSub?.cancel();
     _scan = null;
     _action = null;
     _resetRun();
+    _excludedFiles.clear();
+    _meta.clear();
+    _metaLoading.clear();
     _scanProgress = null;
     _running = false;
     _screen = AppScreen.welcome;
@@ -398,27 +402,130 @@ class AppController extends ChangeNotifier {
     _unread++;
   }
 
+  // --- File selection (drill-down include/exclude) -------------------------
+
+  /// Files (photos AND GPS-source files) the user has unticked in a drill-down
+  /// dialog. Excluded paths are filtered out of every action below.
+  final Set<String> _excludedFiles = {};
+
+  /// The set of paths excluded from processing (read-only view).
+  Set<String> get excludedFiles => Set.unmodifiable(_excludedFiles);
+
+  /// Whether [path] will be processed (i.e. it is not excluded).
+  bool isFileIncluded(String path) => !_excludedFiles.contains(path);
+
+  /// Includes ([included] true) or excludes a single [path].
+  void setFileIncluded(String path, bool included) {
+    final changed = included
+        ? _excludedFiles.remove(path)
+        : _excludedFiles.add(path);
+    if (changed) notifyListeners();
+  }
+
+  /// Includes or excludes every path in [paths] at once (select-all/none).
+  void setGroupIncluded(Iterable<String> paths, bool included) {
+    var changed = false;
+    for (final path in paths) {
+      changed |= included
+          ? _excludedFiles.remove(path)
+          : _excludedFiles.add(path);
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// [paths] with every excluded entry removed, order preserved.
+  List<String> _included(List<String> paths) => [
+    for (final path in paths)
+      if (!_excludedFiles.contains(path)) path,
+  ];
+
+  // --- File metadata cache (drill-down rows) -------------------------------
+
+  final Map<String, FileMeta> _meta = {};
+  final Set<String> _metaLoading = {};
+  StreamSubscription<FileMeta>? _metaSub;
+
+  /// Cached metadata for [path], or null if not read yet.
+  FileMeta? fileMeta(String path) => _meta[path];
+
+  /// Whether an image-metadata read is currently streaming in.
+  bool get metaLoading => _metaLoading.isNotEmpty;
+
+  /// Loads (and caches) image metadata for any of [paths] not already read.
+  ///
+  /// Streams results through [EngineRunner.readImageMeta] off the UI isolate,
+  /// folding each [FileMeta] into the cache as it arrives so a dialog can show
+  /// rows filling in progressively. Re-opening a group is instant: paths whose
+  /// metadata is cached (or already loading) are skipped.
+  Future<void> loadImageMeta(List<String> paths) async {
+    final pending = [
+      for (final path in paths)
+        if (!_meta.containsKey(path) && !_metaLoading.contains(path)) path,
+    ];
+    if (pending.isEmpty) return;
+    _metaLoading.addAll(pending);
+    notifyListeners();
+
+    await _metaSub?.cancel();
+    final completer = Completer<void>();
+    _metaSub = _engine
+        .readImageMeta(pending)
+        .listen(
+          (meta) {
+            _meta[meta.path] = meta;
+            _metaLoading.remove(meta.path);
+            notifyListeners();
+          },
+          onError: (Object _) {
+            _metaLoading.removeAll(pending);
+            notifyListeners();
+            if (!completer.isCompleted) completer.complete();
+          },
+          onDone: () {
+            _metaLoading.removeAll(pending);
+            notifyListeners();
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+    return completer.future;
+  }
+
+  /// Reads GPS-source metadata for [paths] synchronously into the cache.
+  ///
+  /// Source-file parsing is cheap and pure, so it runs in-process; results are
+  /// cached so re-opening the dialog is instant.
+  void loadGpsMeta(List<String> paths) {
+    var changed = false;
+    for (final path in paths) {
+      if (_meta.containsKey(path)) continue;
+      _meta[path] = gpsFileMeta(path);
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
   // --- Operations ----------------------------------------------------------
 
-  /// Number of photos the tag run will process.
-  int get photoCount => _scan?.photoCount ?? 0;
+  /// Number of photos the tag run will process (after exclusions).
+  int get photoCount => _included(_scan?.photos ?? const []).length;
 
-  /// Tags every scanned photo, pooling all GPS sources inside the worker.
+  /// Tags every *included* scanned photo, pooling included GPS sources.
   Future<void> runTag() {
     final scan = _scan;
     if (scan == null) return Future.value();
+    final photos = _included(scan.photos);
     return _consume(
       _engine.tag(
-        photos: scan.photos,
-        gpxFiles: scan.gpxFiles,
-        kmlFiles: scan.kmlFiles,
-        googleFiles: scan.googleFiles,
+        photos: photos,
+        gpxFiles: _included(scan.gpxFiles),
+        kmlFiles: _included(scan.kmlFiles),
+        googleFiles: _included(scan.googleFiles),
         options: buildTagOptions(),
       ),
       startMessage: _dryRun
-          ? 'Previewing ${scan.photoCount} photo(s)…'
-          : 'Tagging ${scan.photoCount} photo(s)…',
-      total: scan.photoCount,
+          ? 'Previewing ${photos.length} photo(s)…'
+          : 'Tagging ${photos.length} photo(s)…',
+      total: photos.length,
     );
   }
 
@@ -427,14 +534,15 @@ class AppController extends ChangeNotifier {
     final folder = _folder;
     final scan = _scan;
     if (folder == null || scan == null) return null;
+    final photos = _included(scan.photos);
     final out = p.join(folder, 'stunda-heatmap.png');
     await _consume(
       _engine.map(
-        photos: scan.photos,
+        photos: photos,
         options: MapOptions(outputPng: out, dpi: dpi ?? 200),
       ),
       startMessage: 'Rendering heatmap…',
-      total: scan.photoCount,
+      total: photos.length,
     );
     return _errorMessage == null ? out : null;
   }
@@ -614,6 +722,7 @@ class AppController extends ChangeNotifier {
   void dispose() {
     _scanSub?.cancel();
     _sub?.cancel();
+    _metaSub?.cancel();
     mcp.dispose();
     super.dispose();
   }
@@ -643,6 +752,13 @@ class AppController extends ChangeNotifier {
     _screen = screen;
     _action = action;
     if (action == LibraryAction.pruneRaw) _preparePruneReview();
+    notifyListeners();
+  }
+
+  /// Seeds the metadata cache for [meta]'s path directly (tests only).
+  @visibleForTesting
+  void debugSeedMeta(FileMeta meta) {
+    _meta[meta.path] = meta;
     notifyListeners();
   }
 

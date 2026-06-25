@@ -43,4 +43,9 @@ abstract interface class EngineRunner {
     required FixDatesMode mode,
     bool dryRun = false,
   });
+
+  /// Batch-reads image metadata for [paths] (off the UI isolate), streaming one
+  /// [FileMeta] per path as exiftool yields each chunk. Backs the drill-down
+  /// dialog's progressive per-row metadata.
+  Stream<FileMeta> readImageMeta(List<String> paths);
 }

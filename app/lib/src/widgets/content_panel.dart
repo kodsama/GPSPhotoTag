@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
 import '../theme/app_theme.dart';
+import 'file_list_dialog.dart';
+
+/// One supported chip: a label, its files, and whether they are GPS sources.
+class _ChipSpec {
+  const _ChipSpec(this.label, this.paths, {required this.gps});
+
+  final String label;
+  final List<String> paths;
+  final bool gps;
+
+  int get count => paths.length;
+}
 
 /// An expandable breakdown of what the scan found: a *Supported* section
 /// (photo formats + GPS sources that will be used) and a muted *Found but not
@@ -51,18 +63,29 @@ class ContentPanel extends StatelessWidget {
     );
   }
 
-  /// (label, count) pairs for the supported chips: photo formats (by count
-  /// desc) then GPS sources. Counts are plain integers — no thousands grouping.
-  static List<(String, int)> _supportedChips(FolderScanResult scan) {
-    final chips = <(String, int)>[];
-    final formats = scan.photosByFormat.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    for (final e in formats) {
-      chips.add((e.key.toUpperCase(), e.value));
+  /// Chip specs for the supported section: photo formats (by count desc) then
+  /// GPS sources. Each carries the file paths behind it so a tap can open the
+  /// drill-down dialog. Counts are plain integers — no thousands grouping.
+  static List<_ChipSpec> _supportedChips(FolderScanResult scan) {
+    final chips = <_ChipSpec>[];
+    final byFormat = <String, List<String>>{};
+    for (final path in scan.photos) {
+      byFormat.putIfAbsent(PhotoFormats.extOf(path), () => []).add(path);
     }
-    if (scan.gpxCount > 0) chips.add(('GPX', scan.gpxCount));
-    if (scan.kmlCount > 0) chips.add(('KML', scan.kmlCount));
-    if (scan.googleCount > 0) chips.add(('Timeline', scan.googleCount));
+    final formats = byFormat.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    for (final e in formats) {
+      chips.add(_ChipSpec(e.key.toUpperCase(), e.value, gps: false));
+    }
+    if (scan.gpxCount > 0) {
+      chips.add(_ChipSpec('GPX', scan.gpxFiles, gps: true));
+    }
+    if (scan.kmlCount > 0) {
+      chips.add(_ChipSpec('KML', scan.kmlFiles, gps: true));
+    }
+    if (scan.googleCount > 0) {
+      chips.add(_ChipSpec('Timeline', scan.googleFiles, gps: true));
+    }
     return chips;
   }
 }
@@ -91,10 +114,11 @@ class _SectionLabel extends StatelessWidget {
 
 /// A wrap of count chips: a bold format/source label on the left and the count
 /// as a distinct pill on the right, so the two never visually run together.
+/// Each chip is tappable, opening the drill-down dialog for its files.
 class _Chips extends StatelessWidget {
   const _Chips({required this.chips});
 
-  final List<(String, int)> chips;
+  final List<_ChipSpec> chips;
 
   @override
   Widget build(BuildContext context) {
@@ -112,45 +136,58 @@ class _Chips extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        for (final (label, count) in chips)
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 7, 7, 7),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest,
+        for (final chip in chips)
+          Material(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(9),
+            child: InkWell(
               borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: scheme.outline),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: text.labelLarge?.copyWith(
-                    color: scheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
+              onTap: () => showFileListDialog(
+                context,
+                title: '${chip.label} — ${chip.count} files',
+                paths: chip.paths,
+                supported: true,
+                gps: chip.gps,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 7, 7, 7),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: scheme.outline),
                 ),
-                const SizedBox(width: 9),
-                // Count in its own subtle pill, well clear of the label.
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: text.bodySmall?.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: AppTheme.tabular,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      chip.label,
+                      style: text.labelLarge?.copyWith(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 9),
+                    // Count in its own subtle pill, well clear of the label.
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${chip.count}',
+                        style: text.bodySmall?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: AppTheme.tabular,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
       ],
@@ -182,12 +219,25 @@ class _UnsupportedGroups extends StatelessWidget {
           if ((byCat[cat] ?? 0) > 0) ...[
             _CategoryRow(
               label: '${_labels[cat]} (${byCat[cat]})',
+              title: '${_labels[cat]} — ${byCat[cat]} files',
               exts: _extsFor(scan, cat, byExt),
+              paths: _pathsFor(scan, cat),
             ),
             const SizedBox(height: 8),
           ],
       ],
     );
+  }
+
+  /// The (capped) sample paths bucketed into [cat], for the read-only dialog.
+  static List<String> _pathsFor(
+    FolderScanResult scan,
+    UnsupportedCategory cat,
+  ) {
+    return [
+      for (final u in scan.unsupported)
+        if (u.category == cat) u.path,
+    ];
   }
 
   /// Up to a few sample extensions seen in [cat], from the capped sample list.
@@ -213,12 +263,19 @@ class _UnsupportedGroups extends StatelessWidget {
   }
 }
 
-/// One muted "Images (12): tif, bmp…" row.
+/// One muted "Images (12): tif, bmp…" row — tappable to open a read-only list.
 class _CategoryRow extends StatelessWidget {
-  const _CategoryRow({required this.label, required this.exts});
+  const _CategoryRow({
+    required this.label,
+    required this.title,
+    required this.exts,
+    required this.paths,
+  });
 
   final String label;
+  final String title;
   final List<String> exts;
+  final List<String> paths;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +283,23 @@ class _CategoryRow extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final muted = scheme.onSurface.withValues(alpha: 0.5);
     final suffix = exts.isEmpty ? '' : ': ${exts.join(', ')}';
-    return Text('$label$suffix', style: text.bodySmall?.copyWith(color: muted));
+    return InkWell(
+      onTap: paths.isEmpty
+          ? null
+          : () => showFileListDialog(
+              context,
+              title: title,
+              paths: paths,
+              supported: false,
+              gps: false,
+            ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          '$label$suffix',
+          style: text.bodySmall?.copyWith(color: muted),
+        ),
+      ),
+    );
   }
 }

@@ -431,6 +431,118 @@ void main() {
     });
   });
 
+  group('file selection / exclusion', () {
+    test('defaults to everything included', () {
+      final c = AppController()..debugSetScan(fakeScan());
+      expect(c.isFileIncluded('/library/a.jpg'), isTrue);
+      expect(c.excludedFiles, isEmpty);
+    });
+
+    test('setFileIncluded toggles a single path', () {
+      final c = AppController()..debugSetScan(fakeScan());
+      c.setFileIncluded('/library/a.jpg', false);
+      expect(c.isFileIncluded('/library/a.jpg'), isFalse);
+      expect(c.excludedFiles, contains('/library/a.jpg'));
+      c.setFileIncluded('/library/a.jpg', true);
+      expect(c.isFileIncluded('/library/a.jpg'), isTrue);
+    });
+
+    test('setGroupIncluded excludes/includes a whole group', () {
+      final c = AppController();
+      c.setGroupIncluded(['/a.jpg', '/b.jpg'], false);
+      expect(c.excludedFiles, {'/a.jpg', '/b.jpg'});
+      c.setGroupIncluded(['/a.jpg', '/b.jpg'], true);
+      expect(c.excludedFiles, isEmpty);
+    });
+
+    test('photoCount reflects exclusions', () {
+      final c = AppController()
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg', '/b.jpg']));
+      expect(c.photoCount, 2);
+      c.setFileIncluded('/library/a.jpg', false);
+      expect(c.photoCount, 1);
+    });
+
+    test('runTag receives only included photos and sources', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetScan(
+          fakeScan(
+            photos: const ['/keep.jpg', '/drop.jpg'],
+            gpxFiles: const ['/keep.gpx', '/drop.gpx'],
+          ),
+        );
+      c.setFileIncluded('/drop.jpg', false);
+      c.setFileIncluded('/drop.gpx', false);
+      await c.runTag();
+      expect(fake.lastTagPhotos, ['/keep.jpg']);
+      expect(fake.lastTagGpx, ['/keep.gpx']);
+    });
+
+    test('renderMap receives only included photos', () async {
+      final dir = Directory.systemTemp.createTempSync('map_excl');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetScan(
+          fakeScan(photos: const ['/keep.jpg', '/drop.jpg']),
+          folder: dir.path,
+        );
+      c.setFileIncluded('/drop.jpg', false);
+      await c.renderMap();
+      expect(fake.lastMapPhotos, ['/keep.jpg']);
+    });
+
+    test('changeLibrary clears exclusions and metadata', () async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan());
+      c.setFileIncluded('/library/a.jpg', false);
+      await c.loadImageMeta(['/library/a.jpg']);
+      c.changeLibrary();
+      expect(c.excludedFiles, isEmpty);
+      expect(c.fileMeta('/library/a.jpg'), isNull);
+    });
+  });
+
+  group('metadata cache', () {
+    test('loadImageMeta streams metas into the cache', () async {
+      const meta = FileMeta(path: '/a.jpg', width: 4, height: 3, hasGps: true);
+      final c = AppController(
+        runner: FakeEngineRunner(imageMeta: const {'/a.jpg': meta}),
+      );
+      expect(c.fileMeta('/a.jpg'), isNull);
+      await c.loadImageMeta(['/a.jpg']);
+      expect(c.fileMeta('/a.jpg')?.width, 4);
+      expect(c.metaLoading, isFalse);
+    });
+
+    test('loadImageMeta skips already-cached paths', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.loadImageMeta(['/a.jpg']);
+      fake.lastImageMetaPaths = null;
+      await c.loadImageMeta(['/a.jpg']);
+      // No second read for an already-cached path.
+      expect(fake.lastImageMetaPaths, isNull);
+    });
+
+    test('loadGpsMeta reads source files in-process', () {
+      final dir = Directory.systemTemp.createTempSync('gps_meta');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = writeGpx(dir, 't.gpx', DateTime.utc(2023, 1, 1, 12));
+      final c = AppController()..loadGpsMeta([path]);
+      expect(c.fileMeta(path)?.pointCount, 1);
+      expect(c.fileMeta(path)?.hasGps, isTrue);
+    });
+
+    test('loadImageMeta surfaces stream errors without crashing', () async {
+      final c = AppController(runner: ThrowingEngineRunner());
+      await c.loadImageMeta(['/a.jpg']);
+      expect(c.metaLoading, isFalse);
+      expect(c.fileMeta('/a.jpg'), isNull);
+    });
+  });
+
   group('lifecycle', () {
     test('dispose tears down the controller and its mcp service', () {
       final c = AppController(runner: FakeEngineRunner());

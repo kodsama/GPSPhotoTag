@@ -1,36 +1,47 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- Stunda mark: a camera aperture — the instant the shutter opens — a warm
-       "moment" of light caught in the iris. Cartographic paper palette. -->
+  <title>Stunda</title>
+  <!-- Stunda mark: a map PIN (a place, a moment "you were here") whose head is a
+       glowing camera LENS holding the light of the moment, with a sparkle for
+       beauty, over faint map contours. -->
   <defs>
     <clipPath id="bg"><rect width="1024" height="1024" rx="224"/></clipPath>
-    <radialGradient id="spark" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#F4C36B"/>
-      <stop offset="55%" stop-color="#E0A33A"/>
-      <stop offset="100%" stop-color="#C25A3A"/>
+    <radialGradient id="lens" cx="42%" cy="38%" r="68%">
+      <stop offset="0%" stop-color="#F6D58A"/>
+      <stop offset="42%" stop-color="#E0A33A"/>
+      <stop offset="100%" stop-color="#BE5230"/>
     </radialGradient>
   </defs>
 
+  <!-- paper + faint topographic contours -->
   <g clip-path="url(#bg)">
     <rect width="1024" height="1024" fill="#F3EDE1"/>
-  </g>
-
-  <g transform="translate(512 512)">
-    <!-- lens rim -->
-    <circle r="300" fill="none" stroke="#C25A3A" stroke-width="34"/>
-
-    <!-- six aperture blades, rotated copies of one chord; together they ring a
-         hexagonal opening -->
-    <g stroke="#2E6F6A" stroke-width="30" stroke-linecap="round" fill="none">
-      <g>             <line x1="150" y1="-260" x2="280" y2="-34"/></g>
-      <g transform="rotate(60)"><line x1="150" y1="-260" x2="280" y2="-34"/></g>
-      <g transform="rotate(120)"><line x1="150" y1="-260" x2="280" y2="-34"/></g>
-      <g transform="rotate(180)"><line x1="150" y1="-260" x2="280" y2="-34"/></g>
-      <g transform="rotate(240)"><line x1="150" y1="-260" x2="280" y2="-34"/></g>
-      <g transform="rotate(300)"><line x1="150" y1="-260" x2="280" y2="-34"/></g>
+    <g fill="none" stroke="#DDD2BD" stroke-width="9">
+      <circle cx="150" cy="170" r="120"/>
+      <circle cx="150" cy="170" r="185"/>
+      <circle cx="880" cy="880" r="150"/>
+      <circle cx="880" cy="880" r="220"/>
     </g>
-
-    <!-- the caught moment: a warm spark at the centre -->
-    <circle r="74" fill="url(#spark)"/>
-    <circle cx="-22" cy="-22" r="20" fill="#FBF7EF" opacity="0.85"/>
   </g>
+
+  <!-- soft ground shadow -->
+  <ellipse cx="512" cy="900" rx="116" ry="24" fill="#23201A" opacity="0.12"/>
+
+  <!-- pin body -->
+  <path d="M512 904 C512 904 288 612 288 424 A224 224 0 1 1 736 424
+           C736 612 512 904 512 904 Z" fill="#C25A3A"/>
+  <path d="M512 904 C512 904 288 612 288 424 A224 224 0 1 1 736 424
+           C736 612 512 904 512 904 Z" fill="none" stroke="#A4472B"
+        stroke-width="10" opacity="0.45"/>
+
+  <!-- lens: paper frame, teal rim, warm glowing glass -->
+  <circle cx="512" cy="424" r="162" fill="#FBF7EF"/>
+  <circle cx="512" cy="424" r="128" fill="url(#lens)"/>
+  <circle cx="512" cy="424" r="162" fill="none" stroke="#2E6F6A" stroke-width="22"/>
+  <!-- glassy highlight -->
+  <path d="M442 372 A104 104 0 0 1 556 332" fill="none" stroke="#FBF7EF"
+        stroke-width="16" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- sparkle: the beautiful moment -->
+  <path d="M624 300 Q636 324 660 336 Q636 348 624 372 Q612 348 588 336
+           Q612 324 624 300 Z" fill="#FBF7EF"/>
 </svg>

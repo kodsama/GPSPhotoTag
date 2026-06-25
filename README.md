@@ -5,9 +5,13 @@
 <h1 align="center">Stunda</h1>
 
 <p align="center">
-  <i>Tag photos with GPS from GPX tracks or Google location history —
-  a cross-platform desktop app and a headless, LLM-friendly CLI,
-  both powered by one pure-Dart engine.</i>
+  <b>Give every photo its moment.</b>
+</p>
+
+<p align="center">
+  <i>A cross-platform desktop photo toolkit — tag with GPS, map your trips,
+  prune orphan RAWs — plus a headless, LLM-friendly CLI, all powered by one
+  pure-Dart engine.</i>
 </p>
 
 ---

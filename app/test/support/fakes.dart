@@ -15,8 +15,13 @@ class FakeEngineRunner implements EngineRunner {
     List<EngineEvent>? events,
     List<ScanEvent>? scanEvents,
     this.keepOpen = false,
+    Map<String, FileMeta>? imageMeta,
   }) : _events = events ?? _success(),
-       _scanEvents = scanEvents ?? _scanSuccess();
+       _scanEvents = scanEvents ?? _scanSuccess(),
+       _imageMeta = imageMeta ?? const {};
+
+  /// Canned per-path image metadata returned by [readImageMeta].
+  final Map<String, FileMeta> _imageMeta;
 
   final List<EngineEvent> _events;
   final List<ScanEvent> _scanEvents;
@@ -37,6 +42,13 @@ class FakeEngineRunner implements EngineRunner {
 
   /// The [TagOptions] passed to the last [tag] call, for assertions.
   TagOptions? lastTagOptions;
+
+  /// Path lists passed to the last [tag] call, for exclusion assertions.
+  List<String>? lastTagPhotos;
+  List<String>? lastTagGpx;
+
+  /// The photos passed to the last [map] call, for exclusion assertions.
+  List<String>? lastMapPhotos;
 
   /// The paths passed to the last [trashPaths] call, for assertions.
   List<String>? lastTrashedPaths;
@@ -90,6 +102,8 @@ class FakeEngineRunner implements EngineRunner {
   }) {
     calls.add('tag');
     lastTagOptions = options;
+    lastTagPhotos = photos;
+    lastTagGpx = gpxFiles;
     return _emit();
   }
 
@@ -99,6 +113,7 @@ class FakeEngineRunner implements EngineRunner {
     required MapOptions options,
   }) {
     calls.add('map');
+    lastMapPhotos = photos;
     // Write a tiny real PNG so result_step's Image.file has a file to point at.
     File(
       options.outputPng,
@@ -130,6 +145,18 @@ class FakeEngineRunner implements EngineRunner {
   }) {
     calls.add('fixDates');
     return _emit();
+  }
+
+  /// Paths passed to the last [readImageMeta] call, for assertions.
+  List<String>? lastImageMetaPaths;
+
+  @override
+  Stream<FileMeta> readImageMeta(List<String> paths) async* {
+    calls.add('readImageMeta');
+    lastImageMetaPaths = paths;
+    for (final path in paths) {
+      yield _imageMeta[path] ?? FileMeta(path: path);
+    }
   }
 }
 
@@ -174,6 +201,10 @@ class ThrowingEngineRunner implements EngineRunner {
     required FixDatesMode mode,
     bool dryRun = false,
   }) => _boom();
+
+  @override
+  Stream<FileMeta> readImageMeta(List<String> paths) =>
+      Stream<FileMeta>.error(StateError('readImageMeta blew up'));
 }
 
 /// Builds a [FolderScanResult] for tests with controllable tallies.

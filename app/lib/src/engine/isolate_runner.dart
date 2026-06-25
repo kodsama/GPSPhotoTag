@@ -114,6 +114,19 @@ class IsolateRunner implements EngineRunner {
     onSpawnError: ErrorEvent.new,
   );
 
+  /// Batch-reads image metadata for [paths] on a worker isolate, streaming one
+  /// [FileMeta] per path back to the UI isolate as exiftool yields each chunk.
+  @override
+  Stream<FileMeta> readImageMeta(List<String> paths) => _spawn(
+    _readImageMetaEntry,
+    (port) => _ReadImageMetaRequest(
+      port: port,
+      paths: paths,
+      bundleDir: exiftoolBundleDir,
+    ),
+    onSpawnError: (_) => const FileMeta(path: ''),
+  );
+
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
   /// by [makeRequest], and re-emits every event of type [E] it sends until the
   /// null sentinel. A spawn failure is surfaced via [onSpawnError].
@@ -238,6 +251,18 @@ class _FixDatesRequest {
   final String? bundleDir;
 }
 
+class _ReadImageMetaRequest {
+  const _ReadImageMetaRequest({
+    required this.port,
+    required this.paths,
+    required this.bundleDir,
+  });
+
+  final SendPort port;
+  final List<String> paths;
+  final String? bundleDir;
+}
+
 // --- Worker entry points (top-level, run on the spawned isolate) -----------
 
 /// Detects exiftool inside the worker when the caller did not pass a value.
@@ -359,6 +384,19 @@ Future<void> _trashPathsEntry(_TrashPathsRequest req) async {
     );
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));
+    req.port.send(null);
+  }
+}
+
+Future<void> _readImageMetaEntry(_ReadImageMetaRequest req) async {
+  try {
+    final runner = _buildRunner(req.bundleDir);
+    await for (final meta in readImageMeta(req.paths, runner: runner)) {
+      req.port.send(meta);
+    }
+  } on Object {
+    // Best-effort: a failed exiftool read just leaves rows un-enriched.
+  } finally {
     req.port.send(null);
   }
 }
