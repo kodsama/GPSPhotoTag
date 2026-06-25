@@ -1,7 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'src/engine/exiftool_bundle.dart';
+import 'src/explore/map_tile_provider.dart';
+import 'src/explore/tile_cache.dart';
+import 'src/explore/tile_provider_scope.dart';
 import 'src/state/app_controller.dart';
 import 'src/state/app_prefs.dart';
 import 'src/state/controller_scope.dart';
@@ -12,7 +19,21 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final support = await getApplicationSupportDirectory();
   final prefs = await AppPrefs.load(support.path);
-  runApp(StundaApp(exiftoolBundleDir: locateBundledExiftool(), prefs: prefs));
+
+  // Resolve the tile cache dir ONCE here (never per tile), build the persistent
+  // browse-cache + provider, and best-effort seed the low-zoom world view so
+  // the first open of the map paints immediately instead of grey.
+  final cacheRoot = await getApplicationCacheDirectory();
+  final tileCache = TileCache(client: http.Client(), root: cacheRoot);
+  unawaited(seedLowZoomTiles(tileCache));
+
+  runApp(
+    StundaApp(
+      exiftoolBundleDir: locateBundledExiftool(),
+      prefs: prefs,
+      tileProvider: CachingTileProvider(cache: tileCache),
+    ),
+  );
 }
 
 /// Root of the Stunda desktop GUI.
@@ -28,6 +49,7 @@ class StundaApp extends StatefulWidget {
     this.controller,
     this.exiftoolBundleDir,
     this.prefs,
+    this.tileProvider,
   });
 
   /// The controller to use; a fresh one is created when null.
@@ -40,6 +62,10 @@ class StundaApp extends StatefulWidget {
   /// Persisted preferences forwarded into a freshly built controller (ignored
   /// when [controller] is injected).
   final AppPrefs? prefs;
+
+  /// The map tile provider (backed by the persistent disk cache) exposed to the
+  /// Explore screen; when null, Explore uses a plain network provider.
+  final TileProvider? tileProvider;
 
   @override
   State<StundaApp> createState() => _StundaAppState();
@@ -74,19 +100,23 @@ class _StundaAppState extends State<StundaApp> {
 
   @override
   Widget build(BuildContext context) {
+    final tileProvider = widget.tileProvider;
+    final app = ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) => MaterialApp(
+        title: 'Stunda',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: _controller.themeMode,
+        home: const AppShell(),
+      ),
+    );
     return ControllerScope(
       controller: _controller,
-      child: ListenableBuilder(
-        listenable: _controller,
-        builder: (context, _) => MaterialApp(
-          title: 'Stunda',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: _controller.themeMode,
-          home: const AppShell(),
-        ),
-      ),
+      child: tileProvider == null
+          ? app
+          : TileProviderScope(tileProvider: tileProvider, child: app),
     );
   }
 }

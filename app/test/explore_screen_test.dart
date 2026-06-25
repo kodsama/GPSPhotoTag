@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/explore/explore_model.dart';
+import 'package:stunda/src/explore/heatmap.dart';
 import 'package:stunda/src/explore/photo_detail_panel.dart';
 import 'package:stunda/src/screens/explore_map_screen.dart';
 import 'package:stunda/src/state/app_controller.dart';
@@ -135,5 +137,43 @@ void main() {
     await tester.tap(find.byIcon(Icons.close));
     await tester.pump();
     expect(find.byType(PhotoDetailPanel), findsNothing);
+  });
+
+  testWidgets('the mode button cycles Numbers -> Heatmap -> Both -> Numbers', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic', '/b.heic']))
+      ..debugSetExplore([
+        _gpsPhoto('/library/a.heic', 42.5, 18.1),
+        _gpsPhoto('/library/b.heic', 42.6, 18.2),
+      ]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Numbers (default): cluster markers shown, no heat overlay.
+    expect(find.text('Numbers'), findsOneWidget);
+    expect(find.byType(MarkerClusterLayerWidget), findsOneWidget);
+    expect(find.byType(HeatmapLayer), findsNothing);
+
+    // -> Heatmap: heat overlay, no number markers.
+    await tester.tap(find.text('Numbers'));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Heatmap'), findsOneWidget);
+    expect(find.byType(HeatmapLayer), findsOneWidget);
+    expect(find.byType(MarkerClusterLayerWidget), findsNothing);
+
+    // -> Both: heat overlay AND number markers.
+    await tester.tap(find.text('Heatmap'));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Both'), findsOneWidget);
+    expect(find.byType(HeatmapLayer), findsOneWidget);
+    expect(find.byType(MarkerClusterLayerWidget), findsOneWidget);
+
+    // -> back to Numbers.
+    await tester.tap(find.text('Both'));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Numbers'), findsOneWidget);
+    expect(find.byType(HeatmapLayer), findsNothing);
   });
 }

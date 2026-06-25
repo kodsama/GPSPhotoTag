@@ -1,9 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/main.dart';
+import 'package:stunda/src/explore/map_tile_provider.dart';
+import 'package:stunda/src/explore/tile_cache.dart';
+import 'package:stunda/src/explore/tile_provider_scope.dart';
 import 'package:stunda/src/screens/scanning_screen.dart';
 import 'package:stunda/src/screens/welcome_screen.dart';
 import 'package:stunda/src/screens/workspace_screen.dart';
@@ -135,6 +141,35 @@ void main() {
       expect(controller.environmentWarning, isNull);
       expect(find.textContaining("ExifTool couldn't start"), findsNothing);
     });
+  });
+
+  testWidgets('a provided tileProvider is published via TileProviderScope', (
+    tester,
+  ) async {
+    final root = Directory.systemTemp.createTempSync('apptiles');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final provider = CachingTileProvider(
+      cache: TileCache(
+        client: MockClient((_) async => http.Response('', 200)),
+        root: root,
+      ),
+    );
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')]);
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      StundaApp(controller: controller, tileProvider: provider),
+    );
+    await tester.pump();
+
+    expect(find.byType(TileProviderScope), findsOneWidget);
+    final scope = tester.widget<TileProviderScope>(
+      find.byType(TileProviderScope),
+    );
+    expect(scope.tileProvider, same(provider));
   });
 
   testWidgets('MCP chip renders in the header', (tester) async {

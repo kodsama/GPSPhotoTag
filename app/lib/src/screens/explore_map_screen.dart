@@ -6,9 +6,13 @@ import 'package:latlong2/latlong.dart';
 import '../explore/explore_interaction.dart';
 import '../explore/explore_markers.dart';
 import '../explore/explore_model.dart';
+import '../explore/heatmap.dart';
+import '../explore/map_display_mode.dart';
 import '../explore/photo_detail_panel.dart';
+import '../explore/tile_provider_scope.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 /// A flutter_map [Marker] that remembers the [MapPoint] it represents, so a tap
@@ -42,6 +46,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   final MapController _map = MapController();
   final ExploreInteractionController _detail = ExploreInteractionController();
   bool _focusHandled = false;
+  MapDisplayMode _mode = MapDisplayMode.numbers;
+
+  void _cycleMode() => setState(() => _mode = _mode.next);
 
   @override
   void initState() {
@@ -121,6 +128,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         _MapShell(
           mapController: _map,
           points: points,
+          mode: _mode,
           onMapEvent: _onMapEvent,
           onMarkerTap: _onMarkerTap,
         ),
@@ -129,15 +137,25 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
           left: 12,
           child: _BackButton(onPressed: controller.closeExplore),
         ),
-        if (controller.exploreLoading)
-          Positioned(
-            top: 12,
-            right: 12,
-            child: _LoadingChip(
-              loaded: controller.exploreLoaded,
-              total: controller.exploreTotal,
-            ),
+        // Mode button top-right; the loading chip stacks just below it so the
+        // two never overlap.
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _ModeButton(mode: _mode, onPressed: _cycleMode),
+              if (controller.exploreLoading) ...[
+                const SizedBox(height: 8),
+                _LoadingChip(
+                  loaded: controller.exploreLoaded,
+                  total: controller.exploreTotal,
+                ),
+              ],
+            ],
           ),
+        ),
         if (!controller.exploreLoading && points.isEmpty)
           const Center(child: _EmptyState()),
         if (selection != null)
@@ -166,12 +184,14 @@ class _MapShell extends StatelessWidget {
   const _MapShell({
     required this.mapController,
     required this.points,
+    required this.mode,
     required this.onMapEvent,
     required this.onMarkerTap,
   });
 
   final MapController mapController;
   final List<MapPoint> points;
+  final MapDisplayMode mode;
   final void Function(MapEvent) onMapEvent;
   final void Function(MapPoint) onMarkerTap;
 
@@ -187,10 +207,17 @@ class _MapShell extends StatelessWidget {
         ),
     ];
 
+    // Persistent disk-cached tiles in the real app; plain network in tests.
+    final tileProvider =
+        TileProviderScope.maybeOf(context) ?? NetworkTileProvider();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
         onMapEvent: onMapEvent,
+        // Not-yet-loaded areas read as paper, not grey.
+        backgroundColor: isDark ? AppColors.duskSunk : AppColors.paperSunk,
         initialCenter: bounds == null
             ? const LatLng(20, 0)
             : LatLng(
@@ -206,29 +233,80 @@ class _MapShell extends StatelessWidget {
                 maxZoom: 16,
               ),
         minZoom: 2,
-        maxZoom: 19,
+        // Allow zooming past native (19) — the last tile upscales instead of
+        // going grey.
+        maxZoom: 20,
       ),
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'ai.paperweight.stunda',
+          userAgentPackageName: 'github.com/kodsama/stunda',
+          tileProvider: tileProvider,
+          // Past native zoom flutter_map upscales the z19 tile.
+          maxNativeZoom: 19,
+          // Keep adjacent tiles warm so panning/zooming isn't grey.
+          keepBuffer: 4,
+          panBuffer: 2,
         ),
-        MarkerClusterLayerWidget(
-          options: MarkerClusterLayerOptions(
-            maxClusterRadius: 60,
-            size: const Size(44, 44),
-            disableClusteringAtZoom: 17,
-            markers: markers,
-            onMarkerTap: (marker) {
-              if (marker is PhotoMarker) onMarkerTap(marker.mapPoint);
-            },
-            builder: (context, clusterMarkers) => ClusterBadge(
-              count: clusterMarkers.length,
-              color: scheme.primary,
+        if (mode.showsHeatmap) HeatmapLayer(points: points),
+        if (mode.showsMarkers)
+          MarkerClusterLayerWidget(
+            options: MarkerClusterLayerOptions(
+              maxClusterRadius: 60,
+              size: const Size(44, 44),
+              disableClusteringAtZoom: 17,
+              markers: markers,
+              onMarkerTap: (marker) {
+                if (marker is PhotoMarker) onMarkerTap(marker.mapPoint);
+              },
+              builder: (context, clusterMarkers) => ClusterBadge(
+                count: clusterMarkers.length,
+                color: scheme.primary,
+              ),
             ),
           ),
-        ),
       ],
+    );
+  }
+}
+
+/// The upper-right button that cycles the map display mode (Numbers → Heatmap →
+/// Both). Shows an icon + label reflecting the current [mode].
+class _ModeButton extends StatelessWidget {
+  const _ModeButton({required this.mode, required this.onPressed});
+
+  final MapDisplayMode mode;
+  final VoidCallback onPressed;
+
+  static (IconData, String) _face(MapDisplayMode mode) => switch (mode) {
+    MapDisplayMode.numbers => (Icons.tag, 'Numbers'),
+    MapDisplayMode.heatmap => (Icons.local_fire_department, 'Heatmap'),
+    MapDisplayMode.both => (Icons.layers, 'Both'),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (icon, label) = _face(mode);
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(AppTheme.radius),
+      elevation: 3,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18),
+              const SizedBox(width: 8),
+              Text(label),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
