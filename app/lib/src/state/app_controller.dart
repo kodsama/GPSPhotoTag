@@ -94,9 +94,18 @@ class AppController extends ChangeNotifier {
   LibraryAction? get action => _action;
 
   /// Opens the focused panel for [action] (resets any prior run state).
+  ///
+  /// Destructive actions preview first: opening [LibraryAction.pruneRaw]
+  /// classifies the library (cheap, in-process) so the panel can show a
+  /// reviewable, selectable list — nothing is removed until the user confirms.
   void openAction(LibraryAction action) {
     _action = action;
     _resetRun();
+    if (action == LibraryAction.pruneRaw) {
+      _preparePruneReview();
+    } else {
+      _pairing = null;
+    }
     _screen = AppScreen.action;
     notifyListeners();
   }
@@ -430,17 +439,108 @@ class AppController extends ChangeNotifier {
     return _errorMessage == null ? out : null;
   }
 
-  /// Prunes orphan RAW files under the library folder.
-  Future<void> runPrune({bool dryRun = false}) {
-    final folder = _folder;
-    if (folder == null) return Future.value();
+  // --- Prune review (preview → select → confirm → execute) -----------------
+
+  RawPairing? _pairing;
+  final Set<String> _selected = {};
+  String _pruneFilter = '';
+  // Which pair kinds are visible in the review list. Candidates (orphan RAWs)
+  // are on by default; context rows are off to keep the list focused.
+  final Set<PairKind> _visibleKinds = {PairKind.orphanRaw};
+
+  /// The classified library for the prune review, or null when not reviewing.
+  RawPairing? get pairing => _pairing;
+
+  /// The orphan-RAW paths currently selected for trashing.
+  Set<String> get selectedPaths => Set.unmodifiable(_selected);
+
+  /// Number of orphan RAWs selected for trashing.
+  int get selectedCount => _selected.length;
+
+  /// The current filename filter (case-insensitive substring).
+  String get pruneFilter => _pruneFilter;
+
+  /// Whether [kind] rows are shown in the review list.
+  bool isKindVisible(PairKind kind) => _visibleKinds.contains(kind);
+
+  /// Classifies the scanned library and pre-selects every orphan RAW.
+  ///
+  /// Cheap and pure (no I/O): [classifyPairing] is O(n) over the scan's photo
+  /// paths. Pre-selecting orphans matches the user's default intent while still
+  /// letting them deselect before confirming.
+  void _preparePruneReview() {
+    final scan = _scan;
+    _pairing = scan == null ? null : classifyPairing(scan.photos);
+    _selected
+      ..clear()
+      ..addAll(_pairing?.orphanRaws ?? const []);
+    _pruneFilter = '';
+    _visibleKinds
+      ..clear()
+      ..add(PairKind.orphanRaw);
+  }
+
+  /// The review rows after applying the visible-kind toggles and filename
+  /// filter, in the scan's original order.
+  List<PairedFile> get filteredPairing {
+    final pairing = _pairing;
+    if (pairing == null) return const [];
+    final needle = _pruneFilter.toLowerCase();
+    return [
+      for (final f in pairing.files)
+        if (_visibleKinds.contains(f.kind) &&
+            (needle.isEmpty || _basename(f.path).contains(needle)))
+          f,
+    ];
+  }
+
+  String _basename(String path) => p.basename(path).toLowerCase();
+
+  /// Sets the filename filter (case-insensitive substring match).
+  void setPruneFilter(String value) {
+    _pruneFilter = value;
+    notifyListeners();
+  }
+
+  /// Shows or hides [kind] rows in the review list.
+  void setKindVisible(PairKind kind, bool visible) {
+    if (visible) {
+      _visibleKinds.add(kind);
+    } else {
+      _visibleKinds.remove(kind);
+    }
+    notifyListeners();
+  }
+
+  /// Toggles whether a single orphan-RAW [path] is selected for trashing.
+  void toggleSelected(String path, bool selected) {
+    if (selected) {
+      _selected.add(path);
+    } else {
+      _selected.remove(path);
+    }
+    notifyListeners();
+  }
+
+  /// Selects ([all] true) or clears every orphan RAW.
+  void selectAllOrphans(bool all) {
+    _selected.clear();
+    if (all) _selected.addAll(_pairing?.orphanRaws ?? const []);
+    notifyListeners();
+  }
+
+  /// Trashes the user-selected orphan RAWs after an explicit confirm.
+  ///
+  /// Only reached once the user has reviewed the preview and confirmed — the
+  /// destructive-actions-preview-first principle. Sends exactly the selected
+  /// paths (plus their sidecars, handled in the engine) to the Trash.
+  Future<void> runTrashSelected() {
+    if (_selected.isEmpty) return Future.value();
+    final paths = _selected.toList(growable: false);
     return _consume(
-      _engine.prune(
-        roots: [folder],
-        options: PruneOptions(dryRun: dryRun),
-      ),
-      startMessage: dryRun ? 'Previewing orphan RAWs…' : 'Pruning orphan RAWs…',
-      total: 0,
+      _engine.trashPaths(paths),
+      startMessage: 'Moving ${paths.length} RAW file(s) to Trash…',
+      total: paths.length,
     );
   }
 
@@ -542,6 +642,7 @@ class AppController extends ChangeNotifier {
   void debugSetScreen(AppScreen screen, {LibraryAction? action}) {
     _screen = screen;
     _action = action;
+    if (action == LibraryAction.pruneRaw) _preparePruneReview();
     notifyListeners();
   }
 

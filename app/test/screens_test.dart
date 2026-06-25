@@ -281,29 +281,154 @@ void main() {
   });
 
   group('prune action', () {
-    testWidgets('preview-first toggles the button label and runs', (
+    AppController openReview(FakeEngineRunner fake) =>
+        AppController(runner: fake)
+          ..debugSetToolkit([_tool('exiftool')])
+          ..debugSetScan(
+            fakeScan(
+              photos: const [
+                '/library/orphan.raf',
+                '/library/keeper.raf',
+                '/library/keeper.jpg',
+              ],
+            ),
+          )
+          ..debugSetScreen(AppScreen.action, action: LibraryAction.pruneRaw);
+
+    testWidgets('shows a review list with the summary, not an immediate run', (
       tester,
     ) async {
       final fake = FakeEngineRunner();
-      final controller = AppController(runner: fake)
-        ..debugSetToolkit([_tool('exiftool')])
-        ..debugSetScan(fakeScan(photos: const ['/library/x.raf']))
-        ..debugSetScreen(AppScreen.action, action: LibraryAction.pruneRaw);
+      final controller = openReview(fake);
       await _pump(tester, controller);
 
       expect(find.byType(PruneAction), findsOneWidget);
-      // Dry-run on by default.
-      expect(find.text('Preview orphan RAWs'), findsOneWidget);
+      // Header summary + candidate row + pre-selected button label.
+      expect(find.textContaining('orphan RAWs ·'), findsOneWidget);
+      expect(find.text('orphan.raf'), findsOneWidget);
+      expect(find.text('Move 1 selected to Trash'), findsOneWidget);
+      // Context rows hidden by default; nothing trashed yet.
+      expect(find.text('keeper.raf'), findsNothing);
+      expect(fake.calls, isEmpty);
+    });
 
-      // Turn dry-run off -> destructive label.
-      await tester.tap(find.byType(Switch));
-      await tester.pump();
-      expect(find.text('Move orphan RAWs to Trash'), findsOneWidget);
+    testWidgets('a kind toggle reveals context rows', (tester) async {
+      final controller = openReview(FakeEngineRunner());
+      await _pump(tester, controller);
 
-      await tester.tap(find.text('Move orphan RAWs to Trash'));
+      await tester.tap(find.text('RAWs with JPG'));
       await tester.pumpAndSettle();
-      expect(fake.calls, contains('prune'));
-      expect(find.text('Done — back to library'), findsOneWidget);
+      expect(find.text('keeper.raf'), findsOneWidget);
+    });
+
+    testWidgets('cancelling the confirm dialog trashes nothing', (
+      tester,
+    ) async {
+      final fake = FakeEngineRunner();
+      final controller = openReview(fake);
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Move 1 selected to Trash'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Move 1 RAW files'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(fake.calls, isEmpty);
+      expect(controller.lastSummary, isNull);
+    });
+
+    testWidgets(
+      'confirming trashes exactly the selected paths and shows done',
+      (tester) async {
+        final fake = FakeEngineRunner(
+          events: const [
+            DoneEvent({'pruned_trashed': 1}),
+          ],
+        );
+        final controller = openReview(fake);
+        await _pump(tester, controller);
+
+        await tester.tap(find.text('Move 1 selected to Trash'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Move to Trash'));
+        await tester.pumpAndSettle();
+
+        expect(fake.calls, contains('trashPaths'));
+        expect(fake.lastTrashedPaths, ['/library/orphan.raf']);
+        expect(find.text('Done — back to library'), findsOneWidget);
+      },
+    );
+
+    testWidgets('deselecting all disables the primary button', (tester) async {
+      final controller = openReview(FakeEngineRunner());
+      await _pump(tester, controller);
+
+      // Tap the per-row orphan checkbox to deselect it.
+      await tester.tap(find.byType(Checkbox).last);
+      await tester.pumpAndSettle();
+      expect(find.text('Move 0 selected to Trash'), findsOneWidget);
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Move 0 selected to Trash'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('the select-all header checkbox clears then restores', (
+      tester,
+    ) async {
+      final controller = openReview(FakeEngineRunner());
+      await _pump(tester, controller);
+
+      // First (header) checkbox is currently fully selected -> tap clears all.
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pumpAndSettle();
+      expect(controller.selectedCount, 0);
+      // Tap again -> selects all orphans.
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pumpAndSettle();
+      expect(controller.selectedCount, 1);
+    });
+
+    testWidgets('a non-matching filter shows the empty state', (tester) async {
+      final controller = openReview(FakeEngineRunner());
+      await _pump(tester, controller);
+
+      await tester.enterText(find.byType(TextField), 'zzzz-nomatch');
+      await tester.pumpAndSettle();
+      expect(find.text('No files match.'), findsOneWidget);
+    });
+
+    testWidgets('the done view lists the per-file rows', (tester) async {
+      final fake = FakeEngineRunner(
+        events: const [
+          ItemEvent(
+            PhotoRow(
+              path: '/library/orphan.raf',
+              status: PhotoStatus.prunedTrashed,
+            ),
+          ),
+          DoneEvent({'pruned_trashed': 1}),
+        ],
+      );
+      final controller = openReview(fake);
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Move 1 selected to Trash'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move to Trash'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recent results'), findsOneWidget);
+      expect(find.text('orphan.raf'), findsWidgets);
+    });
+
+    testWidgets('the review surface handles a missing pairing', (tester) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.pruneRaw);
+      await _pump(tester, controller);
+      expect(find.text('No library scanned.'), findsOneWidget);
     });
   });
 
@@ -331,18 +456,20 @@ void main() {
           )
           ..debugSetScreen(AppScreen.action, action: action);
 
-    testWidgets('prune shows a live progress bar while running', (
+    testWidgets('prune shows a live progress bar while trashing', (
       tester,
     ) async {
       final fake = FakeEngineRunner(
         keepOpen: true,
-        events: const [ProgressEvent(done: 0, total: 0)],
+        events: const [ProgressEvent(done: 0, total: 1)],
       );
       addTearDown(fake.release);
       final controller = openWith(LibraryAction.pruneRaw, fake);
       await _pump(tester, controller);
 
-      await tester.tap(find.text('Preview orphan RAWs'));
+      await tester.tap(find.text('Move 1 selected to Trash'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move to Trash'));
       await tester.pump();
       await tester.pump();
       expect(controller.running, isTrue);
@@ -357,7 +484,9 @@ void main() {
       final controller = openWith(LibraryAction.pruneRaw, fake);
       await _pump(tester, controller);
 
-      await tester.tap(find.text('Preview orphan RAWs'));
+      await tester.tap(find.text('Move 1 selected to Trash'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move to Trash'));
       await tester.pumpAndSettle();
       expect(controller.errorMessage, 'prune boom');
       expect(find.byIcon(Icons.error_outline), findsOneWidget);

@@ -62,6 +62,22 @@ void main() {
     expect(events.whereType<DoneEvent>(), isNotEmpty);
   });
 
+  test('trashPaths deletes exactly the given files on a worker', () async {
+    final a = File('${tmp.path}/a.raf')..writeAsStringSync('x');
+    final b = File('${tmp.path}/b.raf')..writeAsStringSync('y');
+    File('${a.path}.xmp').writeAsStringSync('s'); // a's sidecar
+
+    const runner = IsolateRunner();
+    final events = await runner.trashPaths([a.path], delete: true).toList();
+
+    expect(events.whereType<ErrorEvent>(), isEmpty);
+    expect(events.whereType<DoneEvent>(), isNotEmpty);
+    // a + its sidecar gone; the unselected b survives.
+    expect(a.existsSync(), isFalse);
+    expect(File('${a.path}.xmp').existsSync(), isFalse);
+    expect(b.existsSync(), isTrue);
+  });
+
   test('map runs the worker and reaches a terminal event', () async {
     final jpg = await writeJpegWithDate(
       tmp,

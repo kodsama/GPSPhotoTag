@@ -35,6 +35,7 @@ export 'src/services/dater.dart';
 export 'src/services/locator.dart';
 export 'src/services/map_service.dart';
 export 'src/services/pruner.dart';
+export 'src/services/raw_pairing.dart';
 export 'src/services/scanner.dart';
 export 'src/services/source_pool.dart';
 export 'src/services/toolkit_check.dart';

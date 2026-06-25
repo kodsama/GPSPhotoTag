@@ -226,14 +226,113 @@ void main() {
       expect(path, endsWith('gpsphototag-heatmap.png'));
     });
 
-    test('runPrune is a no-op without a folder, runs with one', () async {
+    test('opening prune classifies the library and pre-selects orphans', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(
+          fakeScan(
+            photos: const [
+              '/library/a.raf', // orphan
+              '/library/b.raf', // paired
+              '/library/b.jpg',
+              '/library/c.jpg', // photo without raw
+            ],
+          ),
+        )
+        ..openAction(LibraryAction.pruneRaw);
+
+      final pairing = c.pairing!;
+      expect(pairing.orphanCount, 1);
+      expect(pairing.pairedRawCount, 1);
+      expect(pairing.photoWithRawCount, 1);
+      expect(pairing.photoWithoutRawCount, 1);
+      // Orphan pre-selected; the paired RAW is not.
+      expect(c.selectedPaths, {'/library/a.raf'});
+      expect(c.selectedCount, 1);
+    });
+
+    test('opening a non-prune action clears the pairing', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: const ['/library/a.raf']))
+        ..openAction(LibraryAction.pruneRaw);
+      expect(c.pairing, isNotNull);
+      c.openAction(LibraryAction.map);
+      expect(c.pairing, isNull);
+    });
+
+    test('filter and kind toggles narrow the review list', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(
+          fakeScan(
+            photos: const [
+              '/library/orphan.raf',
+              '/library/keeper.raf',
+              '/library/keeper.jpg',
+            ],
+          ),
+        )
+        ..openAction(LibraryAction.pruneRaw);
+
+      // Only orphan RAWs visible by default.
+      expect(c.filteredPairing.map((f) => f.path), ['/library/orphan.raf']);
+
+      // Filename filter (case-insensitive) excludes the orphan.
+      c.setPruneFilter('KEEP');
+      expect(c.filteredPairing, isEmpty);
+      c.setPruneFilter('');
+
+      // Show paired RAWs too.
+      c.setKindVisible(PairKind.pairedRaw, true);
+      expect(
+        c.filteredPairing.map((f) => f.path),
+        containsAll(['/library/orphan.raf', '/library/keeper.raf']),
+      );
+      c.setKindVisible(PairKind.orphanRaw, false);
+      expect(c.filteredPairing.map((f) => f.path), ['/library/keeper.raf']);
+    });
+
+    test('selection toggles and select-all/none', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(
+          fakeScan(photos: const ['/library/x.raf', '/library/y.raf']),
+        )
+        ..openAction(LibraryAction.pruneRaw);
+
+      expect(c.selectedCount, 2);
+      c.selectAllOrphans(false);
+      expect(c.selectedCount, 0);
+      c.toggleSelected('/library/x.raf', true);
+      expect(c.selectedPaths, {'/library/x.raf'});
+      c.toggleSelected('/library/x.raf', false);
+      expect(c.selectedPaths, isEmpty);
+      c.selectAllOrphans(true);
+      expect(c.selectedCount, 2);
+    });
+
+    test('runTrashSelected sends exactly the selected paths', () async {
       final fake = FakeEngineRunner();
-      final c = AppController(runner: fake);
-      await c.runPrune();
+      final c = AppController(runner: fake)
+        ..debugSetScan(
+          fakeScan(photos: const ['/library/x.raf', '/library/y.raf']),
+        )
+        ..openAction(LibraryAction.pruneRaw);
+
+      c
+        ..selectAllOrphans(false)
+        ..toggleSelected('/library/x.raf', true);
+      await c.runTrashSelected();
+
+      expect(fake.calls, contains('trashPaths'));
+      expect(fake.lastTrashedPaths, ['/library/x.raf']);
+    });
+
+    test('runTrashSelected with nothing selected is a no-op', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetScan(fakeScan(photos: const ['/library/x.raf']))
+        ..openAction(LibraryAction.pruneRaw)
+        ..selectAllOrphans(false);
+      await c.runTrashSelected();
       expect(fake.calls, isEmpty);
-      c.debugSetScan(fakeScan());
-      await c.runPrune(dryRun: true);
-      expect(fake.calls, contains('prune'));
     });
 
     test(

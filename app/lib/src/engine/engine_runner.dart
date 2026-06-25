@@ -32,6 +32,11 @@ abstract interface class EngineRunner {
     required PruneOptions options,
   });
 
+  /// Moves exactly the given [paths] (plus any `.xmp` sidecars) to the Trash,
+  /// or deletes them when [delete] is true. Backs the preview→confirm flow,
+  /// where the user has already selected which files to remove.
+  Stream<EngineEvent> trashPaths(List<String> paths, {bool delete = false});
+
   /// Fixes capture/file dates for [files] in the given [mode].
   Stream<EngineEvent> fixDates({
     required List<String> files,

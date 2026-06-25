@@ -113,6 +113,59 @@ class Pruner {
     }
   }
 
+  /// Moves exactly the given [paths] (plus any `<path>.xmp` sidecar) to the
+  /// Trash, or permanently deletes them when [delete] is true.
+  ///
+  /// Unlike [prune], this trashes the explicit list the caller chose — it never
+  /// re-scans or re-classifies. It backs the GUI's "preview → select → confirm"
+  /// flow, where the user has already reviewed and selected the candidates, so
+  /// nothing is removed blind. Emits an [ItemEvent] per file
+  /// ([PhotoStatus.prunedTrashed] / [PhotoStatus.prunedDeleted]) and a final
+  /// [DoneEvent]. A per-file failure surfaces as an error [ItemEvent] and does
+  /// not abort the run.
+  Stream<EngineEvent> trashPaths(
+    List<String> paths, {
+    bool delete = false,
+  }) async* {
+    final status = delete
+        ? PhotoStatus.prunedDeleted
+        : PhotoStatus.prunedTrashed;
+    final verb = delete ? 'Deleted' : 'Trashed';
+    final summary = <String, int>{};
+    var done = 0;
+    for (final path in paths) {
+      final sidecar = File('$path.xmp');
+      final hasSidecar = sidecar.existsSync();
+      try {
+        await _removePath(path, delete);
+        if (hasSidecar) await _removePath(sidecar.path, delete);
+        yield LogEvent(
+          '$verb $path${hasSidecar ? ' (+ sidecar ${sidecar.path})' : ''}',
+        );
+        yield ItemEvent(PhotoRow(path: path, status: status));
+        _bump(summary, status);
+      } on Object catch (e) {
+        yield LogEvent('Failed to remove $path: $e', level: LogLevel.error);
+        yield ItemEvent(
+          PhotoRow(path: path, status: PhotoStatus.error, note: '$e'),
+        );
+        _bump(summary, PhotoStatus.error);
+      }
+      done++;
+      yield ProgressEvent(done: done, total: paths.length);
+    }
+    yield DoneEvent(summary);
+  }
+
+  /// Trashes or deletes [path] using the injected [Trash].
+  Future<void> _removePath(String path, bool delete) async {
+    if (delete) {
+      await File(path).delete();
+    } else {
+      await _trash.toTrash(path);
+    }
+  }
+
   /// Performs the destructive action for [file] (or nothing on a dry run).
   Future<void> _remove(File file, PruneOptions options) async {
     if (options.dryRun) return;

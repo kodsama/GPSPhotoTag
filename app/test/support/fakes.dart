@@ -38,6 +38,9 @@ class FakeEngineRunner implements EngineRunner {
   /// The [TagOptions] passed to the last [tag] call, for assertions.
   TagOptions? lastTagOptions;
 
+  /// The paths passed to the last [trashPaths] call, for assertions.
+  List<String>? lastTrashedPaths;
+
   static List<EngineEvent> _success() => [
     const LogEvent('working'),
     const ProgressEvent(done: 1, total: 1),
@@ -113,6 +116,13 @@ class FakeEngineRunner implements EngineRunner {
   }
 
   @override
+  Stream<EngineEvent> trashPaths(List<String> paths, {bool delete = false}) {
+    calls.add('trashPaths');
+    lastTrashedPaths = paths;
+    return _emit();
+  }
+
+  @override
   Stream<EngineEvent> fixDates({
     required List<String> files,
     required FixDatesMode mode,
@@ -153,6 +163,10 @@ class ThrowingEngineRunner implements EngineRunner {
     required List<String> roots,
     required PruneOptions options,
   }) => _boom();
+
+  @override
+  Stream<EngineEvent> trashPaths(List<String> paths, {bool delete = false}) =>
+      _boom();
 
   @override
   Stream<EngineEvent> fixDates({

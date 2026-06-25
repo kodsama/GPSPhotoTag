@@ -86,6 +86,15 @@ class IsolateRunner implements EngineRunner {
     onSpawnError: ErrorEvent.new,
   );
 
+  /// Moves exactly the given [paths] (plus sidecars) to Trash on a worker.
+  @override
+  Stream<EngineEvent> trashPaths(List<String> paths, {bool delete = false}) =>
+      _spawn(
+        _trashPathsEntry,
+        (port) => _TrashPathsRequest(port: port, paths: paths, delete: delete),
+        onSpawnError: ErrorEvent.new,
+      );
+
   /// Fixes capture/file dates for [files] in the given [mode].
   @override
   Stream<EngineEvent> fixDates({
@@ -197,6 +206,18 @@ class _PruneRequest {
   final SendPort port;
   final List<String> roots;
   final PruneOptions options;
+}
+
+class _TrashPathsRequest {
+  const _TrashPathsRequest({
+    required this.port,
+    required this.paths,
+    required this.delete,
+  });
+
+  final SendPort port;
+  final List<String> paths;
+  final bool delete;
 }
 
 class _FixDatesRequest {
@@ -320,6 +341,20 @@ Future<void> _pruneEntry(_PruneRequest req) async {
     await _pump(
       req.port,
       pruner.prune(req.roots, req.options),
+      onError: ErrorEvent.new,
+    );
+  } on Object catch (e) {
+    req.port.send(ErrorEvent('$e'));
+    req.port.send(null);
+  }
+}
+
+Future<void> _trashPathsEntry(_TrashPathsRequest req) async {
+  try {
+    final pruner = Pruner(trash: const SystemTrash());
+    await _pump(
+      req.port,
+      pruner.trashPaths(req.paths, delete: req.delete),
       onError: ErrorEvent.new,
     );
   } on Object catch (e) {
