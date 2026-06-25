@@ -6,6 +6,7 @@ import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
 import 'walkthrough.dart';
+import 'warning_banner.dart';
 
 /// The app frame: a header bar (logo, wordmark, theme toggle), the centred
 /// scrollable walkthrough, a floating activity-log button with an unread badge,
@@ -35,6 +36,7 @@ class _AppShellState extends State<AppShell> {
           Column(
             children: [
               const _Header(),
+              const WarningBanner(),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
@@ -99,7 +101,7 @@ class _Header extends StatelessWidget {
           IconButton(
             tooltip: isDark ? 'Switch to light' : 'Switch to dark',
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: controller.toggleTheme,
+            onPressed: () => controller.setDark(!isDark),
           ),
         ],
       ),

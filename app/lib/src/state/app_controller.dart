@@ -33,7 +33,12 @@ class AppController extends ChangeNotifier {
        _exiftoolBundleDir = exiftoolBundleDir,
        _probeToolkit =
            probeToolkit ??
-           (() => ToolkitChecker(const SystemProcessRunner()).check()),
+           (() => ToolkitChecker(
+             ExiftoolRunner(
+               const SystemProcessRunner(),
+               ExiftoolInvocation.resolve(exiftoolBundleDir),
+             ),
+           ).check()),
        mcp = McpService(exiftoolBundleDir: exiftoolBundleDir) {
     _runner = runner;
   }
@@ -66,17 +71,22 @@ class AppController extends ChangeNotifier {
   /// The active theme mode.
   ThemeMode get themeMode => _themeMode;
 
-  /// Cycles between light and dark.
-  void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.dark
-        ? ThemeMode.light
-        : ThemeMode.dark;
+  /// Sets the theme to light or dark explicitly.
+  ///
+  /// The header passes the *currently displayed* brightness so the first tap
+  /// always flips what the user sees — even when starting from
+  /// [ThemeMode.system] (where a naive dark↔light toggle could pick the mode
+  /// that already matches the OS and appear to do nothing).
+  void setDark(bool dark) {
+    final target = dark ? ThemeMode.dark : ThemeMode.light;
+    if (_themeMode == target) return;
+    _themeMode = target;
     notifyListeners();
   }
 
   // --- Wizard --------------------------------------------------------------
 
-  WizardStep _step = WizardStep.toolkit;
+  WizardStep _step = WizardStep.input;
   final Set<WizardStep> _completed = {};
 
   /// The currently expanded step.
@@ -108,7 +118,6 @@ class AppController extends ChangeNotifier {
 
   /// Whether [step]'s Continue action should be enabled.
   bool isStepSatisfied(WizardStep step) => switch (step) {
-    WizardStep.toolkit => hasBundledExiftool || _toolkit.isNotEmpty,
     WizardStep.input => _summary.hasPhotos,
     WizardStep.review => includedCount > 0,
     WizardStep.options => true,
@@ -117,68 +126,54 @@ class AppController extends ChangeNotifier {
     WizardStep.result => true,
   };
 
-  // --- Toolkit -------------------------------------------------------------
+  // --- Environment self-check ----------------------------------------------
+
+  /// User-facing message shown when exiftool couldn't start; the bundled copy
+  /// (when present) is preferred over a misleading "missing on PATH".
+  static const _exiftoolWarning =
+      "ExifTool couldn't start, so RAW-embed, HEIC, and Fuji/Canon RAW "
+      'timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.';
 
   List<ToolStatus> _toolkit = const [];
-  bool _toolkitLoading = false;
+  bool _checked = false;
 
-  /// The latest toolkit probe results.
-  List<ToolStatus> get toolkit => _toolkit;
-
-  /// Whether a toolkit probe (or install) is in flight.
-  bool get toolkitLoading => _toolkitLoading;
-
-  /// Whether exiftool is available (gates RAW-embed & HEIC). True whenever the
-  /// app bundles its own copy, else reflects the host probe.
+  /// Whether exiftool is available (gates RAW-embed & HEIC), per the last
+  /// [checkEnvironment]. False until the check has run.
   bool get exiftoolAvailable =>
-      hasBundledExiftool ||
       _toolkit.any((t) => t.id == 'exiftool' && t.present);
 
-  /// Probes the machine for optional tools and auto-advances on first success.
-  Future<void> runToolkitCheck() async {
-    _toolkitLoading = true;
-    notifyListeners();
-    _toolkit = await _probeToolkit();
-    _runner = null; // rebuild engine with fresh exiftool availability
-    _toolkitLoading = false;
-    _log(
-      'Toolkit checked: '
-      '${_toolkit.where((t) => t.present).length}/${_toolkit.length} present',
-    );
+  String? _environmentWarning;
+
+  /// A non-alarming warning to surface as a banner, or null when all is well.
+  String? get environmentWarning => _environmentWarning;
+
+  bool _warningDismissed = false;
+
+  /// Whether the user has dismissed the [environmentWarning] banner.
+  bool get warningDismissed => _warningDismissed;
+
+  /// Hides the warning banner until the next launch.
+  void dismissWarning() {
+    if (_warningDismissed) return;
+    _warningDismissed = true;
     notifyListeners();
   }
 
-  String? _bundledVersion;
-  bool _bundleVerifyFailed = false;
-
-  /// The version reported by the bundled exiftool, once verified; else null.
-  String? get bundledExiftoolVersion => _bundledVersion;
-
-  /// Whether running the bundled exiftool failed (e.g. no Perl on the host).
-  bool get bundleVerifyFailed => _bundleVerifyFailed;
-
-  /// Runs the bundled exiftool `-ver` through the resolved runner to confirm it
-  /// launches on this machine. No-op (and clears state) when nothing is bundled.
-  Future<void> verifyBundledExiftool() async {
-    final dir = _exiftoolBundleDir;
-    if (dir == null) return;
-    final runner = ExiftoolRunner(
-      const SystemProcessRunner(),
-      ExiftoolInvocation.resolve(dir),
-    );
-    try {
-      final result = await runner.run('exiftool', const ['-ver']);
-      if (result.ok && result.stdout.trim().isNotEmpty) {
-        _bundledVersion = result.stdout.trim();
-        _bundleVerifyFailed = false;
-        _log('Bundled ExifTool ready: v$_bundledVersion');
-      } else {
-        _bundleVerifyFailed = true;
-        _log('Bundled ExifTool did not run', level: LogLevel.error);
-      }
-    } on Object {
-      _bundleVerifyFailed = true;
-      _log('Bundled ExifTool did not run', level: LogLevel.error);
+  /// Runs the silent startup environment probe once: launches exiftool `-ver`
+  /// through the engine runner (the bundled copy when present). On success
+  /// [environmentWarning] is null; on failure it is set to a clear, calm note.
+  /// Idempotent — repeat calls are no-ops.
+  Future<void> checkEnvironment() async {
+    if (_checked) return;
+    _checked = true;
+    _toolkit = await _probeToolkit();
+    _runner = null; // rebuild engine with fresh exiftool availability
+    if (exiftoolAvailable) {
+      _environmentWarning = null;
+      _log('Environment OK: ExifTool ready');
+    } else {
+      _environmentWarning = _exiftoolWarning;
+      _log('ExifTool unavailable', level: LogLevel.warning);
     }
     notifyListeners();
   }
@@ -544,7 +539,7 @@ class AppController extends ChangeNotifier {
 
   // --- Test seams ----------------------------------------------------------
 
-  /// Injects toolkit results directly (tests only).
+  /// Injects environment-probe results directly (tests only).
   @visibleForTesting
   void debugSetToolkit(List<ToolStatus> statuses) {
     _toolkit = statuses;
@@ -577,14 +572,6 @@ class AppController extends ChangeNotifier {
   @visibleForTesting
   void debugAddLog(String message, {LogLevel level = LogLevel.info}) {
     _log(message, level: level);
-    notifyListeners();
-  }
-
-  /// Sets the bundled-exiftool verification result directly (tests only).
-  @visibleForTesting
-  void debugSetBundleVerify({String? version, bool failed = false}) {
-    _bundledVersion = version;
-    _bundleVerifyFailed = failed;
     notifyListeners();
   }
 }

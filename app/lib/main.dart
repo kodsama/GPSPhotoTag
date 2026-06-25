@@ -40,7 +40,12 @@ class _GpsPhotoTagAppState extends State<GpsPhotoTagApp> {
     super.initState();
     // Always-on MCP endpoint for LLM clients, started only for the real app
     // (an injected controller in tests must not spawn a server isolate).
-    if (widget.controller == null) _controller.mcp.start();
+    if (widget.controller == null) {
+      _controller.mcp.start();
+      // Silent startup probe — surfaces a dismissible banner only if exiftool
+      // can't launch. Non-blocking; the walkthrough stays fully usable.
+      _controller.checkEnvironment();
+    }
   }
 
   @override

@@ -59,10 +59,7 @@ void main() {
         runner: FakeEngineRunner(),
         pickFolder: () async => tmp.path,
       )..debugSetToolkit([_tool('exiftool')]);
-      controller.debugSetStep(
-        WizardStep.input,
-        completed: {WizardStep.toolkit},
-      );
+      controller.debugSetStep(WizardStep.input);
       await _pump(tester, controller);
 
       expect(find.byType(InputStep), findsOneWidget);
@@ -87,7 +84,7 @@ void main() {
       controller.debugSetSummary(_summaryWith(tmp, ['${tmp.path}/a.jpg']));
       controller.debugSetStep(
         WizardStep.options,
-        completed: {WizardStep.toolkit, WizardStep.input, WizardStep.review},
+        completed: {WizardStep.input, WizardStep.review},
       );
       await _pump(tester, controller);
       return controller;
@@ -149,12 +146,7 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       controller.debugSetStep(
         WizardStep.output,
-        completed: {
-          WizardStep.toolkit,
-          WizardStep.input,
-          WizardStep.review,
-          WizardStep.options,
-        },
+        completed: {WizardStep.input, WizardStep.review, WizardStep.options},
       );
       await _pump(tester, controller);
 
@@ -173,12 +165,7 @@ void main() {
       controller.setCopyToFolder(true);
       controller.debugSetStep(
         WizardStep.output,
-        completed: {
-          WizardStep.toolkit,
-          WizardStep.input,
-          WizardStep.review,
-          WizardStep.options,
-        },
+        completed: {WizardStep.input, WizardStep.review, WizardStep.options},
       );
       await _pump(tester, controller);
 
@@ -202,12 +189,7 @@ void main() {
       controller.setCopyToFolder(true);
       controller.debugSetStep(
         WizardStep.output,
-        completed: {
-          WizardStep.toolkit,
-          WizardStep.input,
-          WizardStep.review,
-          WizardStep.options,
-        },
+        completed: {WizardStep.input, WizardStep.review, WizardStep.options},
       );
       await _pump(tester, controller);
 
@@ -229,7 +211,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.run,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -279,7 +260,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.run,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -315,7 +295,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.run,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -349,7 +328,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.result,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -385,7 +363,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.result,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -432,7 +409,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.result,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -462,7 +438,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.result,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -489,7 +464,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.result,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,
@@ -516,7 +490,6 @@ void main() {
       controller.debugSetStep(
         WizardStep.result,
         completed: {
-          WizardStep.toolkit,
           WizardStep.input,
           WizardStep.review,
           WizardStep.options,

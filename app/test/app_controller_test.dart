@@ -26,36 +26,33 @@ InputSummary _summaryWith(List<String> photos) => InputSummary.from(
 
 void main() {
   group('step-advance logic', () {
+    test('the walkthrough starts at the input step', () {
+      final c = AppController();
+      expect(c.step, WizardStep.input);
+      expect(WizardStep.values.first, WizardStep.input);
+    });
+
     test(
-      'toolkit is unsatisfied until results arrive, then advances to input',
+      'input is unsatisfied until photos arrive, then advances to review',
       () {
         final c = AppController();
-        expect(c.step, WizardStep.toolkit);
-        expect(c.isStepSatisfied(WizardStep.toolkit), isFalse);
+        expect(c.isStepSatisfied(WizardStep.input), isFalse);
 
-        c.debugSetToolkit([_tool('exiftool')]);
-        expect(c.isStepSatisfied(WizardStep.toolkit), isTrue);
+        c.debugSetSummary(_summaryWith(['/photos/a.jpg', '/photos/b.jpg']));
+        expect(c.isStepSatisfied(WizardStep.input), isTrue);
+        expect(c.includedCount, 2);
 
         c.completeAndAdvance();
-        expect(c.isCompleted(WizardStep.toolkit), isTrue);
-        expect(c.step, WizardStep.input);
+        expect(c.isCompleted(WizardStep.input), isTrue);
+        expect(c.step, WizardStep.review);
       },
     );
 
     test('completeAndAdvance is a no-op when the step is unsatisfied', () {
       final c = AppController();
       c.completeAndAdvance();
-      expect(c.step, WizardStep.toolkit);
-      expect(c.isCompleted(WizardStep.toolkit), isFalse);
-    });
-
-    test('input needs at least one included photo', () {
-      final c = AppController()..debugSetStep(WizardStep.input);
-      expect(c.isStepSatisfied(WizardStep.input), isFalse);
-
-      c.debugSetSummary(_summaryWith(['/photos/a.jpg', '/photos/b.jpg']));
-      expect(c.isStepSatisfied(WizardStep.input), isTrue);
-      expect(c.includedCount, 2);
+      expect(c.step, WizardStep.input);
+      expect(c.isCompleted(WizardStep.input), isFalse);
     });
 
     test('review reflects include/exclude toggles', () {
@@ -68,14 +65,11 @@ void main() {
 
     test('goTo only revisits completed or earlier steps', () {
       final c = AppController()
-        ..debugSetStep(
-          WizardStep.review,
-          completed: {WizardStep.toolkit, WizardStep.input},
-        );
+        ..debugSetStep(WizardStep.review, completed: {WizardStep.input});
       c.goTo(WizardStep.run); // not completed, later -> ignored
       expect(c.step, WizardStep.review);
-      c.goTo(WizardStep.toolkit); // completed -> allowed
-      expect(c.step, WizardStep.toolkit);
+      c.goTo(WizardStep.input); // completed -> allowed
+      expect(c.step, WizardStep.input);
     });
   });
 
@@ -207,14 +201,18 @@ void main() {
   });
 
   group('theme', () {
-    test('toggleTheme flips dark<->light from the system default', () {
+    test('setDark flips relative to the displayed brightness', () {
       final c = AppController();
       expect(c.themeMode, ThemeMode.system);
-      c.toggleTheme(); // not dark -> dark
-      expect(c.themeMode, ThemeMode.dark);
-      c.toggleTheme(); // dark -> light
+      // Header passes the currently-shown brightness; from system-dark the user
+      // taps "switch to light" -> setDark(false) -> explicit light (a visible
+      // change, unlike a naive toggle that would pick dark and do nothing).
+      c.setDark(false);
       expect(c.themeMode, ThemeMode.light);
-      c.toggleTheme(); // light -> dark
+      c.setDark(true);
+      expect(c.themeMode, ThemeMode.dark);
+      // Setting the same mode is a no-op.
+      c.setDark(true);
       expect(c.themeMode, ThemeMode.dark);
     });
   });
@@ -274,66 +272,64 @@ void main() {
     });
   });
 
-  group('toolkit', () {
+  group('checkEnvironment', () {
     test(
-      'runToolkitCheck probes the host and records results + a log',
+      'exiftool failure sets a warning and exiftoolAvailable false',
       () async {
-        final c = AppController();
-        expect(c.toolkit, isEmpty);
-
-        await c.runToolkitCheck();
-
-        expect(c.toolkitLoading, isFalse);
-        expect(c.toolkit, isNotEmpty);
-        // The probe writes a summary line into the activity log.
-        expect(
-          c.logEntries.any((e) => e.message.startsWith('Toolkit checked')),
-          isTrue,
+        final c = AppController(
+          probeToolkit: () async => [_tool('exiftool', present: false)],
         );
+        expect(c.environmentWarning, isNull);
+
+        await c.checkEnvironment();
+
+        expect(c.exiftoolAvailable, isFalse);
+        expect(c.environmentWarning, isNotNull);
+        expect(c.environmentWarning, contains("ExifTool couldn't start"));
+        // A calm note is logged at warning level.
+        expect(c.logEntries.any((e) => e.level == LogLevel.warning), isTrue);
       },
     );
+
+    test('exiftool success leaves the warning null', () async {
+      final c = AppController(probeToolkit: () async => [_tool('exiftool')]);
+
+      await c.checkEnvironment();
+
+      expect(c.exiftoolAvailable, isTrue);
+      expect(c.environmentWarning, isNull);
+    });
+
+    test('is idempotent — the probe runs at most once', () async {
+      var probes = 0;
+      final c = AppController(
+        probeToolkit: () async {
+          probes++;
+          return [_tool('exiftool')];
+        },
+      );
+      await c.checkEnvironment();
+      await c.checkEnvironment();
+      expect(probes, 1);
+    });
+
+    test('dismissWarning hides the banner state', () async {
+      final c = AppController(
+        probeToolkit: () async => [_tool('exiftool', present: false)],
+      );
+      await c.checkEnvironment();
+      expect(c.warningDismissed, isFalse);
+
+      c.dismissWarning();
+      expect(c.warningDismissed, isTrue);
+      // The message itself is unchanged; the banner uses the flag to hide.
+      expect(c.environmentWarning, isNotNull);
+    });
 
     test('hasBundledExiftool reflects the injected bundle dir', () {
       expect(AppController().hasBundledExiftool, isFalse);
       expect(AppController(exiftoolBundleDir: '/x').hasBundledExiftool, isTrue);
-      // A bundle makes exiftool available without any host probe.
-      expect(AppController(exiftoolBundleDir: '/x').exiftoolAvailable, isTrue);
     });
-
-    test('verifyBundledExiftool is a no-op when nothing is bundled', () async {
-      final c = AppController();
-      await c.verifyBundledExiftool();
-      expect(c.bundledExiftoolVersion, isNull);
-      expect(c.bundleVerifyFailed, isFalse);
-    });
-
-    test('verifyBundledExiftool runs the bundled script via perl', () async {
-      final dir = Directory.systemTemp.createTempSync('bundle_ok');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      File('${dir.path}/exiftool').writeAsStringSync('print "12.99\\n";\n');
-      final c = AppController(exiftoolBundleDir: dir.path);
-
-      await c.verifyBundledExiftool();
-
-      expect(c.bundleVerifyFailed, isFalse);
-      expect(c.bundledExiftoolVersion, '12.99');
-    }, testOn: '!windows');
-
-    test(
-      'verifyBundledExiftool flags failure when the script dies',
-      () async {
-        final dir = Directory.systemTemp.createTempSync('bundle_bad');
-        addTearDown(() => dir.deleteSync(recursive: true));
-        File('${dir.path}/exiftool').writeAsStringSync('exit 3;\n');
-        final c = AppController(exiftoolBundleDir: dir.path);
-
-        await c.verifyBundledExiftool();
-
-        expect(c.bundleVerifyFailed, isTrue);
-        expect(c.bundledExiftoolVersion, isNull);
-      },
-      testOn: '!windows',
-    );
   });
 
   group('lifecycle', () {

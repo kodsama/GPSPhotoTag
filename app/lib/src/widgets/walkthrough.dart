@@ -8,7 +8,6 @@ import '../steps/output_step.dart';
 import '../steps/result_step.dart';
 import '../steps/review_step.dart';
 import '../steps/run_step.dart';
-import '../steps/toolkit_step.dart';
 import 'step_card.dart';
 
 /// The stepped collapsible walkthrough: one [StepCard] per [WizardStep], exactly
@@ -46,7 +45,6 @@ class Walkthrough extends StatelessWidget {
   };
 
   Widget _bodyFor(WizardStep step) => switch (step) {
-    WizardStep.toolkit => const ToolkitStep(),
     WizardStep.input => const InputStep(),
     WizardStep.review => const ReviewStep(),
     WizardStep.options => const OptionsStep(),
