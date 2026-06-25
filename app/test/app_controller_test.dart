@@ -742,4 +742,77 @@ void main() {
       expect(c.dispose, returnsNormally);
     });
   });
+
+  group('simple state getters/setters', () {
+    test('setReplace toggles overwriting existing GPS and notifies', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.replace, isFalse);
+      var notified = 0;
+      c.addListener(() => notified++);
+      c.setReplace(true);
+      expect(c.replace, isTrue);
+      expect(notified, 1);
+    });
+
+    test('folder is null until a scan lands, then exposes the path', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.folder, isNull);
+      c.debugSetScan(fakeScan(), folder: '/my/library');
+      expect(c.folder, '/my/library');
+    });
+
+    test('pruneFilter exposes the current filename filter', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.pruneFilter, '');
+      c.setPruneFilter('raf');
+      expect(c.pruneFilter, 'raf');
+    });
+  });
+
+  group('scan log events', () {
+    test('a ScanLogEvent is folded into the activity log at debug level', () {
+      final c = AppController(
+        runner: FakeEngineRunner(
+          scanEvents: [
+            const ScanLogEvent('skipped a weird file'),
+            ScanDoneEvent(fakeScan()),
+          ],
+        ),
+      );
+      return c.startScan('/library').then((_) {
+        expect(
+          c.logEntries.any(
+            (e) =>
+                e.message == 'skipped a weird file' &&
+                e.level == LogLevel.debug,
+          ),
+          isTrue,
+        );
+      });
+    });
+  });
+
+  group('default (non-injected) engine + toolkit probe', () {
+    test(
+      'checkEnvironment probes the real toolkit and builds the real engine',
+      () async {
+        // No runner and no probe injected: this exercises the default
+        // _probeToolkit closure and the lazily-built IsolateRunner engine.
+        final c = AppController();
+        await c.checkEnvironment();
+        // Probe ran exactly once (a second call is a no-op).
+        expect(c.logEntries, isNotEmpty);
+        final firstLen = c.logEntries.length;
+        await c.checkEnvironment();
+        expect(c.logEntries.length, firstLen);
+
+        // Touch the lazily-built real engine: a missing file has no preview, so
+        // the real IsolateRunner returns null without throwing.
+        final preview = await c.previewImageFor('/no/such/file.raf');
+        expect(preview, isNull);
+
+        c.dispose();
+      },
+    );
+  });
 }

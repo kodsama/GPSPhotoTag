@@ -7,15 +7,24 @@ import 'mcp_server.dart';
 /// Serves [server] over stdio: newline-delimited JSON-RPC on stdin/stdout.
 ///
 /// This is the transport an MCP client uses when it spawns the server as a
-/// subprocess. Completes when stdin closes.
-Future<void> serveStdio(McpServer server) async {
-  final lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
+/// subprocess. Completes when [input] closes.
+///
+/// [input] and [output] default to the process's [stdin]/[stdout]; they are
+/// injectable so the loop can be driven with in-memory streams under test.
+Future<void> serveStdio(
+  McpServer server, {
+  Stream<List<int>>? input,
+  IOSink? output,
+}) async {
+  final source = input ?? stdin;
+  final sink = output ?? stdout;
+  final lines = source.transform(utf8.decoder).transform(const LineSplitter());
   await for (final line in lines) {
     if (line.trim().isEmpty) continue;
     final response = await processLine(server, line);
     if (response != null) {
-      stdout.writeln(jsonEncode(response));
-      await stdout.flush();
+      sink.writeln(jsonEncode(response));
+      await sink.flush();
     }
   }
 }

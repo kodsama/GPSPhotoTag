@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'process_runner.dart';
 import 'trash.dart';
 
 /// Real, per-platform implementation of [Trash].
@@ -9,9 +10,33 @@ import 'trash.dart';
 /// Moves files to the user's Trash on macOS (`~/.Trash`), the XDG trash on
 /// Linux (`$XDG_DATA_HOME/Trash` with a `.trashinfo` record), and the Recycle
 /// Bin on Windows (via PowerShell). Unsupported platforms throw.
+///
+/// The OS decision, the environment lookups, and the PowerShell invocation are
+/// injectable seams (defaulting to the real platform). Production code uses the
+/// zero-argument `const SystemTrash()`; tests drive a specific platform's
+/// layout without depending on the host OS.
 class SystemTrash implements Trash {
   /// Creates a system trash adapter.
-  const SystemTrash();
+  ///
+  /// [operatingSystem] defaults to [Platform.operatingSystem]; [environment]
+  /// to [Platform.environment]; [processRunner] to a real `Process.run`
+  /// adapter. Overriding them keeps behaviour identical while making each
+  /// platform branch reachable under test.
+  const SystemTrash({
+    String? operatingSystem,
+    Map<String, String>? environment,
+    ProcessRunner? processRunner,
+  }) : _osOverride = operatingSystem,
+       _envOverride = environment,
+       _runnerOverride = processRunner;
+
+  final String? _osOverride;
+  final Map<String, String>? _envOverride;
+  final ProcessRunner? _runnerOverride;
+
+  String get _os => _osOverride ?? Platform.operatingSystem;
+  Map<String, String> get _env => _envOverride ?? Platform.environment;
+  ProcessRunner get _runner => _runnerOverride ?? const SystemProcessRunner();
 
   @override
   Future<void> toTrash(String path) async {
@@ -19,16 +44,15 @@ class SystemTrash implements Trash {
     if (!file.existsSync()) {
       throw FileSystemException('Cannot trash missing file', path);
     }
-    if (Platform.isMacOS) {
-      await _toMacTrash(file);
-    } else if (Platform.isLinux) {
-      await _toXdgTrash(file);
-    } else if (Platform.isWindows) {
-      await _toWindowsRecycleBin(path);
-    } else {
-      throw UnsupportedError(
-        'Trash is not supported on ${Platform.operatingSystem}',
-      );
+    switch (_os) {
+      case 'macos':
+        await _toMacTrash(file);
+      case 'linux':
+        await _toXdgTrash(file);
+      case 'windows':
+        await _toWindowsRecycleBin(path);
+      default:
+        throw UnsupportedError('Trash is not supported on $_os');
     }
   }
 
@@ -44,8 +68,7 @@ class SystemTrash implements Trash {
   /// Moves [file] into the XDG trash and writes its `.trashinfo` record.
   Future<void> _toXdgTrash(File file) async {
     final dataHome =
-        Platform.environment['XDG_DATA_HOME'] ??
-        p.join(_home(), '.local', 'share');
+        _env['XDG_DATA_HOME'] ?? p.join(_home(), '.local', 'share');
     final filesDir = Directory(p.join(dataHome, 'Trash', 'files'));
     final infoDir = Directory(p.join(dataHome, 'Trash', 'info'));
     filesDir.createSync(recursive: true);
@@ -65,14 +88,14 @@ class SystemTrash implements Trash {
   /// Sends [path] to the Recycle Bin via PowerShell / VisualBasic FileSystem.
   Future<void> _toWindowsRecycleBin(String path) async {
     final escaped = path.replaceAll("'", "''");
-    final result = await Process.run('powershell', [
+    final result = await _runner.run('powershell', [
       '-NoProfile',
       '-Command',
       "Add-Type -AssemblyName Microsoft.VisualBasic; "
           "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
           "'$escaped','OnlyErrorDialogs','SendToRecycleBin')",
     ]);
-    if (result.exitCode != 0) {
+    if (!result.ok) {
       throw FileSystemException('Failed to recycle (${result.stderr})', path);
     }
   }
@@ -107,7 +130,7 @@ class SystemTrash implements Trash {
       File(path).existsSync() || Directory(path).existsSync();
 
   String _home() {
-    final home = Platform.environment['HOME'];
+    final home = _env['HOME'];
     if (home == null || home.isEmpty) {
       throw StateError('HOME environment variable is not set');
     }

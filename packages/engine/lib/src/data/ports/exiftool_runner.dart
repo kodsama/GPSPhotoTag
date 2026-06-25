@@ -23,9 +23,16 @@ class ExiftoolInvocation {
   /// - non-null, non-Windows → run the vendored Perl script via `perl`.
   /// - non-null, Windows → use `<bundleDir>/exiftool.exe` if present, else fall
   ///   back to `exiftool` on `PATH`.
-  static ExiftoolInvocation resolve(String? bundleDir) {
+  ///
+  /// [operatingSystem] defaults to [Platform.operatingSystem]; overriding it
+  /// makes the Windows branch reachable on any host under test.
+  static ExiftoolInvocation resolve(
+    String? bundleDir, {
+    String? operatingSystem,
+  }) {
     if (bundleDir == null) return const ExiftoolInvocation('exiftool', []);
-    if (!Platform.isWindows) {
+    final os = operatingSystem ?? Platform.operatingSystem;
+    if (os != 'windows') {
       return ExiftoolInvocation('perl', ['$bundleDir/exiftool']);
     }
     final exe = '$bundleDir/exiftool.exe';

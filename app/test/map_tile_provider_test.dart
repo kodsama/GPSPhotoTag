@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -95,4 +96,42 @@ void main() {
     expect(a.updateShouldNotify(b), isTrue);
     expect(a.updateShouldNotify(aAgain), isFalse);
   });
+
+  testWidgets(
+    'resolving a tile image fetches bytes through the cache and yields a frame',
+    (tester) async {
+      await tester.runAsync(() async {
+        // A cache that serves a real PNG for any tile request (the file isn't
+        // on disk yet, so tile() fetches via the client and writes it).
+        final cache = TileCache(
+          client: MockClient((_) async => http.Response.bytes(_realPng(), 200)),
+          root: root,
+        );
+        final provider = CachingTileProvider(cache: cache);
+        final image = provider.getImage(
+          const TileCoordinates(4, 5, 6),
+          TileLayer(urlTemplate: 'https://e/{z}/{x}/{y}.png'),
+        );
+
+        // obtainKey resolves synchronously to the provider itself.
+        final key = await image.obtainKey(ImageConfiguration.empty);
+        expect(key, same(image));
+
+        // loadImage -> _load() decodes the fetched PNG into a single frame.
+        final stream = image.resolve(ImageConfiguration.empty);
+        final completer = Completer<ImageInfo>();
+        late final ImageStreamListener listener;
+        listener = ImageStreamListener((info, _) {
+          if (!completer.isCompleted) completer.complete(info);
+          stream.removeListener(listener);
+        }, onError: (e, _) => completer.completeError(e));
+        stream.addListener(listener);
+
+        final info = await completer.future;
+        expect(info.image.width, 2);
+        expect(info.image.height, 2);
+        info.image.dispose();
+      });
+    },
+  );
 }

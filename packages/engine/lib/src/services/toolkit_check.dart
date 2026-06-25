@@ -57,9 +57,15 @@ class ToolStatus {
 /// without the real binary.
 class ToolkitChecker {
   /// Creates a checker that probes via [_runner].
-  ToolkitChecker(this._runner);
+  ///
+  /// [operatingSystem] defaults to [Platform.operatingSystem] and only affects
+  /// which install command is suggested; overriding it lets tests assert the
+  /// per-OS hint without depending on the host platform.
+  ToolkitChecker(this._runner, {String? operatingSystem})
+    : _os = operatingSystem;
 
   final ProcessRunner _runner;
+  final String? _os;
 
   /// Probes every known tool. Never throws: a missing binary => `present:false`.
   Future<List<ToolStatus>> check() async => [await _checkExiftool()];
@@ -99,12 +105,16 @@ class ToolkitChecker {
   }
 
   String? _exiftoolInstall() {
-    if (Platform.isMacOS) return 'brew install exiftool';
-    if (Platform.isLinux) return 'sudo apt install libimage-exiftool-perl';
-    if (Platform.isWindows) {
-      return 'winget install -e --id OliverBetz.ExifTool';
+    switch (_os ?? Platform.operatingSystem) {
+      case 'macos':
+        return 'brew install exiftool';
+      case 'linux':
+        return 'sudo apt install libimage-exiftool-perl';
+      case 'windows':
+        return 'winget install -e --id OliverBetz.ExifTool';
+      default:
+        return null;
     }
-    return null;
   }
 
   /// Extracts a version-looking token from [output], falling back to the full

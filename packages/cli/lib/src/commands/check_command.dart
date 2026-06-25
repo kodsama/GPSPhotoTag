@@ -6,10 +6,15 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 /// `check` — probe for exiftool (RAW-embed / HEIC via exiftool).
 class CheckCommand extends Command<int> {
-  /// Creates the command. [sink] overrides stdout (for tests).
-  CheckCommand({IOSink? sink}) : _out = sink ?? stdout;
+  /// Creates the command. [sink] overrides stdout (for tests); [runner]
+  /// overrides how external tools are probed (tests inject a fake so the
+  /// missing-tool path is exercised deterministically).
+  CheckCommand({IOSink? sink, ProcessRunner? runner})
+    : _out = sink ?? stdout,
+      _runner = runner ?? const SystemProcessRunner();
 
   final IOSink _out;
+  final ProcessRunner _runner;
 
   @override
   String get name => 'check';
@@ -20,7 +25,7 @@ class CheckCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final tools = await ToolkitChecker(const SystemProcessRunner()).check();
+    final tools = await ToolkitChecker(_runner).check();
     if (globalResults!.flag('json')) {
       _out.writeln(
         jsonEncode({

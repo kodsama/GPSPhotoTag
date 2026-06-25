@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:stunda_cli/src/commands/check_command.dart';
+import 'package:stunda_cli/src/commands/map_command.dart';
 import 'package:stunda_cli/src/exit_codes.dart';
 import 'package:stunda_cli/src/runner.dart';
 import 'package:stunda_engine/stunda_engine.dart';
@@ -36,6 +38,18 @@ class _FakeMapService extends MapService {
       yield const DoneEvent({'mapped': 1});
     }
   }
+}
+
+/// A [ProcessRunner] that always behaves as if the requested binary cannot be
+/// launched, so [ToolkitChecker] reports every tool as absent. Lets the `check`
+/// command's missing-tool / install-hint branch run without depending on what
+/// the host actually has installed.
+class _MissingToolRunner implements ProcessRunner {
+  @override
+  Future<ProcResult> run(String executable, List<String> args) =>
+      Future<ProcResult>.error(
+        const ProcessException('exiftool', <String>[], 'not found'),
+      );
 }
 
 void main() {
@@ -428,6 +442,17 @@ void main() {
     });
   });
 
+  group('map default service factory', () {
+    test('detects exiftool and builds a real MapService', () async {
+      // Exercises the production wiring used when no factory is injected:
+      // real exiftool detection (true externality) + MapService construction,
+      // without rendering or network. Whatever the host's exiftool state, the
+      // factory must return a usable MapService.
+      final service = await MapCommand.defaultServiceFactory();
+      expect(service, isA<MapService>());
+    });
+  });
+
   group('tag with Google history (source_loader)', () {
     test('loads a Records.json -m source; reaches the engine', () async {
       final path = p.join(tmp.path, 'img.jpg');
@@ -462,17 +487,25 @@ void main() {
   });
 
   group('check human-mode install hint', () {
-    test('prints an install line for an absent tool', () async {
-      // Probe a guaranteed-absent tool name so the !present branch renders.
-      final tools = await ToolkitChecker(const SystemProcessRunner()).check();
-      final missing = tools.where(
-        (t) => !t.present && t.installCommand != null,
-      );
-      // Only assert the branch when the host actually lacks a tool; otherwise
-      // the human path with all-present tools is already covered above.
-      if (missing.isEmpty) return;
-      await run(['check']);
+    test('prints an install line when a tool is absent', () async {
+      // Inject a runner that reports every tool missing, so the human-mode
+      // !present + installCommand branch renders deterministically (regardless
+      // of what the host has installed).
+      final runner = buildRunner(sink: buf, checkRunner: _MissingToolRunner());
+      final code = await runner.run(['check']);
+      expect(code, ExitCodes.ok);
+      expect(buf.text, contains('✗'));
       expect(buf.text, contains('install:'));
+    });
+  });
+
+  group('check defaults', () {
+    test('constructs with default stdout sink and system runner', () {
+      // Exercises the no-arg construction path (both `?? stdout` and
+      // `?? SystemProcessRunner()` defaults) used by production wiring.
+      final cmd = CheckCommand();
+      expect(cmd.name, 'check');
+      expect(cmd.description, isNotEmpty);
     });
   });
 

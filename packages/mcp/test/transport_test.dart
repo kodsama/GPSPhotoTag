@@ -19,6 +19,24 @@ McpServer _server() => McpServer(
   tools: buildTools(runner: _FakeRunner(), exiftoolAvailable: true),
 );
 
+/// Collects all bytes written to an [IOSink] into [sink], so serveStdio's
+/// output can be captured and decoded in-memory.
+class _ByteCollector implements StreamConsumer<List<int>> {
+  _ByteCollector(this.sink);
+
+  final List<int> sink;
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) async {
+    await for (final chunk in stream) {
+      sink.addAll(chunk);
+    }
+  }
+
+  @override
+  Future<void> close() async {}
+}
+
 void main() {
   group('processLine', () {
     test('dispatches a valid request and returns the response map', () async {
@@ -48,6 +66,65 @@ void main() {
     test('non-object JSON yields a -32600 invalid-request error', () async {
       final response = await processLine(_server(), '123');
       expect((response!['error'] as Map<String, Object?>)['code'], -32600);
+    });
+  });
+
+  group('serveStdio', () {
+    test(
+      'reads request frames from input and writes response frames to output',
+      () async {
+        // Feed two newline-delimited frames (plus a blank line that must be
+        // skipped) into the loop via an in-memory byte stream.
+        final input = Stream<List<int>>.fromIterable([
+          utf8.encode(
+            '${jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})}\n',
+          ),
+          utf8.encode('\n'), // blank line -> skipped, no response
+          utf8.encode(
+            '${jsonEncode({
+              'jsonrpc': '2.0',
+              'id': 2,
+              'method': 'tools/call',
+              'params': {'name': 'get_capabilities', 'arguments': <String, Object?>{}},
+            })}\n',
+          ),
+          // Notification (no id) -> no response frame emitted.
+          utf8.encode(
+            '${jsonEncode({'jsonrpc': '2.0', 'method': 'notifications/initialized'})}\n',
+          ),
+        ]);
+
+        final captured = <int>[];
+        final output = IOSink(_ByteCollector(captured));
+
+        await serveStdio(_server(), input: input, output: output);
+        await output.close();
+
+        final frames = utf8
+            .decode(captured)
+            .split('\n')
+            .where((l) => l.trim().isNotEmpty)
+            .map((l) => jsonDecode(l) as Map<String, Object?>)
+            .toList();
+
+        // Exactly two responses: ping and get_capabilities. The blank line and
+        // the notification produce nothing.
+        expect(frames, hasLength(2));
+
+        final ping = frames.firstWhere((r) => r['id'] == 1);
+        expect(ping['result'], isA<Map<String, Object?>>());
+
+        final caps = frames.firstWhere((r) => r['id'] == 2);
+        final result = caps['result'] as Map<String, Object?>;
+        final structured = result['structuredContent'] as Map<String, Object?>;
+        expect(structured['ok'], isTrue);
+      },
+    );
+
+    test('defaults output to stdout when only input is injected', () async {
+      // Empty input -> the loop exits immediately without writing anything, so
+      // the default `output ?? stdout` branch runs but nothing reaches stdout.
+      await serveStdio(_server(), input: const Stream<List<int>>.empty());
     });
   });
 

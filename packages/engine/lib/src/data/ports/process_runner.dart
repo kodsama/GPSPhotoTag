@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 /// The result of running an external process.
 class ProcResult {
   /// Wraps an exit code and captured output.
@@ -43,35 +45,42 @@ class SystemProcessRunner implements ProcessRunner {
   /// Creates a system process runner.
   const SystemProcessRunner();
 
-  /// Extra directories to search per platform, appended to the inherited PATH.
-  static List<String> _extraPathDirs() {
-    final home = Platform.environment['HOME'] ?? '';
-    if (Platform.isMacOS) {
-      return [
-        '/opt/homebrew/bin', // Apple Silicon Homebrew
-        '/usr/local/bin', // Intel Homebrew
-        '/opt/local/bin', // MacPorts
-      ];
+  /// Extra directories to search on [os] (`macos`/`linux`/`windows`), appended
+  /// to the inherited PATH. [home] is the user's home directory.
+  ///
+  /// Pure and parameterised so every platform branch is reachable under test;
+  /// [run] calls it with the real [Platform] values.
+  @visibleForTesting
+  static List<String> extraPathDirs(String os, String home) {
+    switch (os) {
+      case 'macos':
+        return const [
+          '/opt/homebrew/bin', // Apple Silicon Homebrew
+          '/usr/local/bin', // Intel Homebrew
+          '/opt/local/bin', // MacPorts
+        ];
+      case 'linux':
+        return [
+          '/usr/local/bin',
+          '/usr/bin',
+          '/bin',
+          '/snap/bin',
+          if (home.isNotEmpty) '$home/.local/bin',
+        ];
+      default:
+        return const []; // Windows GUI apps inherit the full PATH.
     }
-    if (Platform.isLinux) {
-      return [
-        '/usr/local/bin',
-        '/usr/bin',
-        '/bin',
-        '/snap/bin',
-        if (home.isNotEmpty) '$home/.local/bin',
-      ];
-    }
-    return const []; // Windows GUI apps inherit the full PATH.
   }
 
-  /// The inherited PATH plus [_extraPathDirs], de-duplicated, order preserved.
-  static String _augmentedPath() {
-    final sep = Platform.isWindows ? ';' : ':';
-    final current = (Platform.environment['PATH'] ?? '').split(sep);
+  /// The inherited [path] plus [extraPathDirs] for [os], de-duplicated with
+  /// order preserved. [run] supplies the real [Platform] values.
+  @visibleForTesting
+  static String augmentedPath(String os, String home, String path) {
+    final sep = os == 'windows' ? ';' : ':';
+    final current = path.split(sep);
     final seen = <String>{};
     final merged = <String>[
-      for (final d in [...current, ..._extraPathDirs()])
+      for (final d in [...current, ...extraPathDirs(os, home)])
         if (d.isNotEmpty && seen.add(d)) d,
     ];
     return merged.join(sep);
@@ -82,7 +91,13 @@ class SystemProcessRunner implements ProcessRunner {
     final r = await Process.run(
       executable,
       args,
-      environment: {'PATH': _augmentedPath()},
+      environment: {
+        'PATH': augmentedPath(
+          Platform.operatingSystem,
+          Platform.environment['HOME'] ?? '',
+          Platform.environment['PATH'] ?? '',
+        ),
+      },
     );
     return ProcResult(r.exitCode, r.stdout.toString(), r.stderr.toString());
   }

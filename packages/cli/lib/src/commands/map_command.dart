@@ -16,7 +16,7 @@ class MapCommand extends Command<int> {
   MapCommand({IOSink? sink, Future<MapService> Function()? serviceFactory})
     // ignore: prefer_initializing_formals
     : _sink = sink,
-      _serviceFactory = serviceFactory ?? _defaultServiceFactory {
+      _serviceFactory = serviceFactory ?? defaultServiceFactory {
     argParser
       ..addMultiOption(
         'photo',
@@ -93,7 +93,11 @@ class MapCommand extends Command<int> {
   }
 
   /// Detects `exiftool` and builds a real, network-backed [MapService].
-  static Future<MapService> _defaultServiceFactory() async {
+  ///
+  /// Exposed (rather than private) so a test can drive the real detection +
+  /// construction path without rendering; production wiring still uses it as the
+  /// default when no `serviceFactory` is injected.
+  static Future<MapService> defaultServiceFactory() async {
     const runner = SystemProcessRunner();
     final exiftool = await detectExiftool(runner);
     return MapService(runner: runner, exiftoolAvailable: exiftool);

@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/main.dart' as app_main;
 import 'package:stunda/main.dart';
 import 'package:stunda/src/explore/map_tile_provider.dart';
 import 'package:stunda/src/explore/tile_cache.dart';
@@ -172,6 +175,70 @@ void main() {
     expect(scope.tileProvider, same(provider));
   });
 
+  testWidgets('main() boots the real app end to end', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // Fake the platform dirs main() resolves (support/cache) so no plugin
+    // channel is needed; point them at a temp dir.
+    final dirs = Directory.systemTemp.createTempSync('main_boot');
+    addTearDown(() => dirs.deleteSync(recursive: true));
+    final originalPathProvider = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _FakePathProvider(dirs.path);
+    addTearDown(() => PathProviderPlatform.instance = originalPathProvider);
+
+    await tester.runAsync(() async {
+      // The best-effort, unawaited tile seed in main() will try the network;
+      // override the HttpClient so it fails fast offline instead of hanging.
+      await HttpOverrides.runZoned(() async {
+        await app_main.main();
+        await tester.pump();
+        expect(find.byType(StundaApp), findsOneWidget);
+
+        // Let the async startup probe + offline seed settle before teardown.
+        await Future<void>.delayed(const Duration(seconds: 2));
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }, createHttpClient: (_) => _OfflineHttpClient());
+    });
+  });
+
+  testWidgets(
+    'with no injected controller, StundaApp builds its own and starts services',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.runAsync(() async {
+        // No `controller:` -> the State builds a real AppController, starts the
+        // MCP server isolate, and runs the environment probe (initState branch).
+        await tester.pumpWidget(const StundaApp(prefs: null));
+        await tester.pump();
+
+        // The real app stands up on its welcome screen.
+        expect(find.byType(WelcomeScreen), findsOneWidget);
+
+        // Let the async environment probe (real exiftool) settle while the
+        // controller is still mounted, so its notifyListeners runs before
+        // dispose.
+        await Future<void>.delayed(const Duration(seconds: 2));
+        await tester.pump();
+
+        // Tear the app down: dispose() (controller == null branch) stops the
+        // MCP isolate and frees the controller.
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        // Let the spawned server isolate finish shutting down cleanly.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+    },
+  );
+
   testWidgets('MCP status no longer lives in the header', (tester) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
@@ -216,4 +283,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(FloatingActionButton), findsOneWidget);
   });
+}
+
+/// A path_provider stub so `main()` can resolve its support/cache dirs in tests
+/// without a platform channel.
+class _FakePathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakePathProvider(this._root);
+  final String _root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => _root;
+  @override
+  Future<String?> getApplicationCachePath() async => _root;
+  @override
+  Future<String?> getApplicationDocumentsPath() async => _root;
+  @override
+  Future<String?> getTemporaryPath() async => _root;
+}
+
+/// An [HttpClient] that refuses every connection, so the best-effort tile seed
+/// in `main()` fails fast offline instead of touching the real network.
+class _OfflineHttpClient implements HttpClient {
+  @override
+  bool autoUncompress = true;
+  @override
+  Duration? connectionTimeout;
+  @override
+  Duration idleTimeout = const Duration(seconds: 15);
+  @override
+  int? maxConnectionsPerHost;
+  @override
+  String? userAgent;
+
+  @override
+  noSuchMethod(Invocation invocation) =>
+      throw const SocketExceptionStub('offline in tests');
+}
+
+class SocketExceptionStub implements Exception {
+  const SocketExceptionStub(this.message);
+  final String message;
+  @override
+  String toString() => 'SocketExceptionStub: $message';
 }

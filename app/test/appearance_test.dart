@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/main.dart';
 import 'package:stunda/src/explore/explore_model.dart';
@@ -196,6 +198,39 @@ void main() {
       expect(controller.backgroundVeil, lessThan(before));
     });
 
+    testWidgets('Choose image… picks a file and sets it as the background', (
+      tester,
+    ) async {
+      final original = FileSelectorPlatform.instance;
+      FileSelectorPlatform.instance = _FakeFileSelector(
+        XFile('/pics/picked.jpg'),
+      );
+      addTearDown(() => FileSelectorPlatform.instance = original);
+
+      final controller = await openSettings(tester);
+      expect(controller.backgroundImagePath, isNull);
+
+      await tester.tap(find.text('Choose image…'));
+      await tester.pumpAndSettle();
+
+      // The picked path flowed through _pickImage -> setBackgroundImagePath.
+      expect(controller.backgroundImagePath, '/pics/picked.jpg');
+      expect(find.text('picked.jpg'), findsOneWidget);
+    });
+
+    testWidgets('Choose image… cancelled leaves the background unchanged', (
+      tester,
+    ) async {
+      final original = FileSelectorPlatform.instance;
+      FileSelectorPlatform.instance = _FakeFileSelector(null); // user cancels
+      addTearDown(() => FileSelectorPlatform.instance = original);
+
+      final controller = await openSettings(tester);
+      await tester.tap(find.text('Choose image…'));
+      await tester.pumpAndSettle();
+      expect(controller.backgroundImagePath, isNull);
+    });
+
     testWidgets('reset button appears only with an image and clears it', (
       tester,
     ) async {
@@ -242,3 +277,20 @@ final Uint8List _tinyPng = Uint8List.fromList(const [
   120, 156, 99, 96, 0, 2, 0, 0, 5, 0, 1, 122, 94, 171, 63, 0, 0, 0, 0, 73, //
   69, 78, 68, 174, 66, 96, 130,
 ]);
+
+/// A fake file-picker that returns a pre-set [XFile] (or null for "cancelled")
+/// so the settings dialog's "Choose image…" flow is testable without a real
+/// platform file dialog.
+class _FakeFileSelector extends FileSelectorPlatform
+    with MockPlatformInterfaceMixin {
+  _FakeFileSelector(this._result);
+
+  final XFile? _result;
+
+  @override
+  Future<XFile?> openFile({
+    List<XTypeGroup>? acceptedTypeGroups,
+    String? initialDirectory,
+    String? confirmButtonText,
+  }) async => _result;
+}

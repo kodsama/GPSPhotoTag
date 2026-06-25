@@ -79,6 +79,18 @@ void main() {
       expect(c.explorePhotos.single.path, '/library/a.jpg');
     });
 
+    test('a stream error while loading clears the loading flag', () async {
+      final c = AppController(runner: ThrowingEngineRunner())
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      c.openExplore();
+      expect(c.exploreLoading, isTrue); // kicked off, one pending read
+      await Future<void>.delayed(Duration.zero);
+
+      // readImageMeta erred -> onError stops the spinner, nothing plotted.
+      expect(c.exploreLoading, isFalse);
+      expect(c.explorePhotos, isEmpty);
+    });
+
     test('closeExplore returns to the workspace', () {
       final c = AppController(runner: FakeEngineRunner())
         ..debugSetScan(fakeScan(photos: const []));

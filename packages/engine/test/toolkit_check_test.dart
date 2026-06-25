@@ -79,6 +79,31 @@ void main() {
       expect(statuses.firstWhere((s) => s.id == 'exiftool').present, isFalse);
     });
 
+    test(
+      'install command is OS-specific for each supported platform',
+      () async {
+        Future<String?> hintFor(String os) async {
+          final checker = ToolkitChecker(
+            FakeProcessRunner(const {}),
+            operatingSystem: os,
+          );
+          final statuses = await checker.check();
+          return statuses.firstWhere((s) => s.id == 'exiftool').installCommand;
+        }
+
+        expect(await hintFor('macos'), 'brew install exiftool');
+        expect(
+          await hintFor('linux'),
+          'sudo apt install libimage-exiftool-perl',
+        );
+        expect(
+          await hintFor('windows'),
+          'winget install -e --id OliverBetz.ExifTool',
+        );
+        expect(await hintFor('fuchsia'), isNull);
+      },
+    );
+
     test('every status serialises to JSON with expected keys', () async {
       final checker = ToolkitChecker(FakeProcessRunner(const {}));
       final statuses = await checker.check();

@@ -23,9 +23,13 @@ import 'commands/tag_command.dart';
 /// [mapServiceFactory] overrides how the `map` command obtains its
 /// [MapService]; tests inject a fake to exercise rendering without exiftool or
 /// network. Defaults to the real, exiftool-detecting factory.
+///
+/// [checkRunner] overrides how the `check` command probes external tools; tests
+/// inject a fake to exercise the missing-tool reporting path deterministically.
 CommandRunner<int> buildRunner({
   IOSink? sink,
   Future<MapService> Function()? mapServiceFactory,
+  ProcessRunner? checkRunner,
 }) {
   final runner =
       CommandRunner<int>(
@@ -49,7 +53,7 @@ CommandRunner<int> buildRunner({
     ..addCommand(MapCommand(sink: sink, serviceFactory: mapServiceFactory))
     ..addCommand(PruneCommand(sink: sink))
     ..addCommand(FixDatesCommand(sink: sink))
-    ..addCommand(CheckCommand(sink: sink))
+    ..addCommand(CheckCommand(sink: sink, runner: checkRunner))
     ..addCommand(InfoCommand(sink: sink))
     ..addCommand(ListSourcesCommand(sink: sink))
     ..addCommand(ListProvidersCommand(sink: sink))

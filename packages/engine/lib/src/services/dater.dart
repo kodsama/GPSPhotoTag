@@ -17,14 +17,23 @@ import '../domain/status.dart';
 class Dater {
   /// Creates a dater backed by [exif] (for reading capture time) and [runner]
   /// (for invoking `SetFile` and `exiftool`).
-  Dater({required ExifBackend exif, required ProcessRunner runner})
-    // ignore: prefer_initializing_formals
-    : _exif = exif,
-      // ignore: prefer_initializing_formals
-      _runner = runner;
+  ///
+  /// [operatingSystem] defaults to [Platform.operatingSystem] and only gates the
+  /// macOS-only birthtime fix; overriding it lets that branch be tested on any
+  /// host.
+  Dater({
+    required ExifBackend exif,
+    required ProcessRunner runner,
+    String? operatingSystem,
+  }) : _os = operatingSystem,
+       // ignore: prefer_initializing_formals
+       _exif = exif,
+       // ignore: prefer_initializing_formals
+       _runner = runner;
 
   final ExifBackend _exif;
   final ProcessRunner _runner;
+  final String? _os;
 
   /// Fixes dates for [files] in the given [mode].
   ///
@@ -107,7 +116,7 @@ class Dater {
 
     await File(path).setLastModified(target);
 
-    if (Platform.isMacOS) {
+    if ((_os ?? Platform.operatingSystem) == 'macos') {
       yield* _setBirthtime(path, target);
     }
 

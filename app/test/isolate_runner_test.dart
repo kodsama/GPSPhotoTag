@@ -216,6 +216,46 @@ void main() {
     expect(result, isNull);
   });
 
+  test('readImageMeta returns empty stream for no paths', () async {
+    const runner = IsolateRunner();
+    final out = await runner.readImageMeta(const []).toList();
+    expect(out, isEmpty);
+  });
+
+  test('readImageMeta reads each photo on a single worker', () async {
+    final jpgs = [
+      for (var i = 0; i < 3; i++)
+        await writeJpegWithDate(
+          tmp,
+          'm$i.jpg',
+          dateTimeOriginal: DateTime(2026, 1, 1, i + 1),
+        ),
+    ];
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final metas = await runner.readImageMeta(jpgs).toList();
+
+    // Every path comes back exactly once (order across workers isn't
+    // guaranteed, so compare as sets).
+    expect(metas.map((m) => m.path).toSet(), jpgs.toSet());
+  });
+
+  test('readImageMeta fans out across workers for many paths', () async {
+    // >64 paths trips the multi-worker branch (round-robin slicing). Reuse one
+    // real JPEG many times so the merged stream still returns one meta per path.
+    final jpg = await writeJpegWithDate(
+      tmp,
+      'big.jpg',
+      dateTimeOriginal: DateTime(2026, 2, 2, 2),
+    );
+    final paths = List<String>.filled(70, jpg);
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final metas = await runner.readImageMeta(paths).toList();
+
+    // One FileMeta per requested path (workers merge into a single stream).
+    expect(metas.length, paths.length);
+    expect(metas.every((m) => m.path == jpg), isTrue);
+  });
+
   test('scan runs on a worker isolate and reports the tree', () async {
     final jpg = await writeJpegWithDate(tmp, 'a.jpg');
     writeGpx(tmp, 'track.gpx', DateTime(2026));

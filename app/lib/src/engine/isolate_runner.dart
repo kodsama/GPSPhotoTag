@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
@@ -30,8 +31,8 @@ class IsolateRunner implements EngineRunner {
   /// Scans [roots] on a worker isolate, streaming [ScanEvent]s back.
   @override
   Stream<ScanEvent> scan(List<String> roots) => _spawn(
-    _scanEntry,
-    (port) => _ScanRequest(port: port, roots: roots),
+    scanEntry,
+    (port) => ScanRequest(port: port, roots: roots),
     onSpawnError: ScanLogEvent.new,
   );
 
@@ -46,8 +47,8 @@ class IsolateRunner implements EngineRunner {
     required List<String> googleFiles,
     required TagOptions options,
   }) => _spawn(
-    _tagEntry,
-    (port) => _TagRequest(
+    tagEntry,
+    (port) => TagRequest(
       port: port,
       photos: photos,
       gpxFiles: gpxFiles,
@@ -66,8 +67,8 @@ class IsolateRunner implements EngineRunner {
     required List<String> photos,
     required MapOptions options,
   }) => _spawn(
-    _mapEntry,
-    (port) => _MapRequest(
+    mapEntry,
+    (port) => MapRequest(
       port: port,
       photos: photos,
       options: options,
@@ -83,8 +84,8 @@ class IsolateRunner implements EngineRunner {
     required List<String> roots,
     required PruneOptions options,
   }) => _spawn(
-    _pruneEntry,
-    (port) => _PruneRequest(port: port, roots: roots, options: options),
+    pruneEntry,
+    (port) => PruneRequest(port: port, roots: roots, options: options),
     onSpawnError: ErrorEvent.new,
   );
 
@@ -92,8 +93,8 @@ class IsolateRunner implements EngineRunner {
   @override
   Stream<EngineEvent> trashPaths(List<String> paths, {bool delete = false}) =>
       _spawn(
-        _trashPathsEntry,
-        (port) => _TrashPathsRequest(port: port, paths: paths, delete: delete),
+        trashPathsEntry,
+        (port) => TrashPathsRequest(port: port, paths: paths, delete: delete),
         onSpawnError: ErrorEvent.new,
       );
 
@@ -104,8 +105,8 @@ class IsolateRunner implements EngineRunner {
     required FixDatesMode mode,
     bool dryRun = false,
   }) => _spawn(
-    _fixDatesEntry,
-    (port) => _FixDatesRequest(
+    fixDatesEntry,
+    (port) => FixDatesRequest(
       port: port,
       files: files,
       mode: mode,
@@ -151,8 +152,8 @@ class IsolateRunner implements EngineRunner {
         }
       });
       Isolate.spawn(
-        _readImageMetaEntry,
-        _ReadImageMetaRequest(
+        readImageMetaEntry,
+        ReadImageMetaRequest(
           port: receive.sendPort,
           paths: slice,
           bundleDir: exiftoolBundleDir,
@@ -176,8 +177,8 @@ class IsolateRunner implements EngineRunner {
     final receive = ReceivePort();
     try {
       await Isolate.spawn(
-        _extractPreviewEntry,
-        _ExtractPreviewRequest(
+        extractPreviewEntry,
+        ExtractPreviewRequest(
           port: receive.sendPort,
           path: path,
           full: full,
@@ -229,16 +230,22 @@ class IsolateRunner implements EngineRunner {
 }
 
 // --- Request payloads (plain data, isolate-sendable) ----------------------
+//
+// These payloads and the worker entry points below are library-public ONLY so
+// they can be driven in-process by tests (coverage tooling can't see code that
+// runs on a spawned isolate). They are not part of the app's API surface.
 
-class _ScanRequest {
-  const _ScanRequest({required this.port, required this.roots});
+@visibleForTesting
+class ScanRequest {
+  const ScanRequest({required this.port, required this.roots});
 
   final SendPort port;
   final List<String> roots;
 }
 
-class _TagRequest {
-  const _TagRequest({
+@visibleForTesting
+class TagRequest {
+  const TagRequest({
     required this.port,
     required this.photos,
     required this.gpxFiles,
@@ -259,8 +266,9 @@ class _TagRequest {
   final String? bundleDir;
 }
 
-class _MapRequest {
-  const _MapRequest({
+@visibleForTesting
+class MapRequest {
+  const MapRequest({
     required this.port,
     required this.photos,
     required this.options,
@@ -275,8 +283,9 @@ class _MapRequest {
   final String? bundleDir;
 }
 
-class _PruneRequest {
-  const _PruneRequest({
+@visibleForTesting
+class PruneRequest {
+  const PruneRequest({
     required this.port,
     required this.roots,
     required this.options,
@@ -287,8 +296,9 @@ class _PruneRequest {
   final PruneOptions options;
 }
 
-class _TrashPathsRequest {
-  const _TrashPathsRequest({
+@visibleForTesting
+class TrashPathsRequest {
+  const TrashPathsRequest({
     required this.port,
     required this.paths,
     required this.delete,
@@ -299,8 +309,9 @@ class _TrashPathsRequest {
   final bool delete;
 }
 
-class _FixDatesRequest {
-  const _FixDatesRequest({
+@visibleForTesting
+class FixDatesRequest {
+  const FixDatesRequest({
     required this.port,
     required this.files,
     required this.mode,
@@ -317,8 +328,9 @@ class _FixDatesRequest {
   final String? bundleDir;
 }
 
-class _ReadImageMetaRequest {
-  const _ReadImageMetaRequest({
+@visibleForTesting
+class ReadImageMetaRequest {
+  const ReadImageMetaRequest({
     required this.port,
     required this.paths,
     required this.bundleDir,
@@ -329,8 +341,9 @@ class _ReadImageMetaRequest {
   final String? bundleDir;
 }
 
-class _ExtractPreviewRequest {
-  const _ExtractPreviewRequest({
+@visibleForTesting
+class ExtractPreviewRequest {
+  const ExtractPreviewRequest({
     required this.port,
     required this.path,
     required this.full,
@@ -346,7 +359,8 @@ class _ExtractPreviewRequest {
 // --- Worker entry points (top-level, run on the spawned isolate) -----------
 
 /// Detects exiftool inside the worker when the caller did not pass a value.
-Future<bool> _resolveExiftool(bool? passed) async {
+@visibleForTesting
+Future<bool> resolveWorkerExiftool(bool? passed) async {
   if (passed != null) return passed;
   final tools = await ToolkitChecker(const SystemProcessRunner()).check();
   return tools.any((t) => t.id == 'exiftool' && t.present);
@@ -354,7 +368,8 @@ Future<bool> _resolveExiftool(bool? passed) async {
 
 /// Builds the runner for a worker: a plain system runner when no bundle dir is
 /// known, otherwise one that routes `exiftool` to the bundled copy.
-ProcessRunner _buildRunner(String? bundleDir) => bundleDir == null
+@visibleForTesting
+ProcessRunner buildWorkerRunner(String? bundleDir) => bundleDir == null
     ? const SystemProcessRunner()
     : ExiftoolRunner(
         const SystemProcessRunner(),
@@ -364,7 +379,8 @@ ProcessRunner _buildRunner(String? bundleDir) => bundleDir == null
 /// Pipes [events] to [port], then sends the null sentinel. A thrown error is
 /// converted by [onError] (an [ErrorEvent] or [ScanLogEvent]) before the
 /// sentinel, so the consumer's stream always closes cleanly.
-Future<void> _pump<E>(
+@visibleForTesting
+Future<void> pumpEvents<E>(
   SendPort port,
   Stream<E> events, {
   required E Function(String message) onError,
@@ -380,9 +396,10 @@ Future<void> _pump<E>(
   }
 }
 
-Future<void> _scanEntry(_ScanRequest req) async {
+@visibleForTesting
+Future<void> scanEntry(ScanRequest req) async {
   try {
-    await _pump(
+    await pumpEvents(
       req.port,
       FolderScanner().scan(req.roots),
       onError: ScanLogEvent.new,
@@ -393,10 +410,11 @@ Future<void> _scanEntry(_ScanRequest req) async {
   }
 }
 
-Future<void> _tagEntry(_TagRequest req) async {
+@visibleForTesting
+Future<void> tagEntry(TagRequest req) async {
   try {
-    final exiftool = await _resolveExiftool(req.exiftoolAvailable);
-    final runner = _buildRunner(req.bundleDir);
+    final exiftool = await resolveWorkerExiftool(req.exiftoolAvailable);
+    final runner = buildWorkerRunner(req.bundleDir);
     final registry = BackendRegistry(
       runner: runner,
       rawMode: req.options.rawMode,
@@ -415,21 +433,22 @@ Future<void> _tagEntry(_TagRequest req) async {
       google: pool.google,
       options: req.options,
     );
-    await _pump(req.port, stream, onError: ErrorEvent.new);
+    await pumpEvents(req.port, stream, onError: ErrorEvent.new);
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));
     req.port.send(null);
   }
 }
 
-Future<void> _mapEntry(_MapRequest req) async {
+@visibleForTesting
+Future<void> mapEntry(MapRequest req) async {
   try {
-    final exiftool = await _resolveExiftool(req.exiftoolAvailable);
+    final exiftool = await resolveWorkerExiftool(req.exiftoolAvailable);
     final service = MapService(
-      runner: _buildRunner(req.bundleDir),
+      runner: buildWorkerRunner(req.bundleDir),
       exiftoolAvailable: exiftool,
     );
-    await _pump(
+    await pumpEvents(
       req.port,
       service.render(req.photos, req.options),
       onError: ErrorEvent.new,
@@ -440,10 +459,11 @@ Future<void> _mapEntry(_MapRequest req) async {
   }
 }
 
-Future<void> _pruneEntry(_PruneRequest req) async {
+@visibleForTesting
+Future<void> pruneEntry(PruneRequest req) async {
   try {
     final pruner = Pruner(trash: const SystemTrash());
-    await _pump(
+    await pumpEvents(
       req.port,
       pruner.prune(req.roots, req.options),
       onError: ErrorEvent.new,
@@ -454,10 +474,11 @@ Future<void> _pruneEntry(_PruneRequest req) async {
   }
 }
 
-Future<void> _trashPathsEntry(_TrashPathsRequest req) async {
+@visibleForTesting
+Future<void> trashPathsEntry(TrashPathsRequest req) async {
   try {
     final pruner = Pruner(trash: const SystemTrash());
-    await _pump(
+    await pumpEvents(
       req.port,
       pruner.trashPaths(req.paths, delete: req.delete),
       onError: ErrorEvent.new,
@@ -468,9 +489,10 @@ Future<void> _trashPathsEntry(_TrashPathsRequest req) async {
   }
 }
 
-Future<void> _readImageMetaEntry(_ReadImageMetaRequest req) async {
+@visibleForTesting
+Future<void> readImageMetaEntry(ReadImageMetaRequest req) async {
   try {
-    final runner = _buildRunner(req.bundleDir);
+    final runner = buildWorkerRunner(req.bundleDir);
     await for (final meta in readImageMeta(req.paths, runner: runner)) {
       req.port.send(meta);
     }
@@ -484,16 +506,18 @@ Future<void> _readImageMetaEntry(_ReadImageMetaRequest req) async {
 /// The shared on-disk cache directory for extracted previews (stable across a
 /// session so re-opening a photo is instant). Lives under the system temp dir,
 /// which is reachable from any isolate without a platform plugin.
-Directory _previewCacheDir() =>
+@visibleForTesting
+Directory previewCacheDir() =>
     Directory(p.join(Directory.systemTemp.path, 'stunda_preview_cache'));
 
-Future<void> _extractPreviewEntry(_ExtractPreviewRequest req) async {
+@visibleForTesting
+Future<void> extractPreviewEntry(ExtractPreviewRequest req) async {
   String? result;
   try {
-    final runner = _buildRunner(req.bundleDir);
+    final runner = buildWorkerRunner(req.bundleDir);
     result = await extractPreview(
       req.path,
-      cacheDir: _previewCacheDir().path,
+      cacheDir: previewCacheDir().path,
       size: req.full ? PreviewSize.full : PreviewSize.thumb,
       runner: runner,
     );
@@ -504,16 +528,17 @@ Future<void> _extractPreviewEntry(_ExtractPreviewRequest req) async {
   }
 }
 
-Future<void> _fixDatesEntry(_FixDatesRequest req) async {
+@visibleForTesting
+Future<void> fixDatesEntry(FixDatesRequest req) async {
   try {
-    final exiftool = await _resolveExiftool(req.exiftoolAvailable);
-    final runner = _buildRunner(req.bundleDir);
+    final exiftool = await resolveWorkerExiftool(req.exiftoolAvailable);
+    final runner = buildWorkerRunner(req.bundleDir);
     final registry = BackendRegistry(
       runner: runner,
       exiftoolAvailable: exiftool,
     );
     final dater = Dater(exif: DispatchingExifBackend(registry), runner: runner);
-    await _pump(
+    await pumpEvents(
       req.port,
       dater.fixDates(req.files, req.mode, dryRun: req.dryRun),
       onError: ErrorEvent.new,

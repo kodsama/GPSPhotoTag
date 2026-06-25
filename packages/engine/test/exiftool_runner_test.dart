@@ -29,26 +29,28 @@ void main() {
       expect(inv.prefixArgs, ['/bundle/exiftool/exiftool']);
     }, testOn: '!windows');
 
-    test(
-      'non-null bundleDir on Windows without .exe -> PATH fallback',
-      () {
-        final tmp = Directory.systemTemp.createTempSync('et_resolve');
-        addTearDown(() => tmp.deleteSync(recursive: true));
-        final inv = ExiftoolInvocation.resolve(tmp.path);
-        expect(inv.executable, 'exiftool');
-        expect(inv.prefixArgs, isEmpty);
-      },
-      testOn: 'windows',
-    );
+    test('non-null bundleDir on Windows without .exe -> PATH fallback', () {
+      final tmp = Directory.systemTemp.createTempSync('et_resolve');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final inv = ExiftoolInvocation.resolve(
+        tmp.path,
+        operatingSystem: 'windows',
+      );
+      expect(inv.executable, 'exiftool');
+      expect(inv.prefixArgs, isEmpty);
+    });
 
     test('non-null bundleDir on Windows with .exe -> uses it', () {
       final tmp = Directory.systemTemp.createTempSync('et_resolve');
       addTearDown(() => tmp.deleteSync(recursive: true));
       File('${tmp.path}/exiftool.exe').writeAsStringSync('');
-      final inv = ExiftoolInvocation.resolve(tmp.path);
+      final inv = ExiftoolInvocation.resolve(
+        tmp.path,
+        operatingSystem: 'windows',
+      );
       expect(inv.executable, '${tmp.path}/exiftool.exe');
       expect(inv.prefixArgs, isEmpty);
-    }, testOn: 'windows');
+    });
   });
 
   group('ExiftoolRunner', () {

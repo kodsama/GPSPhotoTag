@@ -10,7 +10,9 @@ import 'package:stunda/src/actions/prune_action.dart';
 import 'package:stunda/src/actions/tag_action.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
+import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/screens/workspace_screen.dart';
 import 'package:stunda/src/widgets/action_card.dart';
 import 'package:stunda/src/widgets/status_pill.dart';
 
@@ -71,6 +73,57 @@ void main() {
       // Content panel groups unsupported files.
       expect(find.textContaining('Videos (1)'), findsOneWidget);
       expect(find.textContaining('Images (1)'), findsOneWidget);
+    });
+
+    testWidgets('the action grid reflows to fewer columns when narrow', (
+      tester,
+    ) async {
+      // A narrow viewport drives the LayoutBuilder's 2-then-1 column branches.
+      tester.view.physicalSize = const Size(420, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      await tester.pumpWidget(StundaApp(controller: controller));
+      await tester.pump();
+
+      // All cards still render; they stack rather than sitting 3-across.
+      final cards = find.byType(ActionCard);
+      expect(cards, findsNWidgets(LibraryAction.all.length));
+      // Cards are full-width (single column): each spans most of the viewport.
+      final size = tester.getSize(cards.first);
+      expect(size.width, greaterThan(300));
+    });
+
+    testWidgets('a non-const WorkspaceScreen builds from the scanned library', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1000, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      await tester.pumpWidget(
+        ControllerScope(
+          controller: controller,
+          child: MaterialApp(
+            // Non-const construction so the constructor body is exercised.
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: WorkspaceScreen(key: UniqueKey()),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(ActionCard), findsNWidgets(LibraryAction.all.length));
     });
 
     testWidgets('readiness reflects the scan', (tester) async {
@@ -158,6 +211,22 @@ void main() {
         expect(controller.maxTimeDiffSeconds, 45);
       },
     );
+
+    testWidgets('a chosen output folder shows the confirmation row', (
+      tester,
+    ) async {
+      final controller = await open(tester);
+
+      // Turn on copy-to-folder, then pick a destination.
+      controller.setCopyToFolder(true);
+      controller.setOutDir('/exports/tagged');
+      await tester.pump();
+
+      // The chosen-dir row renders with the confirmation tick and the path.
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(find.text('/exports/tagged'), findsOneWidget);
+      expect(find.text('Change'), findsOneWidget);
+    });
 
     testWidgets('dry-run renames the primary button to Preview', (
       tester,
@@ -345,6 +414,46 @@ void main() {
       expect(find.text('keeper.jpg'), findsOneWidget);
     });
 
+    testWidgets('the Orphan RAWs chip toggles candidate visibility', (
+      tester,
+    ) async {
+      final controller = openReview(FakeEngineRunner());
+      await _pump(tester, controller);
+
+      expect(controller.isKindVisible(PairKind.orphanRaw), isTrue);
+      expect(find.text('orphan.raf'), findsOneWidget);
+
+      // Tapping the (selected) chip hides the orphan candidates.
+      await tester.tap(find.text('Orphan RAWs'));
+      await tester.pumpAndSettle();
+      expect(controller.isKindVisible(PairKind.orphanRaw), isFalse);
+      expect(find.text('orphan.raf'), findsNothing);
+    });
+
+    testWidgets('the Photos-without-RAW chip toggles those rows', (
+      tester,
+    ) async {
+      // keeper.jpg has a RAW twin, lonely.jpg does not -> it is the only
+      // "photo without RAW" row the chip reveals.
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(
+          fakeScan(
+            photos: const ['/library/orphan.raf', '/library/lonely.jpg'],
+          ),
+        )
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.pruneRaw);
+      await _pump(tester, controller);
+
+      expect(controller.isKindVisible(PairKind.photoWithoutRaw), isFalse);
+      expect(find.text('lonely.jpg'), findsNothing);
+
+      await tester.tap(find.text('Photos without RAW'));
+      await tester.pumpAndSettle();
+      expect(controller.isKindVisible(PairKind.photoWithoutRaw), isTrue);
+      expect(find.text('lonely.jpg'), findsOneWidget);
+    });
+
     testWidgets('cancelling the confirm dialog trashes nothing', (
       tester,
     ) async {
@@ -456,6 +565,25 @@ void main() {
     });
   });
 
+  group('action screen routing', () {
+    testWidgets('the explore arm renders nothing as an action body', (
+      tester,
+    ) async {
+      // Explore is normally a full screen, never an action; forcing it as the
+      // action exercises the exhaustive switch's explore arm (a SizedBox).
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan())
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.explore);
+      await _pump(tester, controller);
+
+      // The action chrome (title) shows, but no tag/map/prune body renders.
+      expect(find.byType(TagAction), findsNothing);
+      expect(find.byType(MapAction), findsNothing);
+      expect(find.byType(PruneAction), findsNothing);
+    });
+  });
+
   group('action header', () {
     testWidgets('the back affordance returns to the library', (tester) async {
       final controller = AppController(runner: FakeEngineRunner())
@@ -498,6 +626,58 @@ void main() {
       await tester.pump();
       expect(controller.running, isTrue);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      fake.release();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('an in-flight error renders the banner above the progress', (
+      tester,
+    ) async {
+      // An ErrorEvent arrives while the stream is still open: the run stays
+      // active so the running column shows the error banner over the progress.
+      final fake = FakeEngineRunner(
+        keepOpen: true,
+        events: const [ErrorEvent('mid-flight prune fail')],
+      );
+      addTearDown(fake.release);
+      final controller = openWith(LibraryAction.pruneRaw, fake);
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Move 1 selected to Trash'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move to Trash'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(controller.running, isTrue);
+      expect(controller.errorMessage, 'mid-flight prune fail');
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+      fake.release();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('an in-flight tag error renders the banner over progress', (
+      tester,
+    ) async {
+      final fake = FakeEngineRunner(
+        keepOpen: true,
+        events: const [ErrorEvent('mid-flight tag fail')],
+      );
+      addTearDown(fake.release);
+      final controller = openWith(LibraryAction.tag, fake);
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Tag 1 photos'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(controller.running, isTrue);
+      expect(controller.errorMessage, 'mid-flight tag fail');
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
 
       fake.release();
       await tester.pumpAndSettle();
@@ -565,8 +745,29 @@ void main() {
       await tester.pump();
       await gesture.moveTo(tester.getCenter(find.text('Generate map')));
       await tester.pumpAndSettle();
-      // No assertion needed beyond no-throw: exercises the hover state path.
-      expect(find.text('Generate map'), findsOneWidget);
+
+      // On hover the card's border takes the primary accent (the onEnter path).
+      final scheme = Theme.of(
+        tester.element(find.text('Generate map')),
+      ).colorScheme;
+      Border borderOf() {
+        final container = tester.widget<AnimatedContainer>(
+          find
+              .ancestor(
+                of: find.text('Generate map'),
+                matching: find.byType(AnimatedContainer),
+              )
+              .first,
+        );
+        return (container.decoration! as BoxDecoration).border! as Border;
+      }
+
+      expect(borderOf().top.color, scheme.primary);
+
+      // Moving the pointer off the card fires onExit and drops the accent.
+      await gesture.moveTo(Offset.zero);
+      await tester.pumpAndSettle();
+      expect(borderOf().top.color, isNot(scheme.primary));
     });
   });
 }

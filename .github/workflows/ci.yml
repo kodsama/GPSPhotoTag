@@ -11,7 +11,7 @@ on:
 # Pin the toolchain to the versions the repo is developed against.
 env:
   FLUTTER_VERSION: 3.44.3
-  COVERAGE_MIN: 95
+  COVERAGE_MIN: 99
 
 jobs:
   lint-and-test:

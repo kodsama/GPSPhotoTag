@@ -465,6 +465,117 @@ void main() {
     });
   });
 
+  group('PhotoThumbnail non-image fallback', () {
+    testWidgets('a non-decodable, non-RAW path shows the typed placeholder', (
+      tester,
+    ) async {
+      // .txt is neither natively decodable nor extractable -> straight to the
+      // placeholder without any Image or extraction.
+      await tester.pumpWidget(
+        _wrap(const PhotoThumbnail(path: '/library/notes.txt', height: 100)),
+      );
+      await tester.pump();
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+      expect(find.text('TXT'), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+    });
+  });
+
+  group('_ExtractedImage error fallback', () {
+    testWidgets(
+      'a preview path that fails to decode falls back to the placeholder',
+      (tester) async {
+        // The extractor "succeeds" but points at a non-existent JPEG, so
+        // Image.file errors and its errorBuilder shows the typed placeholder.
+        final fake = FakeEngineRunner()
+          ..previews['/library/shot.raf'] = '/no/such/extracted.jpg';
+        final c = AppController(runner: fake);
+
+        await tester.runAsync(() async {
+          await tester.pumpWidget(
+            _wrap(
+              const PhotoThumbnail(path: '/library/shot.raf', height: 100),
+              controller: c,
+            ),
+          );
+          // Let the extractor future resolve and the Image.file read fail.
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+        await tester.pump();
+        expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+        expect(find.text('RAF'), findsOneWidget);
+      },
+    );
+  });
+
+  group('FullscreenImageView fallbacks', () {
+    testWidgets('a non-decodable path shows the typed placeholder', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: FullscreenImageView(path: '/library/doc.pdf')),
+      );
+      await tester.pump();
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+      expect(find.text('PDF'), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+    });
+
+    testWidgets('a decodable but missing file falls back to the placeholder', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: FullscreenImageView(path: '/no/such/photo.jpg'),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+      expect(find.text('JPG'), findsOneWidget);
+    });
+  });
+
+  group('showPhotoPreviewDialog', () {
+    testWidgets('the close button pops the dialog', (tester) async {
+      final c = AppController(runner: FakeEngineRunner());
+      await tester.pumpWidget(
+        ControllerScope(
+          controller: c,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => Center(
+                  child: ElevatedButton(
+                    onPressed: () => showPhotoPreviewDialog(
+                      context,
+                      path: '/library/shot.heic',
+                      meta: const FileMeta(path: '/library/shot.heic'),
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PhotoPreview), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.byType(PhotoPreview), findsNothing);
+    });
+  });
+
   group('previewMetaLines', () {
     test('includes date, dimensions and coordinates when present', () {
       final lines = previewMetaLines(

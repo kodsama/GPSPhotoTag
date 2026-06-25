@@ -173,6 +173,7 @@ void main() {
     final dater = Dater(
       exif: FakeExifBackend(captureNaive: DateTime(2021, 7, 4, 13, 37, 5)),
       runner: runner,
+      operatingSystem: 'macos',
     );
 
     final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
@@ -187,13 +188,14 @@ void main() {
       events.whereType<ItemEvent>().single.row.status,
       PhotoStatus.datesFixed,
     );
-  }, testOn: 'mac-os');
+  });
 
   test('exif direction warns when SetFile is unavailable on macOS', () async {
     final runner = FakeProcessRunner(throws: true);
     final dater = Dater(
       exif: FakeExifBackend(captureNaive: DateTime(2021, 7, 4, 13, 37, 5)),
       runner: runner,
+      operatingSystem: 'macos',
     );
 
     final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
@@ -205,7 +207,25 @@ void main() {
       events.whereType<ItemEvent>().single.row.status,
       PhotoStatus.datesFixed,
     );
-  }, testOn: 'mac-os');
+  });
+
+  test('exif direction skips the birthtime fix on non-macOS', () async {
+    final runner = FakeProcessRunner();
+    final dater = Dater(
+      exif: FakeExifBackend(captureNaive: DateTime(2021, 7, 4, 13, 37, 5)),
+      runner: runner,
+      operatingSystem: 'linux',
+    );
+
+    final events = await dater.fixDates([photo], FixDatesMode.exif).toList();
+
+    // No SetFile call on Linux; the mtime fix still succeeds.
+    expect(runner.calls.any((c) => c.first == 'SetFile'), isFalse);
+    expect(
+      events.whereType<ItemEvent>().single.row.status,
+      PhotoStatus.datesFixed,
+    );
+  });
 
   test('none mode yields a single empty DoneEvent', () async {
     final dater = Dater(exif: FakeExifBackend(), runner: FakeProcessRunner());

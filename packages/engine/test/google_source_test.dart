@@ -59,6 +59,35 @@ void main() {
       expect(parseGoogleRecords('not json'), isEmpty);
       expect(parseGoogleRecords('{}'), isEmpty);
     });
+
+    test('converts E7 coordinates supplied as numeric strings', () {
+      // Some exports stringify latitudeE7/longitudeE7; _degreesFromE7 must
+      // double.tryParse them rather than skip the entry.
+      const json = '''
+      {"locations":[
+        {"latitudeE7":"427077000","longitudeE7":"183441000",
+         "timestamp":"2026-06-22T12:00:00Z"}
+      ]}''';
+      final points = parseGoogleRecords(json);
+      expect(points, hasLength(1));
+      expect(points.first.latitude, closeTo(42.7077, 1e-9));
+      expect(points.first.longitude, closeTo(18.3441, 1e-9));
+    });
+
+    test('accepts timestampMs supplied as a JSON number', () {
+      // _timeFromEpochMs handles a num directly (not only a numeric string).
+      const json = '''
+      {"locations":[
+        {"latitudeE7":427077000,"longitudeE7":183441000,
+         "timestampMs":1690000000000}
+      ]}''';
+      final points = parseGoogleRecords(json);
+      expect(points, hasLength(1));
+      expect(
+        points.first.time,
+        DateTime.fromMillisecondsSinceEpoch(1690000000000, isUtc: true),
+      );
+    });
   });
 
   group('parseGoogleTimeline semanticSegments', () {
@@ -100,6 +129,19 @@ void main() {
       expect(points, hasLength(2));
       expect(_isSorted(points), isTrue);
       expect(points.first.latitude, closeTo(3.0, 1e-9));
+    });
+
+    test('visit falls back to topCandidate.latLng without placeLocation', () {
+      // No placeLocation: _segmentLatLng must read latLng off the candidate.
+      const json = '''
+      {"semanticSegments":[
+        {"startTime":"2026-06-22T08:00:00Z","endTime":"2026-06-22T09:00:00Z",
+         "visit":{"topCandidate":{"latLng":"7.5°, 8.5°"}}}
+      ]}''';
+      final points = parseGoogleTimeline(json);
+      expect(points, hasLength(2));
+      expect(points.first.latitude, closeTo(7.5, 1e-9));
+      expect(points.first.longitude, closeTo(8.5, 1e-9));
     });
 
     test('activity emits a single point when only startTime present', () {
