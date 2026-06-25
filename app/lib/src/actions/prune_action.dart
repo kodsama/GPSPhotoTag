@@ -119,12 +119,31 @@ class _FilterRow extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final entry in _kindLabels.entries)
-              FilterChip(
-                label: Text(entry.value),
-                selected: controller.isKindVisible(entry.key),
-                onSelected: (v) => controller.setKindVisible(entry.key, v),
-              ),
+            // Orphan RAWs — the selectable deletion candidates (default on).
+            FilterChip(
+              label: const Text('Orphan RAWs'),
+              selected: controller.isKindVisible(PairKind.orphanRaw),
+              onSelected: (v) =>
+                  controller.setKindVisible(PairKind.orphanRaw, v),
+            ),
+            // One chip for the RAW+JPG pairing: shows both the paired RAFs and
+            // their JPG twins (was two chips describing the same pairing).
+            FilterChip(
+              label: const Text('Paired (RAW + JPG)'),
+              selected:
+                  controller.isKindVisible(PairKind.pairedRaw) &&
+                  controller.isKindVisible(PairKind.photoWithRaw),
+              onSelected: (v) {
+                controller.setKindVisible(PairKind.pairedRaw, v);
+                controller.setKindVisible(PairKind.photoWithRaw, v);
+              },
+            ),
+            FilterChip(
+              label: const Text('Photos without RAW'),
+              selected: controller.isKindVisible(PairKind.photoWithoutRaw),
+              onSelected: (v) =>
+                  controller.setKindVisible(PairKind.photoWithoutRaw, v),
+            ),
           ],
         ),
       ],
@@ -346,13 +365,6 @@ class _Done extends StatelessWidget {
     );
   }
 }
-
-const Map<PairKind, String> _kindLabels = {
-  PairKind.orphanRaw: 'Orphan RAWs',
-  PairKind.pairedRaw: 'RAWs with JPG',
-  PairKind.photoWithoutRaw: 'Photos without RAW',
-  PairKind.photoWithRaw: 'Photos with RAW',
-};
 
 const Map<PairKind, String> _kindTags = {
   PairKind.orphanRaw: 'Orphan',

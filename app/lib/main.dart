@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'src/engine/exiftool_bundle.dart';
 import 'src/state/app_controller.dart';
+import 'src/state/app_prefs.dart';
 import 'src/state/controller_scope.dart';
 import 'src/theme/app_theme.dart';
 import 'src/widgets/app_shell.dart';
 
-void main() => runApp(StundaApp(exiftoolBundleDir: locateBundledExiftool()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final support = await getApplicationSupportDirectory();
+  final prefs = await AppPrefs.load(support.path);
+  runApp(StundaApp(exiftoolBundleDir: locateBundledExiftool(), prefs: prefs));
+}
 
 /// Root of the Stunda desktop GUI.
 ///
@@ -16,7 +23,12 @@ class StundaApp extends StatefulWidget {
   /// Creates the app, optionally with an injected [controller] (tests). When no
   /// controller is injected, builds one wired to the bundled [exiftoolBundleDir]
   /// located in `main`.
-  const StundaApp({super.key, this.controller, this.exiftoolBundleDir});
+  const StundaApp({
+    super.key,
+    this.controller,
+    this.exiftoolBundleDir,
+    this.prefs,
+  });
 
   /// The controller to use; a fresh one is created when null.
   final AppController? controller;
@@ -25,6 +37,10 @@ class StundaApp extends StatefulWidget {
   /// controller (ignored when [controller] is injected).
   final String? exiftoolBundleDir;
 
+  /// Persisted preferences forwarded into a freshly built controller (ignored
+  /// when [controller] is injected).
+  final AppPrefs? prefs;
+
   @override
   State<StundaApp> createState() => _StundaAppState();
 }
@@ -32,7 +48,10 @@ class StundaApp extends StatefulWidget {
 class _StundaAppState extends State<StundaApp> {
   late final AppController _controller =
       widget.controller ??
-      AppController(exiftoolBundleDir: widget.exiftoolBundleDir);
+      AppController(
+        exiftoolBundleDir: widget.exiftoolBundleDir,
+        prefs: widget.prefs,
+      );
 
   @override
   void initState() {

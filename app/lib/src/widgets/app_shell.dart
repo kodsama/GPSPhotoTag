@@ -7,10 +7,13 @@ import '../screens/explore_map_screen.dart';
 import '../screens/scanning_screen.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/workspace_screen.dart';
+import '../state/app_controller.dart';
 import '../state/app_screen.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
+import 'licenses.dart';
+import 'settings_dialog.dart';
 import 'warning_banner.dart';
 
 /// The app frame: a header bar (logo, wordmark, MCP chip, theme toggle), the
@@ -92,7 +95,6 @@ class _Header extends StatelessWidget {
     final controller = ControllerScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
@@ -118,15 +120,92 @@ class _Header extends StatelessWidget {
           ),
           _McpChip(mcp: controller.mcp),
           const SizedBox(width: 12),
-          IconButton(
-            tooltip: isDark ? 'Switch to light' : 'Switch to dark',
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => controller.setDark(!isDark),
-          ),
+          _SettingsMenu(controller: controller),
         ],
       ),
     );
   }
+}
+
+/// Top-right overflow menu: appearance toggle, settings, licenses, and about.
+class _SettingsMenu extends StatelessWidget {
+  const _SettingsMenu({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return PopupMenuButton<String>(
+      tooltip: 'Menu',
+      icon: const Icon(Icons.settings),
+      position: PopupMenuPosition.under,
+      onSelected: (v) {
+        switch (v) {
+          case 'theme':
+            controller.setDark(!isDark);
+          case 'settings':
+            showSettingsDialog(context, controller);
+          case 'licenses':
+            showAppLicenses(context);
+          case 'about':
+            _showAbout(context);
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'theme',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+            title: Text(isDark ? 'Appearance: Light' : 'Appearance: Dark'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'settings',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.tune),
+            title: Text('Settings…'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'licenses',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.gavel),
+            title: Text('Licenses'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'about',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.info_outline),
+            title: Text('About'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shows the About dialog: the logo mark, version, tagline, author, license.
+void _showAbout(BuildContext context) {
+  showAboutDialog(
+    context: context,
+    applicationName: 'Stunda',
+    applicationVersion: '2.0.0',
+    applicationIcon: const LogoMark(size: 48),
+    applicationLegalese:
+        'Give every photo its moment.\n'
+        'Author: Kodsama\n'
+        'GPL-3.0-or-later',
+  );
 }
 
 /// Header chip showing the always-on MCP server status (the LLM endpoint).

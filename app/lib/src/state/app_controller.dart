@@ -9,6 +9,7 @@ import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
 import '../explore/explore_model.dart';
+import 'app_prefs.dart';
 import 'app_screen.dart';
 import 'library_action.dart';
 import 'log_entry.dart';
@@ -31,8 +32,10 @@ class AppController extends ChangeNotifier {
     Future<String?> Function()? pickFolder,
     Future<List<ToolStatus>> Function()? probeToolkit,
     String? exiftoolBundleDir,
+    AppPrefs? prefs,
   }) : _pickFolder = pickFolder ?? getDirectoryPath,
        _exiftoolBundleDir = exiftoolBundleDir,
+       _prefs = prefs,
        _probeToolkit =
            probeToolkit ??
            (() => ToolkitChecker(
@@ -43,11 +46,20 @@ class AppController extends ChangeNotifier {
            ).check()),
        mcp = McpService(exiftoolBundleDir: exiftoolBundleDir) {
     _runner = runner;
+    if (prefs != null) {
+      _themeMode = prefs.themeMode;
+      _rawMode = prefs.defaultRawMode;
+      _maxTimeDiffSeconds = prefs.defaultMaxTimeDiffSeconds;
+    }
   }
 
   EngineRunner? _runner;
   final Future<String?> Function() _pickFolder;
   final Future<List<ToolStatus>> Function() _probeToolkit;
+
+  /// Persisted preferences (theme + tag defaults), or null when persistence is
+  /// disabled (most tests). Changes are written back through it.
+  final AppPrefs? _prefs;
 
   /// On-disk dir of the app-bundled exiftool, or null when none is bundled.
   final String? _exiftoolBundleDir;
@@ -72,15 +84,54 @@ class AppController extends ChangeNotifier {
   /// The active theme mode.
   ThemeMode get themeMode => _themeMode;
 
-  /// Sets the theme to light or dark explicitly.
+  /// Sets the theme mode explicitly and persists the choice.
+  void setThemeMode(ThemeMode mode) {
+    if (_themeMode == mode) return;
+    _themeMode = mode;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Sets the theme to light or dark explicitly, persisting the choice.
   ///
   /// The header passes the *currently displayed* brightness so the first tap
   /// always flips what the user sees — even from [ThemeMode.system].
-  void setDark(bool dark) {
-    final target = dark ? ThemeMode.dark : ThemeMode.light;
-    if (_themeMode == target) return;
-    _themeMode = target;
+  void setDark(bool dark) =>
+      setThemeMode(dark ? ThemeMode.dark : ThemeMode.light);
+
+  // --- Tag defaults (persisted) --------------------------------------------
+
+  /// The persisted default RAW mode new tag runs start from.
+  RawMode get defaultRawMode => _prefs?.defaultRawMode ?? RawMode.auto;
+
+  /// The persisted default max time-difference (seconds) tag runs start from.
+  int get defaultMaxTimeDiffSeconds => _prefs?.defaultMaxTimeDiffSeconds ?? 300;
+
+  /// Sets the persisted default RAW mode (embed is rejected without exiftool),
+  /// applying it to the current tag options too.
+  void setDefaultRawMode(RawMode mode) {
+    if (mode == RawMode.embed && !exiftoolAvailable) return;
+    _prefs?.defaultRawMode = mode;
+    _rawMode = mode;
+    _persistPrefs();
     notifyListeners();
+  }
+
+  /// Sets the persisted default max time-difference (clamped to >= 0), applying
+  /// it to the current tag options too.
+  void setDefaultMaxTimeDiff(int seconds) {
+    final clamped = seconds < 0 ? 0 : seconds;
+    _prefs?.defaultMaxTimeDiffSeconds = clamped;
+    _maxTimeDiffSeconds = clamped;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  void _persistPrefs() {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    prefs.themeMode = _themeMode;
+    prefs.save();
   }
 
   // --- Screen navigation ---------------------------------------------------

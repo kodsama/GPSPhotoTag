@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../data/iana_timezones.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
@@ -214,15 +215,29 @@ class _Options extends StatelessWidget {
           style: text.bodySmall,
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          initialValue: controller.timezone ?? '',
-          decoration: const InputDecoration(hintText: 'Europe/Paris'),
-          onChanged: controller.setTimezone,
+        DropdownMenu<String>(
+          // 'Auto-detect' maps to a null timezone (use EXIF offset).
+          initialSelection: controller.timezone ?? _autoDetect,
+          enableFilter: true,
+          requestFocusOnTap: true,
+          expandedInsets: EdgeInsets.zero,
+          label: const Text('Timezone'),
+          onSelected: (value) => controller.setTimezone(
+            value == null || value == _autoDetect ? null : value,
+          ),
+          dropdownMenuEntries: [
+            const DropdownMenuEntry(value: _autoDetect, label: _autoDetect),
+            for (final zone in kIanaTimezones)
+              DropdownMenuEntry(value: zone, label: zone),
+          ],
         ),
       ],
     );
   }
 }
+
+/// The sentinel "auto-detect" entry that maps to a null timezone.
+const _autoDetect = 'Auto-detect';
 
 /// The post-run result: summary table + back-to-library button.
 class _Done extends StatelessWidget {

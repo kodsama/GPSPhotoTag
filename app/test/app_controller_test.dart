@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/state/app_controller.dart';
+import 'package:stunda/src/state/app_prefs.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/library_action.dart';
 
@@ -376,6 +377,105 @@ void main() {
       expect(c.themeMode, ThemeMode.dark);
       c.setDark(true);
       expect(c.themeMode, ThemeMode.dark);
+    });
+
+    test('setThemeMode can return to system (auto)', () {
+      final c = AppController()..setDark(true);
+      expect(c.themeMode, ThemeMode.dark);
+      c.setThemeMode(ThemeMode.system);
+      expect(c.themeMode, ThemeMode.system);
+    });
+  });
+
+  group('persisted preferences', () {
+    late Directory dir;
+    setUp(() => dir = Directory.systemTemp.createTempSync('prefs'));
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    test('load returns defaults when nothing is saved', () async {
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.themeMode, ThemeMode.system);
+      expect(prefs.defaultRawMode, RawMode.auto);
+      expect(prefs.defaultMaxTimeDiffSeconds, 300);
+    });
+
+    test('a controller applies loaded prefs to theme and tag options', () {
+      final prefs = AppPrefs(
+        themeMode: ThemeMode.dark,
+        defaultRawMode: RawMode.sidecar,
+        defaultMaxTimeDiffSeconds: 90,
+      );
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.themeMode, ThemeMode.dark);
+      expect(c.rawMode, RawMode.sidecar);
+      expect(c.maxTimeDiffSeconds, 90);
+      expect(c.buildTagOptions().maxTimeDiff, const Duration(seconds: 90));
+    });
+
+    test('controller writes choices into the prefs bag', () {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs)
+        ..debugSetToolkit([_tool('exiftool')]);
+
+      c.setDark(true);
+      c.setDefaultRawMode(RawMode.embed);
+      c.setDefaultMaxTimeDiff(42);
+
+      // The setters mutate the shared bag synchronously (the file write is a
+      // best-effort async side effect tested separately via save/load).
+      expect(prefs.themeMode, ThemeMode.dark);
+      expect(prefs.defaultRawMode, RawMode.embed);
+      expect(prefs.defaultMaxTimeDiffSeconds, 42);
+    });
+
+    test(
+      'save then load round-trips every preference through a file',
+      () async {
+        final prefs = await AppPrefs.load(dir.path)
+          ..themeMode = ThemeMode.dark
+          ..defaultRawMode = RawMode.embed
+          ..defaultMaxTimeDiffSeconds = 42;
+        await prefs.save();
+
+        final reloaded = await AppPrefs.load(dir.path);
+        expect(reloaded.themeMode, ThemeMode.dark);
+        expect(reloaded.defaultRawMode, RawMode.embed);
+        expect(reloaded.defaultMaxTimeDiffSeconds, 42);
+      },
+    );
+
+    test('save is a no-op without a backing file', () async {
+      final prefs = AppPrefs(themeMode: ThemeMode.light);
+      await expectLater(prefs.save(), completes);
+    });
+
+    test('setDefaultRawMode rejects embed without exiftool', () {
+      final c = AppController(runner: FakeEngineRunner(), prefs: AppPrefs());
+      c.setDefaultRawMode(RawMode.embed);
+      expect(c.defaultRawMode, RawMode.auto);
+    });
+
+    test('setDefaultMaxTimeDiff clamps negatives to zero', () {
+      final c = AppController(runner: FakeEngineRunner(), prefs: AppPrefs());
+      c.setDefaultMaxTimeDiff(-9);
+      expect(c.defaultMaxTimeDiffSeconds, 0);
+      expect(c.maxTimeDiffSeconds, 0);
+    });
+
+    test('load ignores a malformed preferences file', () async {
+      File('${dir.path}/preferences.json').writeAsStringSync('{ not json');
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.themeMode, ThemeMode.system);
+      expect(prefs.defaultRawMode, RawMode.auto);
+    });
+
+    test('defaults are exposed without a prefs store', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.defaultRawMode, RawMode.auto);
+      expect(c.defaultMaxTimeDiffSeconds, 300);
+      // No store: setters still apply to live options without throwing.
+      c.setDefaultMaxTimeDiff(60);
+      expect(c.maxTimeDiffSeconds, 60);
     });
   });
 

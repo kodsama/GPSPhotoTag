@@ -325,13 +325,24 @@ void main() {
       expect(fake.calls, isEmpty);
     });
 
-    testWidgets('a kind toggle reveals context rows', (tester) async {
+    testWidgets('the Paired chip reveals both sides of the RAW+JPG pairing', (
+      tester,
+    ) async {
       final controller = openReview(FakeEngineRunner());
       await _pump(tester, controller);
 
-      await tester.tap(find.text('RAWs with JPG'));
+      // Three merged chips; the duplicate side is gone.
+      expect(find.text('Orphan RAWs'), findsOneWidget);
+      expect(find.text('Paired (RAW + JPG)'), findsOneWidget);
+      expect(find.text('Photos without RAW'), findsOneWidget);
+      expect(find.text('RAWs with JPG'), findsNothing);
+      expect(find.text('Photos with RAW'), findsNothing);
+
+      await tester.tap(find.text('Paired (RAW + JPG)'));
       await tester.pumpAndSettle();
+      // Reveals both the paired RAF and its JPG twin.
       expect(find.text('keeper.raf'), findsOneWidget);
+      expect(find.text('keeper.jpg'), findsOneWidget);
     });
 
     testWidgets('cancelling the confirm dialog trashes nothing', (

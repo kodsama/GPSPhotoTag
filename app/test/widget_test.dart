@@ -144,16 +144,18 @@ void main() {
     expect(find.textContaining('MCP'), findsOneWidget);
   });
 
-  testWidgets('theme toggle flips the mode', (tester) async {
+  testWidgets('the settings menu appearance item flips the theme', (
+    tester,
+  ) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
     await _pumpApp(tester, controller);
 
-    final isDark = controller.themeMode == ThemeMode.dark;
-    await tester.tap(
-      find.byTooltip(isDark ? 'Switch to light' : 'Switch to dark'),
-    );
-    await tester.pump();
+    // The standalone toggle is gone — the theme lives in the overflow menu.
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Appearance:'));
+    await tester.pumpAndSettle();
     expect(controller.themeMode, isNot(ThemeMode.system));
   });
 
