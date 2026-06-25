@@ -52,7 +52,7 @@ class _ActionCardState extends State<ActionCard> {
         opacity: enabled ? 1 : 0.55,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          width: 280,
+          width: double.infinity,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -75,8 +75,13 @@ class _ActionCardState extends State<ActionCard> {
                     const SizedBox(height: 14),
                     Text(widget.action.title, style: text.titleMedium),
                     const SizedBox(height: 6),
-                    Text(widget.action.description, style: text.bodySmall),
-                    const SizedBox(height: 14),
+                    Text(
+                      widget.action.description,
+                      style: text.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
                     _ReadinessChip(readiness: widget.readiness),
                   ],
                 ),

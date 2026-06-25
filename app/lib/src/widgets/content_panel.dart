@@ -32,7 +32,7 @@ class ContentPanel extends StatelessWidget {
           childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
           children: [
             _SectionLabel('Supported — will be used'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _Chips(chips: _supportedChips(scan)),
             if (scan.unsupportedCount > 0) ...[
               const SizedBox(height: 20),
@@ -51,30 +51,19 @@ class ContentPanel extends StatelessWidget {
     );
   }
 
-  static List<String> _supportedChips(FolderScanResult scan) {
-    final chips = <String>[];
+  /// (label, count) pairs for the supported chips: photo formats (by count
+  /// desc) then GPS sources. Counts are plain integers — no thousands grouping.
+  static List<(String, int)> _supportedChips(FolderScanResult scan) {
+    final chips = <(String, int)>[];
     final formats = scan.photosByFormat.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     for (final e in formats) {
-      chips.add('${e.key.toUpperCase()} ${_fmt(e.value)}');
+      chips.add((e.key.toUpperCase(), e.value));
     }
-    if (scan.gpxCount > 0) chips.add('GPX ${_fmt(scan.gpxCount)}');
-    if (scan.kmlCount > 0) chips.add('KML ${_fmt(scan.kmlCount)}');
-    if (scan.googleCount > 0) {
-      chips.add('Timeline ${_fmt(scan.googleCount)}');
-    }
-    if (chips.isEmpty) chips.add('Nothing supported found');
+    if (scan.gpxCount > 0) chips.add(('GPX', scan.gpxCount));
+    if (scan.kmlCount > 0) chips.add(('KML', scan.kmlCount));
+    if (scan.googleCount > 0) chips.add(('Timeline', scan.googleCount));
     return chips;
-  }
-
-  static String _fmt(int n) {
-    final s = n.toString();
-    final buf = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
-      buf.write(s[i]);
-    }
-    return buf.toString();
   }
 }
 
@@ -100,33 +89,68 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-/// A wrap of plain rounded count chips.
+/// A wrap of count chips: a bold format/source label on the left and the count
+/// as a distinct pill on the right, so the two never visually run together.
 class _Chips extends StatelessWidget {
   const _Chips({required this.chips});
 
-  final List<String> chips;
+  final List<(String, int)> chips;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = scheme.onSurface;
+    final text = Theme.of(context).textTheme;
+    if (chips.isEmpty) {
+      return Text(
+        'Nothing supported found.',
+        style: text.bodySmall?.copyWith(
+          color: scheme.onSurface.withValues(alpha: 0.5),
+        ),
+      );
+    }
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 10,
+      runSpacing: 10,
       children: [
-        for (final chip in chips)
+        for (final (label, count) in chips)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.fromLTRB(12, 7, 7, 7),
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
               border: Border.all(color: scheme.outline),
             ),
-            child: Text(
-              chip,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: color),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: text.labelLarge?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                // Count in its own subtle pill, well clear of the label.
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: text.bodySmall?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: AppTheme.tabular,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
       ],

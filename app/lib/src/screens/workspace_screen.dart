@@ -32,17 +32,34 @@ class WorkspaceScreen extends StatelessWidget {
             const SizedBox(height: 24),
             Text('Actions', style: text.titleMedium),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: [
-                for (final action in LibraryAction.all)
-                  ActionCard(
-                    action: action,
-                    readiness: action.readiness(scan),
-                    onOpen: () => controller.openAction(action),
-                  ),
-              ],
+            LayoutBuilder(
+              builder: (context, c) {
+                const gap = 16.0;
+                // Up to 3 across; reflow to 2 / 1 as the window narrows. Cards
+                // share the width equally so there's never a dead gap.
+                final cols = c.maxWidth >= 760
+                    ? 3
+                    : c.maxWidth >= 480
+                    ? 2
+                    : 1;
+                final w = (c.maxWidth - gap * (cols - 1)) / cols;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (final action in LibraryAction.all)
+                      SizedBox(
+                        width: w,
+                        height: 196,
+                        child: ActionCard(
+                          action: action,
+                          readiness: action.readiness(scan),
+                          onOpen: () => controller.openAction(action),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),
