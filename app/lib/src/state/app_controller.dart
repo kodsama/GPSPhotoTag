@@ -590,6 +590,26 @@ class AppController extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
+  // --- Preview extraction (RAW/HEIC embedded JPEG) -------------------------
+
+  /// Memoized extracted-preview paths, keyed by `<full|thumb>:<source path>`, so
+  /// re-opening the same photo at the same size never re-runs exiftool.
+  final Map<String, Future<String?>> _previewCache = {};
+
+  /// Extracts (once) an embedded JPEG preview for [path] off the UI isolate and
+  /// returns the cached JPEG path, or null when the file has no usable preview.
+  ///
+  /// Memoizes by path + size: the first call kicks off the worker extraction;
+  /// every later call for the same path/size returns the same in-flight or
+  /// completed [Future] without re-running the engine.
+  Future<String?> previewImageFor(String path, {bool full = false}) {
+    final key = '${full ? 'full' : 'thumb'}:$path';
+    return _previewCache.putIfAbsent(
+      key,
+      () => _engine.extractPreview(path, full: full),
+    );
+  }
+
   // --- Explore map ---------------------------------------------------------
 
   final List<ExplorePhoto> _explorePhotos = [];

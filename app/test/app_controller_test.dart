@@ -710,6 +710,32 @@ void main() {
     });
   });
 
+  group('previewImageFor', () {
+    test('returns the runner-extracted JPEG path', () async {
+      final fake = FakeEngineRunner()..previews['/lib/a.raf'] = '/cache/a.jpg';
+      final c = AppController(runner: fake);
+      expect(await c.previewImageFor('/lib/a.raf'), '/cache/a.jpg');
+    });
+
+    test('memoizes by path + size (second call does not re-run)', () async {
+      final fake = FakeEngineRunner()..previews['/lib/a.raf'] = '/cache/a.jpg';
+      final c = AppController(runner: fake);
+
+      await c.previewImageFor('/lib/a.raf', full: true);
+      await c.previewImageFor('/lib/a.raf', full: true);
+      expect(fake.extractPreviewCalls, 1); // cached on the second call
+
+      // A different size is a distinct cache key, so it does run again.
+      await c.previewImageFor('/lib/a.raf');
+      expect(fake.extractPreviewCalls, 2);
+    });
+
+    test('returns null when the file has no embedded preview', () async {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(await c.previewImageFor('/lib/none.raf'), isNull);
+    });
+  });
+
   group('lifecycle', () {
     test('dispose tears down the controller and its mcp service', () {
       final c = AppController(runner: FakeEngineRunner());

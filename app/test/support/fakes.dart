@@ -158,6 +158,20 @@ class FakeEngineRunner implements EngineRunner {
       yield _imageMeta[path] ?? FileMeta(path: path);
     }
   }
+
+  /// Per-source extracted preview paths returned by [extractPreview]; an absent
+  /// path yields null (no embedded preview).
+  final Map<String, String?> previews = {};
+
+  /// How many times [extractPreview] actually ran (to prove memoization).
+  int extractPreviewCalls = 0;
+
+  @override
+  Future<String?> extractPreview(String path, {bool full = false}) async {
+    calls.add('extractPreview');
+    extractPreviewCalls++;
+    return previews[path];
+  }
 }
 
 /// An [EngineRunner] whose streams emit a stream-level error (rather than an
@@ -205,6 +219,10 @@ class ThrowingEngineRunner implements EngineRunner {
   @override
   Stream<FileMeta> readImageMeta(List<String> paths) =>
       Stream<FileMeta>.error(StateError('readImageMeta blew up'));
+
+  @override
+  Future<String?> extractPreview(String path, {bool full = false}) async =>
+      throw StateError('extractPreview blew up');
 }
 
 /// Builds a [FolderScanResult] for tests with controllable tallies.

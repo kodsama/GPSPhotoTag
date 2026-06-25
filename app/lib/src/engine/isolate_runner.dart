@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
 import 'engine_runner.dart';
@@ -167,6 +168,31 @@ class IsolateRunner implements EngineRunner {
     return controller.stream;
   }
 
+  /// Extracts an embedded JPEG preview of [path] on a one-shot worker isolate
+  /// via the bundled exiftool, returning the cached JPEG path (or null when no
+  /// embedded image is produced or the worker fails to start).
+  @override
+  Future<String?> extractPreview(String path, {bool full = false}) async {
+    final receive = ReceivePort();
+    try {
+      await Isolate.spawn(
+        _extractPreviewEntry,
+        _ExtractPreviewRequest(
+          port: receive.sendPort,
+          path: path,
+          full: full,
+          bundleDir: exiftoolBundleDir,
+        ),
+      );
+    } on Object {
+      receive.close();
+      return null;
+    }
+    final result = await receive.first;
+    receive.close();
+    return result is String ? result : null;
+  }
+
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
   /// by [makeRequest], and re-emits every event of type [E] it sends until the
   /// null sentinel. A spawn failure is surfaced via [onSpawnError].
@@ -300,6 +326,20 @@ class _ReadImageMetaRequest {
 
   final SendPort port;
   final List<String> paths;
+  final String? bundleDir;
+}
+
+class _ExtractPreviewRequest {
+  const _ExtractPreviewRequest({
+    required this.port,
+    required this.path,
+    required this.full,
+    required this.bundleDir,
+  });
+
+  final SendPort port;
+  final String path;
+  final bool full;
   final String? bundleDir;
 }
 
@@ -438,6 +478,29 @@ Future<void> _readImageMetaEntry(_ReadImageMetaRequest req) async {
     // Best-effort: a failed exiftool read just leaves rows un-enriched.
   } finally {
     req.port.send(null);
+  }
+}
+
+/// The shared on-disk cache directory for extracted previews (stable across a
+/// session so re-opening a photo is instant). Lives under the system temp dir,
+/// which is reachable from any isolate without a platform plugin.
+Directory _previewCacheDir() =>
+    Directory(p.join(Directory.systemTemp.path, 'stunda_preview_cache'));
+
+Future<void> _extractPreviewEntry(_ExtractPreviewRequest req) async {
+  String? result;
+  try {
+    final runner = _buildRunner(req.bundleDir);
+    result = await extractPreview(
+      req.path,
+      cacheDir: _previewCacheDir().path,
+      size: req.full ? PreviewSize.full : PreviewSize.thumb,
+      runner: runner,
+    );
+  } on Object {
+    result = null; // best-effort: a failed extract just keeps the placeholder
+  } finally {
+    req.port.send(result);
   }
 }
 

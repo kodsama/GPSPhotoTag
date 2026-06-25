@@ -197,6 +197,25 @@ void main() {
     },
   );
 
+  test('extractPreview returns null on a worker for a non-RAW file', () async {
+    // A plain text file has no embedded preview; exiftool (when present) writes
+    // nothing and the worker returns null. With no exiftool the run still ends
+    // cleanly with null. Either way the worker plumbing + sentinel are exercised.
+    final txt = File('${tmp.path}/notes.txt')..writeAsStringSync('hello');
+    const runner = IsolateRunner();
+    final result = await runner.extractPreview(txt.path);
+    expect(result, isNull);
+  });
+
+  test('extractPreview returns null for a missing file', () async {
+    const runner = IsolateRunner();
+    final result = await runner.extractPreview(
+      '${tmp.path}/does-not-exist.raf',
+      full: true,
+    );
+    expect(result, isNull);
+  });
+
   test('scan runs on a worker isolate and reports the tree', () async {
     final jpg = await writeJpegWithDate(tmp, 'a.jpg');
     writeGpx(tmp, 'track.gpx', DateTime(2026));

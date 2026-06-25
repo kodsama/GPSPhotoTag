@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../state/controller_scope.dart';
 import '../theme/app_theme.dart';
 import 'detail_selection.dart';
 import 'explore_model.dart';
@@ -282,6 +283,15 @@ class PhotoThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (needsPreviewExtraction(path)) {
+      return _ExtractedImage(
+        path: path,
+        full: false,
+        height: height,
+        cacheWidth: cacheWidth,
+        fit: BoxFit.cover,
+      );
+    }
     if (!isDecodableImage(path)) {
       return _Placeholder(label: fileTypeLabel(path), height: height);
     }
@@ -293,6 +303,84 @@ class PhotoThumbnail extends StatelessWidget {
       cacheWidth: cacheWidth,
       errorBuilder: (context, _, _) =>
           _Placeholder(label: fileTypeLabel(path), height: height),
+    );
+  }
+}
+
+/// Renders a RAW/HEIC [path] by extracting its embedded JPEG via the controller
+/// (off the UI isolate), showing a spinner while extracting and the typed
+/// placeholder on failure. Thin glue around [AppController.previewImageFor] and
+/// an [Image.file]; the decision to use it lives in [needsPreviewExtraction].
+class _ExtractedImage extends StatelessWidget {
+  const _ExtractedImage({
+    required this.path,
+    required this.full,
+    required this.height,
+    this.cacheWidth,
+    this.fit = BoxFit.contain,
+  });
+
+  /// The RAW/HEIC source file.
+  final String path;
+
+  /// Whether to extract the large (fullscreen) preview vs the small thumbnail.
+  final bool full;
+
+  /// Fixed display height (also sizes the spinner/placeholder).
+  final double height;
+
+  /// Optional decode width hint for the resulting JPEG.
+  final int? cacheWidth;
+
+  /// How the extracted JPEG fits its box.
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = ControllerScope.of(context);
+    return FutureBuilder<String?>(
+      future: controller.previewImageFor(path, full: full),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return _Spinner(height: height);
+        }
+        final jpeg = snapshot.data;
+        if (jpeg == null) {
+          return _Placeholder(label: fileTypeLabel(path), height: height);
+        }
+        return Image.file(
+          File(jpeg),
+          height: height,
+          width: full ? null : double.infinity,
+          fit: fit,
+          cacheWidth: cacheWidth,
+          errorBuilder: (context, _, _) =>
+              _Placeholder(label: fileTypeLabel(path), height: height),
+        );
+      },
+    );
+  }
+}
+
+/// A centered progress indicator sized to [height], shown while a preview is
+/// being extracted.
+class _Spinner extends StatelessWidget {
+  const _Spinner({required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: const Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      ),
     );
   }
 }
@@ -390,7 +478,9 @@ class FullscreenImageView extends StatelessWidget {
         child: InteractiveViewer(
           minScale: 0.5,
           maxScale: 6,
-          child: isDecodableImage(path)
+          child: needsPreviewExtraction(path)
+              ? _ExtractedImage(path: path, full: true, height: 240)
+              : isDecodableImage(path)
               ? Image.file(
                   File(path),
                   errorBuilder: (context, _, _) =>

@@ -24,8 +24,11 @@ ExplorePhoto _photo(String path, {FileMeta? meta}) => ExplorePhoto(
   meta: meta,
 );
 
-Widget _wrap(Widget child) => MaterialApp(
-  home: Scaffold(body: Center(child: child)),
+Widget _wrap(Widget child, {AppController? controller}) => ControllerScope(
+  controller: controller ?? AppController(runner: FakeEngineRunner()),
+  child: MaterialApp(
+    home: Scaffold(body: Center(child: child)),
+  ),
 );
 
 void main() {
@@ -66,11 +69,13 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
       // Filename + dimensions + coordinates.
       expect(find.text('shot.heic'), findsOneWidget);
       expect(find.text('4032 × 3024'), findsOneWidget);
       expect(find.text('42.50000, 18.10000'), findsOneWidget);
-      // HEIC isn't decodable -> typed placeholder, not an Image.
+      // HEIC has no extractable preview here (fake returns null) -> typed
+      // placeholder, not an Image.
       expect(find.text('HEIC'), findsOneWidget);
       expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
       // No pager for a single photo.
@@ -123,18 +128,21 @@ void main() {
         ),
       );
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Builder(
-              builder: (context) => PhotoDetailPanel(
-                selection: selection,
-                onPrev: () {},
-                onNext: () {},
-                onClose: () {},
-                onExpand: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        const FullscreenImageView(path: '/library/shot.heic'),
+        ControllerScope(
+          controller: AppController(runner: FakeEngineRunner()),
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => PhotoDetailPanel(
+                  selection: selection,
+                  onPrev: () {},
+                  onNext: () {},
+                  onClose: () {},
+                  onExpand: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          const FullscreenImageView(path: '/library/shot.heic'),
+                    ),
                   ),
                 ),
               ),
@@ -145,7 +153,8 @@ void main() {
       await tester.tap(find.byIcon(Icons.open_in_full));
       await tester.pumpAndSettle();
       expect(find.byType(InteractiveViewer), findsOneWidget);
-      expect(find.text('HEIC'), findsOneWidget); // placeholder fullscreen
+      // No extractable preview (fake returns null) -> placeholder fullscreen.
+      expect(find.text('HEIC'), findsOneWidget);
     });
   });
 
@@ -339,6 +348,77 @@ void main() {
       expect(find.byIcon(Icons.image_not_supported_outlined), findsNothing);
       // cacheWidth wired through.
       expect(image.image, isA<ResizeImage>());
+    });
+  });
+
+  group('PhotoThumbnail — RAW/HEIC preview extraction', () {
+    testWidgets('shows a spinner, then the extracted JPEG for a RAF', (
+      tester,
+    ) async {
+      final dir = Directory.systemTemp.createTempSync('raw_thumb');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final jpeg = p.join(dir.path, 'extracted.jpg');
+      File(
+        jpeg,
+      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+
+      final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
+      final c = AppController(runner: fake);
+
+      await tester.pumpWidget(
+        _wrap(
+          const PhotoThumbnail(path: '/library/shot.raf', height: 100),
+          controller: c,
+        ),
+      );
+      // First frame: extraction in flight -> spinner, no placeholder.
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsNothing);
+
+      await tester.pumpAndSettle();
+      // Extraction done -> the embedded JPEG renders, spinner gone.
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(Image), findsOneWidget);
+      expect(fake.calls, contains('extractPreview'));
+    });
+
+    testWidgets('falls back to the placeholder when no preview is produced', (
+      tester,
+    ) async {
+      final c = AppController(runner: FakeEngineRunner());
+      await tester.pumpWidget(
+        _wrap(
+          const PhotoThumbnail(path: '/library/shot.raf', height: 100),
+          controller: c,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+      expect(find.text('RAF'), findsOneWidget);
+    });
+  });
+
+  group('FullscreenImageView — RAW preview extraction', () {
+    testWidgets('extracts the full-size preview for a RAF', (tester) async {
+      final dir = Directory.systemTemp.createTempSync('raw_full');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final jpeg = p.join(dir.path, 'full.jpg');
+      File(
+        jpeg,
+      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 16, height: 16)));
+
+      final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
+      final c = AppController(runner: fake);
+
+      await tester.pumpWidget(
+        _wrap(
+          const FullscreenImageView(path: '/library/shot.raf'),
+          controller: c,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
   });
 

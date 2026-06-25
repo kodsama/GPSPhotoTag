@@ -14,6 +14,35 @@ bool isDecodableImage(String path) {
   return _decodableExtensions.contains(ext);
 }
 
+/// Extensions Flutter's `Image` can't decode natively but exiftool can extract
+/// an embedded JPEG preview from — RAW formats plus HEIC/HEIF.
+const _extractableExtensions = {
+  'raf',
+  'nef',
+  'cr2',
+  'cr3',
+  'dng',
+  'arw',
+  'orf',
+  'rw2',
+  'pef',
+  'srw',
+  'raw', //
+  'heic', 'heif',
+};
+
+/// Whether [path] needs an exiftool preview extraction to render: true for RAW
+/// and HEIC/HEIF (which Flutter can't decode but carry an embedded JPEG), false
+/// for natively decodable images (jpg/png/webp/…) and everything else.
+///
+/// Pure, so the gate that decides whether to call the extractor is unit-testable
+/// without a widget tree.
+bool needsPreviewExtraction(String path) {
+  final e = p.extension(path);
+  final ext = e.isEmpty ? '' : e.substring(1).toLowerCase();
+  return _extractableExtensions.contains(ext);
+}
+
 /// The upper-case file-type label for [path] (e.g. `HEIC`, `RAF`), for the
 /// placeholder shown when an image can't be decoded.
 String fileTypeLabel(String path) {

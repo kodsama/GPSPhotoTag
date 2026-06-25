@@ -48,4 +48,10 @@ abstract interface class EngineRunner {
   /// [FileMeta] per path as exiftool yields each chunk. Backs the drill-down
   /// dialog's progressive per-row metadata.
   Stream<FileMeta> readImageMeta(List<String> paths);
+
+  /// Extracts an embedded JPEG preview of [path] (a RAW/HEIC file) on a worker
+  /// isolate via the bundled exiftool, returning the cached JPEG path — or null
+  /// when the file carries no usable embedded image. [full] picks the largest
+  /// preview (fullscreen) vs the small thumbnail (list miniature).
+  Future<String?> extractPreview(String path, {bool full = false});
 }

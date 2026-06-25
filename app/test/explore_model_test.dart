@@ -121,6 +121,32 @@ void main() {
     });
   });
 
+  group('needsPreviewExtraction', () {
+    test('true for RAW and HEIC/HEIF (case-insensitive)', () {
+      for (final ext in [
+        'raf', 'nef', 'cr2', 'cr3', 'dng', 'arw', 'orf', 'rw2', //
+        'pef', 'srw', 'raw', 'heic', 'heif', 'RAF', 'HEIC',
+      ]) {
+        expect(needsPreviewExtraction('/x.$ext'), isTrue, reason: ext);
+      }
+    });
+
+    test('false for natively decodable images and unknown types', () {
+      for (final ext in [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'bmp',
+        'webp',
+        'mov',
+        '',
+      ]) {
+        expect(needsPreviewExtraction('/x.$ext'), isFalse, reason: ext);
+      }
+    });
+  });
+
   group('DetailSelection', () {
     MapPoint multi() => MapPoint(
       latitude: 1,
