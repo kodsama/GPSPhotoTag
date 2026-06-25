@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../explore/photo_detail_panel.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_theme.dart';
@@ -140,6 +141,7 @@ class _FileListDialogState extends State<FileListDialog> {
                           itemBuilder: (context, i) => _FileRow(
                             path: visible[i],
                             supported: widget.supported,
+                            gps: widget.gps,
                             controller: controller,
                           ),
                         ),
@@ -219,11 +221,13 @@ class _FileRow extends StatelessWidget {
   const _FileRow({
     required this.path,
     required this.supported,
+    required this.gps,
     required this.controller,
   });
 
   final String path;
   final bool supported;
+  final bool gps;
   final AppController controller;
 
   @override
@@ -249,13 +253,46 @@ class _FileRow extends StatelessWidget {
             else
               const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                p.basename(path),
-                overflow: TextOverflow.ellipsis,
-                style: text.bodyMedium,
-              ),
+              child: gps
+                  ? Text(
+                      p.basename(path),
+                      overflow: TextOverflow.ellipsis,
+                      style: text.bodyMedium,
+                    )
+                  // Image rows: tapping the filename opens the standalone photo
+                  // preview (thumbnail + metadata + expand), not the map.
+                  : InkWell(
+                      onTap: () => showPhotoPreviewDialog(
+                        context,
+                        path: path,
+                        meta: controller.fileMeta(path),
+                      ),
+                      child: Text(
+                        p.basename(path),
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodyMedium?.copyWith(
+                          decoration: TextDecoration.underline,
+                          decorationColor: scheme.onSurface.withValues(
+                            alpha: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
             ),
-            if (meta?.hasGps ?? false) ...[
+            if ((meta?.hasGps ?? false) && !gps) ...[
+              const SizedBox(width: 6),
+              IconButton(
+                tooltip: 'Explore on map',
+                icon: Icon(Icons.place, size: 16, color: scheme.primary),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  controller.openExploreAt(path);
+                },
+              ),
+            ] else if (meta?.hasGps ?? false) ...[
               const SizedBox(width: 6),
               Icon(Icons.place, size: 16, color: scheme.primary),
             ],

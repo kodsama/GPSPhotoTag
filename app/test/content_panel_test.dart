@@ -181,14 +181,16 @@ void main() {
     expect(find.text('Nothing supported found.'), findsOneWidget);
   });
 
-  testWidgets('tapping a row body toggles selection', (tester) async {
+  testWidgets('the row checkbox toggles selection', (tester) async {
     final c = AppController(runner: FakeEngineRunner());
     final scan = fakeScan(photos: const ['/library/a.jpg']);
     await tester.pumpWidget(_host(c, scan));
     await tester.tap(find.text('JPG'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('a.jpg'));
+    // The checkbox is the unchanged selection control (the filename now opens
+    // the preview instead).
+    await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
     expect(c.isFileIncluded('/library/a.jpg'), isFalse);
   });

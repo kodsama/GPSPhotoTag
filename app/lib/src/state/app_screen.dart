@@ -15,4 +15,7 @@ enum AppScreen {
 
   /// A single focused action flow (tag, map, prune).
   action,
+
+  /// The live, pannable/zoomable Explore map of geotagged photos.
+  explore,
 }

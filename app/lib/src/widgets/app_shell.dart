@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../branding/logo_mark.dart';
 import '../engine/mcp_service.dart';
 import '../screens/action_screen.dart';
+import '../screens/explore_map_screen.dart';
 import '../screens/scanning_screen.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/workspace_screen.dart';
@@ -41,12 +42,7 @@ class _AppShellState extends State<AppShell> {
             children: [
               const _Header(),
               const WarningBanner(),
-              const Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24, 96),
-                  child: _ScreenBody(),
-                ),
-              ),
+              const Expanded(child: _ScreenBody()),
             ],
           ),
           ActivityLogPanel(
@@ -69,12 +65,21 @@ class _ScreenBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
-    return switch (controller.screen) {
-      AppScreen.welcome => const WelcomeScreen(),
-      AppScreen.scanning => const ScanningScreen(),
-      AppScreen.workspace => const WorkspaceScreen(),
-      AppScreen.action => const ActionScreen(),
-    };
+    // The Explore map fills the available height itself (it must not live in a
+    // scroll view); every other screen scrolls inside the standard padding.
+    if (controller.screen == AppScreen.explore) {
+      return const ExploreMapScreen();
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
+      child: switch (controller.screen) {
+        AppScreen.welcome => const WelcomeScreen(),
+        AppScreen.scanning => const ScanningScreen(),
+        AppScreen.workspace => const WorkspaceScreen(),
+        AppScreen.action => const ActionScreen(),
+        AppScreen.explore => const SizedBox.shrink(),
+      },
+    );
   }
 }
 

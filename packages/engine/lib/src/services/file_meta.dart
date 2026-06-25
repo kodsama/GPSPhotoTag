@@ -21,6 +21,8 @@ class FileMeta {
   const FileMeta({
     required this.path,
     this.hasGps = false,
+    this.latitude,
+    this.longitude,
     this.width,
     this.height,
     this.date,
@@ -34,6 +36,12 @@ class FileMeta {
 
   /// Whether the file carries GPS coordinates (image) or any points (source).
   final bool hasGps;
+
+  /// Image GPS latitude in signed decimal degrees, when present.
+  final double? latitude;
+
+  /// Image GPS longitude in signed decimal degrees, when present.
+  final double? longitude;
 
   /// Image pixel width, when known.
   final int? width;
@@ -57,6 +65,8 @@ class FileMeta {
   Map<String, Object?> toJson() => {
     'path': path,
     'hasGps': hasGps,
+    'latitude': latitude,
+    'longitude': longitude,
     'width': width,
     'height': height,
     'date': date?.toIso8601String(),
@@ -70,11 +80,12 @@ class FileMeta {
 ///
 /// Runs exiftool once per [chunk] of paths through the injected [runner]:
 /// `exiftool -json -n -ImageWidth -ImageHeight -DateTimeOriginal -CreateDate
-/// -GPSLatitude PATHS`, parses the JSON array, and yields one [FileMeta] per
-/// path in request order. `hasGps` is true when `GPSLatitude` is present and
-/// non-empty; the date comes from `DateTimeOriginal` falling back to
-/// `CreateDate`, parsed as a naive [DateTime]. Missing fields are tolerated; a
-/// path exiftool omits entirely still yields a bare [FileMeta].
+/// -GPSLatitude -GPSLongitude PATHS`, parses the JSON array, and yields one
+/// [FileMeta] per path in request order. `hasGps` is true (and
+/// [FileMeta.latitude]/[FileMeta.longitude] populated, numeric via `-n`) only
+/// when BOTH coordinates are present; the date comes from `DateTimeOriginal`
+/// falling back to `CreateDate`, parsed as a naive [DateTime]. Missing fields
+/// are tolerated; a path exiftool omits entirely still yields a bare [FileMeta].
 Stream<FileMeta> readImageMeta(
   List<String> paths, {
   required ProcessRunner runner,
@@ -95,6 +106,7 @@ Stream<FileMeta> readImageMeta(
       '-DateTimeOriginal',
       '-CreateDate',
       '-GPSLatitude',
+      '-GPSLongitude',
       ...batch,
     ]);
 
@@ -114,11 +126,14 @@ Stream<FileMeta> readImageMeta(
 
 FileMeta _metaFrom(String path, Map<String, Object?>? fields) {
   if (fields == null) return FileMeta(path: path);
-  final gps = fields['GPSLatitude'];
-  final hasGps = gps != null && '$gps'.trim().isNotEmpty;
+  final lat = _asDouble(fields['GPSLatitude']);
+  final lon = _asDouble(fields['GPSLongitude']);
+  final hasGps = lat != null && lon != null;
   return FileMeta(
     path: path,
     hasGps: hasGps,
+    latitude: hasGps ? lat : null,
+    longitude: hasGps ? lon : null,
     width: _asInt(fields['ImageWidth']),
     height: _asInt(fields['ImageHeight']),
     date: _parseExifDate(fields['DateTimeOriginal'] ?? fields['CreateDate']),
@@ -175,6 +190,15 @@ int? _asInt(Object? v) {
   if (v is int) return v;
   if (v is num) return v.toInt();
   if (v is String) return int.tryParse(v);
+  return null;
+}
+
+double? _asDouble(Object? v) {
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    final s = v.trim();
+    return s.isEmpty ? null : double.tryParse(s);
+  }
   return null;
 }
 

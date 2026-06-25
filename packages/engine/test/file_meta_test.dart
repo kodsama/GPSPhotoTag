@@ -33,6 +33,7 @@ void main() {
             'ImageHeight': 3024,
             'DateTimeOriginal': '2023:07:15 12:30:45',
             'GPSLatitude': 42.5,
+            'GPSLongitude': 18.1,
           },
           {
             'SourceFile': '/lib/b.jpg',
@@ -54,12 +55,52 @@ void main() {
       expect(a.width, 4032);
       expect(a.height, 3024);
       expect(a.hasGps, isTrue);
+      expect(a.latitude, 42.5);
+      expect(a.longitude, 18.1);
       expect(a.date, DateTime(2023, 7, 15, 12, 30, 45));
 
       final b = metas[1];
       expect(b.hasGps, isFalse);
+      expect(b.latitude, isNull);
+      expect(b.longitude, isNull);
       // Falls back to CreateDate when DateTimeOriginal is absent.
       expect(b.date, DateTime(2020, 1, 2, 3, 4, 5));
+    });
+
+    test('requires BOTH coordinates for hasGps (lat-only is no GPS)', () async {
+      final runner = _FakeRunner([
+        jsonEncode([
+          // Latitude present but longitude missing → not GPS.
+          {'SourceFile': '/lib/a.jpg', 'GPSLatitude': 42.5},
+          // Longitude present but latitude missing → not GPS.
+          {'SourceFile': '/lib/b.jpg', 'GPSLongitude': 18.1},
+          // Both present → GPS, parsed numerically.
+          {
+            'SourceFile': '/lib/c.jpg',
+            'GPSLatitude': '-33.87',
+            'GPSLongitude': '151.21',
+          },
+        ]),
+      ]);
+      final metas = await readImageMeta([
+        '/lib/a.jpg',
+        '/lib/b.jpg',
+        '/lib/c.jpg',
+      ], runner: runner).toList();
+      expect(metas[0].hasGps, isFalse);
+      expect(metas[0].latitude, isNull);
+      expect(metas[1].hasGps, isFalse);
+      expect(metas[1].longitude, isNull);
+      expect(metas[2].hasGps, isTrue);
+      expect(metas[2].latitude, -33.87);
+      expect(metas[2].longitude, 151.21);
+    });
+
+    test('requests -GPSLongitude alongside -GPSLatitude', () async {
+      final runner = _FakeRunner([jsonEncode([])]);
+      await readImageMeta(['/lib/a.jpg'], runner: runner).toList();
+      expect(runner.calls.single, contains('-GPSLatitude'));
+      expect(runner.calls.single, contains('-GPSLongitude'));
     });
 
     test('yields a bare meta for paths exiftool omits', () async {
@@ -146,10 +187,19 @@ void main() {
     });
 
     test('toJson round-trips the fields', () {
-      const meta = FileMeta(path: '/p.jpg', hasGps: true, width: 4, height: 3);
+      const meta = FileMeta(
+        path: '/p.jpg',
+        hasGps: true,
+        latitude: 42.5,
+        longitude: 18.1,
+        width: 4,
+        height: 3,
+      );
       final json = meta.toJson();
       expect(json['path'], '/p.jpg');
       expect(json['hasGps'], isTrue);
+      expect(json['latitude'], 42.5);
+      expect(json['longitude'], 18.1);
       expect(json['width'], 4);
       expect(json['height'], 3);
       expect(json['date'], isNull);

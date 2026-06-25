@@ -82,8 +82,8 @@ void main() {
       // Tag has no GPS sources; prune has no RAWs.
       expect(find.text('No GPS sources found'), findsOneWidget);
       expect(find.text('No RAW files found'), findsOneWidget);
-      // Map is ready (1 photo).
-      expect(find.text('1 photos'), findsOneWidget);
+      // Map and Explore are both ready (1 photo).
+      expect(find.text('1 photos'), findsNWidgets(2));
     });
 
     testWidgets('tapping a ready card opens its action', (tester) async {
@@ -97,6 +97,19 @@ void main() {
       expect(controller.screen, AppScreen.action);
       expect(controller.action, LibraryAction.tag);
       expect(find.byType(TagAction), findsOneWidget);
+    });
+
+    testWidgets('tapping the Explore card opens the live map screen', (
+      tester,
+    ) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      await _pump(tester, controller);
+
+      await tester.tap(find.text('Explore on map'));
+      await tester.pump();
+      expect(controller.screen, AppScreen.explore);
     });
 
     testWidgets('Change library returns to welcome', (tester) async {

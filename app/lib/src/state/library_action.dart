@@ -49,6 +49,14 @@ enum LibraryAction {
     description: 'See where your photos were taken.',
   ),
 
+  /// Open a live, pannable/zoomable world map of the geotagged photos.
+  explore(
+    id: 'explore',
+    icon: Icons.travel_explore,
+    title: 'Explore on map',
+    description: 'Browse your geotagged photos on a live, zoomable map.',
+  ),
+
   /// Move RAW files with no JPG/HEIC companion to the Trash.
   pruneRaw(
     id: 'prune_raw',
@@ -83,6 +91,10 @@ enum LibraryAction {
   ActionReadiness readiness(FolderScanResult scan) => switch (this) {
     LibraryAction.tag => _tagReadiness(scan),
     LibraryAction.map =>
+      scan.photoCount > 0
+          ? ActionReadiness.ready('${scan.photoCount} photos')
+          : const ActionReadiness.blocked('No photos found'),
+    LibraryAction.explore =>
       scan.photoCount > 0
           ? ActionReadiness.ready('${scan.photoCount} photos')
           : const ActionReadiness.blocked('No photos found'),

@@ -51,5 +51,7 @@ class ActionScreen extends StatelessWidget {
     LibraryAction.tag => const TagAction(),
     LibraryAction.map => const MapAction(),
     LibraryAction.pruneRaw => const PruneAction(),
+    // Explore is a full screen (AppScreen.explore), never an action panel.
+    LibraryAction.explore => const SizedBox.shrink(),
   };
 }

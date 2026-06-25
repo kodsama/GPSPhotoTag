@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
+import '../explore/explore_model.dart';
 import 'app_screen.dart';
 import 'library_action.dart';
 import 'log_entry.dart';
@@ -99,6 +100,12 @@ class AppController extends ChangeNotifier {
   /// classifies the library (cheap, in-process) so the panel can show a
   /// reviewable, selectable list — nothing is removed until the user confirms.
   void openAction(LibraryAction action) {
+    // The Explore map is a full screen, not an action panel: route it there and
+    // start loading coordinates.
+    if (action == LibraryAction.explore) {
+      openExplore();
+      return;
+    }
     _action = action;
     _resetRun();
     if (action == LibraryAction.pruneRaw) {
@@ -122,6 +129,9 @@ class AppController extends ChangeNotifier {
   void changeLibrary() {
     _sub?.cancel();
     _metaSub?.cancel();
+    _exploreSub?.cancel();
+    _explorePhotos.clear();
+    _exploreLoading = false;
     _scan = null;
     _action = null;
     _resetRun();
@@ -504,6 +514,110 @@ class AppController extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
+  // --- Explore map ---------------------------------------------------------
+
+  final List<ExplorePhoto> _explorePhotos = [];
+  int _exploreLoaded = 0;
+  int _exploreTotal = 0;
+  bool _exploreLoading = false;
+  StreamSubscription<FileMeta>? _exploreSub;
+  String? _exploreFocusPath;
+
+  /// Geotagged photos discovered so far for the Explore map (grows as
+  /// coordinates stream in).
+  List<ExplorePhoto> get explorePhotos => List.unmodifiable(_explorePhotos);
+
+  /// Photos whose metadata has been read so far (for the "loading N/M" chip).
+  int get exploreLoaded => _exploreLoaded;
+
+  /// Total photos being read for the Explore map.
+  int get exploreTotal => _exploreTotal;
+
+  /// Whether coordinates are still streaming in.
+  bool get exploreLoading => _exploreLoading;
+
+  /// A photo path the Explore screen should focus (open its detail) once
+  /// loaded, set by [openExploreAt]. The screen reads and clears it.
+  String? get exploreFocusPath => _exploreFocusPath;
+
+  /// Clears the pending deep-link focus once the screen has consumed it.
+  void clearExploreFocus() => _exploreFocusPath = null;
+
+  /// Opens the Explore map and starts loading every included photo's
+  /// coordinates off the UI isolate. [focusPath], when given, is remembered so
+  /// the screen can open that photo's detail panel.
+  void openExplore({String? focusPath}) {
+    _screen = AppScreen.explore;
+    _exploreFocusPath = focusPath;
+    notifyListeners();
+    _loadExploreCoordinates();
+  }
+
+  /// Deep-links into the Explore map focused on [path] (camera centered +
+  /// zoomed, detail panel open). Threaded from the file-list dialog's pin icon.
+  void openExploreAt(String path) => openExplore(focusPath: path);
+
+  /// Leaves the Explore map, returning to the workspace hub.
+  void closeExplore() {
+    _exploreSub?.cancel();
+    _exploreLoading = false;
+    _screen = AppScreen.workspace;
+    notifyListeners();
+  }
+
+  void _loadExploreCoordinates() {
+    final scan = _scan;
+    if (scan == null) return;
+    final photos = _included(scan.photos);
+    _explorePhotos.clear();
+    _exploreLoaded = 0;
+    _exploreTotal = photos.length;
+    _exploreLoading = photos.isNotEmpty;
+    notifyListeners();
+    if (photos.isEmpty) return;
+
+    // Reuse any coordinates already cached from a drill-down; only read the
+    // rest. Cached ones count as loaded immediately.
+    final pending = <String>[];
+    for (final path in photos) {
+      final cached = _meta[path];
+      if (cached != null) {
+        _exploreLoaded++;
+        final ep = ExplorePhoto.fromMeta(cached);
+        if (ep != null) _explorePhotos.add(ep);
+      } else {
+        pending.add(path);
+      }
+    }
+    if (pending.isEmpty) {
+      _exploreLoading = false;
+      notifyListeners();
+      return;
+    }
+    notifyListeners();
+
+    _exploreSub?.cancel();
+    _exploreSub = _engine
+        .readImageMeta(pending)
+        .listen(
+          (meta) {
+            _meta[meta.path] = meta;
+            _exploreLoaded++;
+            final ep = ExplorePhoto.fromMeta(meta);
+            if (ep != null) _explorePhotos.add(ep);
+            notifyListeners();
+          },
+          onError: (Object _) {
+            _exploreLoading = false;
+            notifyListeners();
+          },
+          onDone: () {
+            _exploreLoading = false;
+            notifyListeners();
+          },
+        );
+  }
+
   // --- Operations ----------------------------------------------------------
 
   /// Number of photos the tag run will process (after exclusions).
@@ -723,6 +837,7 @@ class AppController extends ChangeNotifier {
     _scanSub?.cancel();
     _sub?.cancel();
     _metaSub?.cancel();
+    _exploreSub?.cancel();
     mcp.dispose();
     super.dispose();
   }
@@ -766,6 +881,25 @@ class AppController extends ChangeNotifier {
   @visibleForTesting
   void debugAddLog(String message, {LogLevel level = LogLevel.info}) {
     _log(message, level: level);
+    notifyListeners();
+  }
+
+  /// Seeds the Explore map with [photos] on the explore screen, bypassing the
+  /// isolate-backed coordinate read (tests only).
+  @visibleForTesting
+  void debugSetExplore(
+    List<ExplorePhoto> photos, {
+    String? focusPath,
+    bool loading = false,
+  }) {
+    _screen = AppScreen.explore;
+    _explorePhotos
+      ..clear()
+      ..addAll(photos);
+    _exploreLoaded = photos.length;
+    _exploreTotal = photos.length;
+    _exploreLoading = loading;
+    _exploreFocusPath = focusPath;
     notifyListeners();
   }
 }
