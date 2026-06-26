@@ -1,0 +1,47 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:args/command_runner.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+
+/// `check` — probe for exiftool (RAW-embed / HEIC via exiftool).
+class CheckCommand extends Command<int> {
+  /// Creates the command. [sink] overrides stdout (for tests); [runner]
+  /// overrides how external tools are probed (tests inject a fake so the
+  /// missing-tool path is exercised deterministically).
+  CheckCommand({IOSink? sink, ProcessRunner? runner})
+    : _out = sink ?? stdout,
+      _runner = runner ?? const SystemProcessRunner();
+
+  final IOSink _out;
+  final ProcessRunner _runner;
+
+  @override
+  String get name => 'check';
+
+  @override
+  String get description =>
+      'Report the status of external tools and how to install them.';
+
+  @override
+  Future<int> run() async {
+    final tools = await ToolkitChecker(_runner).check();
+    if (globalResults!.flag('json')) {
+      _out.writeln(
+        jsonEncode({
+          'tools': [for (final t in tools) t.toJson()],
+        }),
+      );
+    } else {
+      for (final t in tools) {
+        final mark = t.present ? '✓' : '✗';
+        final ver = t.version == null ? '' : ' (${t.version})';
+        _out.writeln('$mark ${t.name}$ver — ${t.purpose}');
+        if (!t.present && t.installCommand != null) {
+          _out.writeln('    install: ${t.installCommand}');
+        }
+      }
+    }
+    return 0;
+  }
+}

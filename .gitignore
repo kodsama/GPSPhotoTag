@@ -30,3 +30,27 @@ env/
 
 # Logs
 *.log
+
+# Dart / Flutter (workspace v2.0)
+.dart_tool/
+**/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+app/macos/Flutter/ephemeral/
+app/linux/flutter/ephemeral/
+app/windows/flutter/ephemeral/
+# Keep the root workspace lockfile; ignore per-member stray locks
+packages/*/pubspec.lock
+app/pubspec.lock
+
+# Coverage output
+coverage/
+**/coverage/
+
+# Local build artifacts
+*.dmg
+*.app/
+
+# Vendored exiftool (bundled at build time via tool/fetch-exiftool.sh)
+app/assets/exiftool/

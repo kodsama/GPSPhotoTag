@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Stunda pre-commit hook — mirrors the CI lint/test gate so problems are
+# caught locally before they ever reach GitHub Actions.
+#
+# Enable with:  bash tool/setup-hooks.sh
+#
+# Assumes `dart` and `flutter` are on PATH. Fast-fails: the first failing
+# section aborts the commit immediately.
+
+set -euo pipefail
+
+# Run from the repository root regardless of where git invokes the hook.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+section() {
+  printf '\n\033[1;34m==> %s\033[0m\n' "$1"
+}
+
+fail() {
+  printf '\n\033[1;31m✗ pre-commit failed: %s\033[0m\n' "$1" >&2
+  exit 1
+}
+
+# Source directories to format/check — scoped so generated build/ output is
+# never considered. Keep this list in sync with .github/workflows/ci.yml.
+SRC_DIRS="packages/engine/lib packages/engine/test \
+packages/cli/lib packages/cli/bin packages/cli/test \
+packages/mcp/lib packages/mcp/bin packages/mcp/test \
+app/lib app/test"
+
+section "1/4  dart format (check only)"
+# shellcheck disable=SC2086
+dart format --output=none --set-exit-if-changed $SRC_DIRS \
+  || fail "code is not formatted — run 'dart format \$SRC_DIRS' (see this hook)"
+
+section "2/4  dart analyze (workspace: engine, cli, mcp)"
+dart analyze \
+  || fail "dart analyze reported issues"
+
+section "3/4  flutter analyze (app)"
+( cd app && flutter analyze ) \
+  || fail "flutter analyze reported issues"
+
+section "4/4  tests (engine, cli, mcp via dart test; app via flutter test)"
+dart test packages/engine packages/cli packages/mcp \
+  || fail "dart tests failed"
+( cd app && flutter test ) \
+  || fail "flutter tests failed"
+
+printf '\n\033[1;32m✓ pre-commit passed — all checks green\033[0m\n'

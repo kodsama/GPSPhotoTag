@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Stunda
+GenericName=Photo GPS Tagger
+Comment=Tag photos with GPS coordinates from GPX or Google location history
+Exec=stunda
+Icon=ai.kodsama.Stunda
+Terminal=false
+Categories=Graphics;Photography;
+Keywords=GPS;EXIF;Photo;Geotag;GPX;
+StartupWMClass=stunda

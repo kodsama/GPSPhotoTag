@@ -1,0 +1,51 @@
+# Flatpak manifest for Stunda.
+#
+# Flatpak builds run offline in a sandbox, so this manifest does NOT build
+# Flutter from source. It packages the bundle produced by `flutter build linux`
+# (build/linux/x64/release/bundle) on the host runner.
+#
+# In CI, run `flutter build linux --release ...` first (see release.yml), then
+# point flatpak-builder at this manifest. The `dir` source below picks up the
+# already-built bundle from the repo's app/ build output.
+app-id: ai.kodsama.Stunda
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: stunda
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # Read/write user files so the app can tag photos the user selects.
+  - --filesystem=home
+  # Network access for optional basemap tile downloads when rendering heatmaps.
+  - --share=network
+
+modules:
+  - name: stunda
+    buildsystem: simple
+    build-commands:
+      # Install the pre-built Flutter Linux bundle.
+      - mkdir -p /app/bin /app/lib/stunda
+      - cp -r bundle/* /app/lib/stunda/
+      - ln -s /app/lib/stunda/stunda /app/bin/stunda
+      # Desktop entry, icon and AppStream metadata.
+      - install -Dm644 ai.kodsama.Stunda.desktop
+        /app/share/applications/ai.kodsama.Stunda.desktop
+      - install -Dm644 ai.kodsama.Stunda.metainfo.xml
+        /app/share/metainfo/ai.kodsama.Stunda.metainfo.xml
+      - install -Dm644 icon_256.png
+        /app/share/icons/hicolor/256x256/apps/ai.kodsama.Stunda.png
+    sources:
+      - type: dir
+        path: ../../app/build/linux/x64/release
+      - type: file
+        path: ../linux/ai.kodsama.Stunda.desktop
+      - type: file
+        path: ai.kodsama.Stunda.metainfo.xml
+      # 256px icon derived from app/assets/icon_1024.png (see RELEASE.md).
+      - type: file
+        path: ../linux/icon_256.png

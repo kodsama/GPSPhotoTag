@@ -1,0 +1,131 @@
+name: CI
+
+# Lint + test gate for the Stunda pub workspace (engine, cli, mcp, app).
+# Mirrors .githooks/pre-commit, plus a per-package ≥95% line-coverage gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Pin the toolchain to the versions the repo is developed against.
+env:
+  FLUTTER_VERSION: 3.44.3
+  COVERAGE_MIN: 99
+
+jobs:
+  lint-and-test:
+    name: Lint, test & coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Print toolchain versions
+        run: flutter --version
+
+      # exiftool must be on PATH for the worker-isolate integration tests (they
+      # run the real tool) and so the vendor step bundles a reliable system copy
+      # rather than a downloaded tarball.
+      - name: Install exiftool
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
+      # Resolves the whole workspace (engine, cli, mcp, app) with one lockfile.
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # Vendor exiftool into app/assets/exiftool/ and regenerate the pubspec
+      # asset list, so the declared bundle asset exists for the app tests/build.
+      # Falls back to downloading from exiftool.org when no system exiftool is
+      # present (Ubuntu runners ship libimage-exiftool-perl on most images).
+      - name: Vendor bundled exiftool
+        run: bash tool/fetch-exiftool.sh
+
+      - name: Format check
+        # Scoped to source dirs (kept in sync with .githooks/pre-commit) so
+        # generated build/ output is never considered.
+        run: >
+          dart format --output=none --set-exit-if-changed
+          packages/engine/lib packages/engine/test
+          packages/cli/lib packages/cli/bin packages/cli/test
+          packages/mcp/lib packages/mcp/bin packages/mcp/test
+          app/lib app/test
+
+      - name: Analyze Dart packages (workspace root)
+        run: dart analyze
+
+      - name: Analyze Flutter app
+        working-directory: app
+        run: flutter analyze
+
+      # --- Tests with coverage -------------------------------------------------
+      # Dart packages use package:coverage (dart test --coverage emits a raw
+      # coverage dir; format_coverage turns it into lcov). The Flutter app uses
+      # the built-in `flutter test --coverage`.
+      - name: Activate coverage tooling
+        run: dart pub global activate coverage
+
+      - name: Test engine (with coverage)
+        working-directory: packages/engine
+        run: |
+          dart test --coverage=coverage
+          dart pub global run coverage:format_coverage \
+            --lcov --check-ignore \
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
+
+      - name: Test cli (with coverage)
+        working-directory: packages/cli
+        run: |
+          dart test --coverage=coverage
+          dart pub global run coverage:format_coverage \
+            --lcov --check-ignore \
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
+
+      - name: Test mcp (with coverage)
+        working-directory: packages/mcp
+        run: |
+          dart test --coverage=coverage
+          dart pub global run coverage:format_coverage \
+            --lcov --check-ignore \
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
+
+      - name: Test app (with coverage)
+        working-directory: app
+        run: flutter test --coverage
+
+      # --- Coverage gate (≥95% line coverage per package) ---------------------
+      - name: Coverage gate — engine
+        run: bash tool/check_coverage.sh packages/engine/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Coverage gate — cli
+        run: bash tool/check_coverage.sh packages/cli/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Coverage gate — mcp
+        run: bash tool/check_coverage.sh packages/mcp/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Coverage gate — app
+        run: bash tool/check_coverage.sh app/coverage/lcov.info "${COVERAGE_MIN}"
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov-reports
+          path: |
+            packages/engine/coverage/lcov.info
+            packages/cli/coverage/lcov.info
+            packages/mcp/coverage/lcov.info
+            app/coverage/lcov.info
+          if-no-files-found: warn
