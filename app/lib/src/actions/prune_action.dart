@@ -4,15 +4,17 @@ import 'package:path/path.dart' as p;
 
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
+import '../state/prune_direction.dart';
 import '../widgets/run_view.dart';
 
-/// The Remove-orphan-RAWs flow.
+/// The Match-Images-to-RAW flow.
 ///
 /// Destructive actions preview first, then confirm: opening this action does
 /// NOT delete anything. It shows a reviewable, filterable, selectable list of
-/// every classified photo (orphan RAWs pre-selected), and only after the user
-/// confirms a dialog does it move the selected files to the Trash. Live
-/// progress and a result summary follow, then a back-to-library affordance.
+/// every classified photo, with a direction toggle choosing which orphans are
+/// trashable (orphan RAWs, or orphan images). Only after the user confirms a
+/// dialog does it move the selected files to the Trash. Live progress and a
+/// result summary follow, then a back-to-library affordance.
 class PruneAction extends StatelessWidget {
   /// Creates the prune action body.
   const PruneAction({super.key});
@@ -45,8 +47,8 @@ class PruneAction extends StatelessWidget {
   }
 }
 
-/// The preview/review surface: summary header, filter row, scrollable list, and
-/// the confirm-gated primary button.
+/// The preview/review surface: direction toggle, summary header, filter row,
+/// scrollable list, and the confirm-gated primary button.
 class _Review extends StatelessWidget {
   const _Review({required this.controller});
 
@@ -68,10 +70,11 @@ class _Review extends StatelessWidget {
           ErrorBanner(message: controller.errorMessage!),
           const SizedBox(height: 14),
         ],
+        _DirectionToggle(controller: controller),
+        const SizedBox(height: 12),
         Text(
           'Nothing is removed until you review the list below and confirm. '
-          'RAW files with no JPG/HEIC companion anywhere in the library are '
-          'pre-selected.',
+          '${controller.pruneDirection.description}',
           style: text.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -90,6 +93,33 @@ class _Review extends StatelessWidget {
         const SizedBox(height: 20),
         _ConfirmButton(controller: controller),
       ],
+    );
+  }
+}
+
+/// The A/B direction selector: which orphans are selectable and trashed.
+class _DirectionToggle extends StatelessWidget {
+  const _DirectionToggle({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<PruneDirection>(
+      segments: const [
+        ButtonSegment(
+          value: PruneDirection.removeOrphanRaws,
+          label: Text('Remove orphan RAWs'),
+          icon: Icon(Icons.raw_on, size: 18),
+        ),
+        ButtonSegment(
+          value: PruneDirection.removeOrphanImages,
+          label: Text('Remove orphan images'),
+          icon: Icon(Icons.image_outlined, size: 18),
+        ),
+      ],
+      selected: {controller.pruneDirection},
+      onSelectionChanged: (s) => controller.setPruneDirection(s.first),
     );
   }
 }
@@ -119,7 +149,7 @@ class _FilterRow extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            // Orphan RAWs — the selectable deletion candidates (default on).
+            // Orphan RAWs — selectable deletion candidates in direction A.
             FilterChip(
               label: const Text('Orphan RAWs'),
               selected: controller.isKindVisible(PairKind.orphanRaw),
@@ -138,6 +168,7 @@ class _FilterRow extends StatelessWidget {
                 controller.setKindVisible(PairKind.photoWithRaw, v);
               },
             ),
+            // Orphan images — selectable deletion candidates in direction B.
             FilterChip(
               label: const Text('Photos without RAW'),
               selected: controller.isKindVisible(PairKind.photoWithoutRaw),
@@ -151,7 +182,7 @@ class _FilterRow extends StatelessWidget {
   }
 }
 
-/// A "select all / none" affordance for the orphan candidates.
+/// A "select all / none" affordance for the active direction's candidates.
 class _SelectAll extends StatelessWidget {
   const _SelectAll({required this.controller});
 
@@ -159,28 +190,28 @@ class _SelectAll extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orphans = controller.pairing?.orphanCount ?? 0;
+    final candidates = controller.pruneCandidateCount;
     final selected = controller.selectedCount;
     final text = Theme.of(context).textTheme;
+    final noun = controller.pruneDirection == PruneDirection.removeOrphanRaws
+        ? 'orphan RAWs'
+        : 'orphan images';
     return Row(
       children: [
         Checkbox(
-          value: orphans == 0
+          value: candidates == 0
               ? false
-              : selected == orphans
+              : selected == candidates
               ? true
               : selected == 0
               ? false
               : null,
           tristate: true,
-          onChanged: orphans == 0
+          onChanged: candidates == 0
               ? null
-              : (_) => controller.selectAllOrphans(selected != orphans),
+              : (_) => controller.selectAllCandidates(selected != candidates),
         ),
-        Text(
-          '$selected of $orphans orphan RAWs selected',
-          style: text.bodySmall,
-        ),
+        Text('$selected of $candidates $noun selected', style: text.bodySmall),
       ],
     );
   }
@@ -226,7 +257,7 @@ class _FileList extends StatelessWidget {
   }
 }
 
-/// One review row: filename, a small kind tag, and (for orphans) a checkbox.
+/// One review row: filename, a small kind tag, and (for targets) a checkbox.
 class _FileRow extends StatelessWidget {
   const _FileRow({required this.controller, required this.file});
 
@@ -236,15 +267,15 @@ class _FileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final isOrphan = file.kind == PairKind.orphanRaw;
+    final isTarget = file.kind == controller.pruneDirection.target;
     final selected = controller.selectedPaths.contains(file.path);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Row(
         children: [
-          // Only orphan RAWs are selectable; context rows show a placeholder so
-          // names stay aligned.
-          if (isOrphan)
+          // Only the active direction's candidates are selectable; context rows
+          // show a placeholder so names stay aligned.
+          if (isTarget)
             Checkbox(
               value: selected,
               onChanged: (v) =>
@@ -260,23 +291,24 @@ class _FileRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _KindTag(kind: file.kind),
+          _KindTag(kind: file.kind, emphasised: isTarget),
         ],
       ),
     );
   }
 }
 
-/// A small coloured tag naming a [PairKind].
+/// A small coloured tag naming a [PairKind]; the [emphasised] target is red.
 class _KindTag extends StatelessWidget {
-  const _KindTag({required this.kind});
+  const _KindTag({required this.kind, required this.emphasised});
 
   final PairKind kind;
+  final bool emphasised;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = kind == PairKind.orphanRaw ? scheme.error : scheme.outline;
+    final color = emphasised ? scheme.error : scheme.outline;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -317,7 +349,7 @@ class _ConfirmButton extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Move $n RAW files to the Trash?'),
+        title: Text('Move $n files to the Trash?'),
         content: const Text('You can restore them from the Trash.'),
         actions: [
           TextButton(

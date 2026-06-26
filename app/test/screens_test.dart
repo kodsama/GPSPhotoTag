@@ -11,6 +11,7 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/state/prune_direction.dart';
 import 'package:stunda/src/screens/workspace_screen.dart';
 import 'package:stunda/src/widgets/action_card.dart';
 import 'package:stunda/src/widgets/status_pill.dart';
@@ -67,7 +68,7 @@ void main() {
       expect(find.byType(ActionCard), findsNWidgets(LibraryAction.all.length));
       expect(find.text('Tag with GPS'), findsOneWidget);
       expect(find.text('Explore on map'), findsOneWidget);
-      expect(find.text('Remove orphan RAWs'), findsOneWidget);
+      expect(find.text('Match Images to RAW'), findsOneWidget);
       expect(find.text('Generate map'), findsNothing);
 
       // Content panel groups unsupported files.
@@ -421,6 +422,51 @@ void main() {
       expect(find.text('lonely.jpg'), findsOneWidget);
     });
 
+    testWidgets(
+      'switching direction re-targets the selectable category and trash set',
+      (tester) async {
+        final fake = FakeEngineRunner(
+          events: const [
+            DoneEvent({'pruned_trashed': 1}),
+          ],
+        );
+        final controller = AppController(runner: fake)
+          ..debugSetToolkit([_tool('exiftool')])
+          ..debugSetScan(
+            fakeScan(
+              photos: const [
+                '/library/orphan.raf', // orphan RAW (A target)
+                '/library/lonely.jpg', // orphan image (B target)
+              ],
+            ),
+          )
+          ..debugSetScreen(AppScreen.action, action: LibraryAction.pruneRaw);
+        await _pump(tester, controller);
+
+        // Direction A: orphan RAW is selected and shown; the image is hidden.
+        expect(controller.pruneDirection, PruneDirection.removeOrphanRaws);
+        expect(find.text('orphan.raf'), findsOneWidget);
+        expect(find.text('lonely.jpg'), findsNothing);
+        expect(find.text('Move 1 selected to Trash'), findsOneWidget);
+
+        // Flip to direction B via the segmented button.
+        await tester.tap(find.text('Remove orphan images'));
+        await tester.pumpAndSettle();
+        expect(controller.pruneDirection, PruneDirection.removeOrphanImages);
+        expect(controller.selectedPaths, {'/library/lonely.jpg'});
+        expect(find.text('lonely.jpg'), findsOneWidget);
+        expect(find.text('orphan.raf'), findsNothing);
+        expect(find.text('Move 1 selected to Trash'), findsOneWidget);
+
+        // Confirm -> trashes exactly the orphan image, not the RAW.
+        await tester.tap(find.text('Move 1 selected to Trash'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Move to Trash'));
+        await tester.pumpAndSettle();
+        expect(fake.lastTrashedPaths, ['/library/lonely.jpg']);
+      },
+    );
+
     testWidgets('cancelling the confirm dialog trashes nothing', (
       tester,
     ) async {
@@ -430,7 +476,7 @@ void main() {
 
       await tester.tap(find.text('Move 1 selected to Trash'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Move 1 RAW files'), findsOneWidget);
+      expect(find.textContaining('Move 1 files'), findsOneWidget);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();

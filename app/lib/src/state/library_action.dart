@@ -49,12 +49,13 @@ enum LibraryAction {
     description: 'Browse your geotagged photos on a live, zoomable map.',
   ),
 
-  /// Move RAW files with no JPG/HEIC companion to the Trash.
+  /// Match images to RAW: trash orphan RAWs or orphan images (the review's
+  /// direction toggle picks which side).
   pruneRaw(
     id: 'prune_raw',
     icon: Icons.cleaning_services_outlined,
-    title: 'Remove orphan RAWs',
-    description: 'Move RAW files with no JPG/HEIC partner to the Trash.',
+    title: 'Match Images to RAW',
+    description: 'Trash RAW files or photos that have no matching partner.',
   );
 
   const LibraryAction({

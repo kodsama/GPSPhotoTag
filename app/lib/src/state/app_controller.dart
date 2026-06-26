@@ -16,6 +16,7 @@ import 'app_screen.dart';
 import 'library_action.dart';
 import 'library_roots.dart';
 import 'log_entry.dart';
+import 'prune_direction.dart';
 
 /// The single source of truth for the Stunda GUI.
 ///
@@ -864,18 +865,30 @@ class AppController extends ChangeNotifier {
   RawPairing? _pairing;
   final Set<String> _selected = {};
   String _pruneFilter = '';
-  // Which pair kinds are visible in the review list. Candidates (orphan RAWs)
-  // are on by default; context rows are off to keep the list focused.
+  // The trash direction: A (orphan RAWs) by default, B (orphan images).
+  PruneDirection _direction = PruneDirection.removeOrphanRaws;
+  // Which pair kinds are visible in the review list. The direction's target
+  // category is on by default; context rows are off to keep the list focused.
   final Set<PairKind> _visibleKinds = {PairKind.orphanRaw};
 
   /// The classified library for the prune review, or null when not reviewing.
   RawPairing? get pairing => _pairing;
 
-  /// The orphan-RAW paths currently selected for trashing.
+  /// The active trash direction (which category is selectable/trashed).
+  PruneDirection get pruneDirection => _direction;
+
+  /// The paths currently selected for trashing (the direction's target kind).
   Set<String> get selectedPaths => Set.unmodifiable(_selected);
 
-  /// Number of orphan RAWs selected for trashing.
+  /// Number of files selected for trashing.
   int get selectedCount => _selected.length;
+
+  /// All trashable candidates under the active direction, in scan order.
+  List<String> get pruneCandidates =>
+      _pairing == null ? const [] : trashCandidates(_pairing!, _direction);
+
+  /// Number of trashable candidates under the active direction.
+  int get pruneCandidateCount => pruneCandidates.length;
 
   /// The current filename filter (case-insensitive substring).
   String get pruneFilter => _pruneFilter;
@@ -883,21 +896,42 @@ class AppController extends ChangeNotifier {
   /// Whether [kind] rows are shown in the review list.
   bool isKindVisible(PairKind kind) => _visibleKinds.contains(kind);
 
-  /// Classifies the scanned library and pre-selects every orphan RAW.
+  /// Classifies the scanned library and pre-selects the direction's candidates.
   ///
   /// Cheap and pure (no I/O): [classifyPairing] is O(n) over the scan's photo
-  /// paths. Pre-selecting orphans matches the user's default intent while still
-  /// letting them deselect before confirming.
+  /// paths. Resets to direction A and pre-selects its candidates, matching the
+  /// user's default intent while still letting them deselect before confirming.
   void _preparePruneReview() {
     final scan = _scan;
     _pairing = scan == null ? null : classifyPairing(scan.photos);
-    _selected
-      ..clear()
-      ..addAll(_pairing?.orphanRaws ?? const []);
+    _direction = PruneDirection.removeOrphanRaws;
     _pruneFilter = '';
     _visibleKinds
       ..clear()
-      ..add(PairKind.orphanRaw);
+      ..add(_direction.target);
+    _resetSelectionToCandidates();
+  }
+
+  /// Replaces the selection with every candidate of the active direction.
+  void _resetSelectionToCandidates() {
+    _selected
+      ..clear()
+      ..addAll(pruneCandidates);
+  }
+
+  /// Switches the trash direction, recomputing the selectable category.
+  ///
+  /// Resets the visible-kinds to emphasise the new target and re-selects all of
+  /// its candidates, so the count, description, and trash set all follow the
+  /// chosen direction.
+  void setPruneDirection(PruneDirection direction) {
+    if (_direction == direction) return;
+    _direction = direction;
+    _visibleKinds
+      ..clear()
+      ..add(direction.target);
+    _resetSelectionToCandidates();
+    notifyListeners();
   }
 
   /// The review rows after applying the visible-kind toggles and filename
@@ -932,7 +966,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggles whether a single orphan-RAW [path] is selected for trashing.
+  /// Toggles whether a single candidate [path] is selected for trashing.
   void toggleSelected(String path, bool selected) {
     if (selected) {
       _selected.add(path);
@@ -942,14 +976,14 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Selects ([all] true) or clears every orphan RAW.
-  void selectAllOrphans(bool all) {
+  /// Selects ([all] true) or clears every candidate of the active direction.
+  void selectAllCandidates(bool all) {
     _selected.clear();
-    if (all) _selected.addAll(_pairing?.orphanRaws ?? const []);
+    if (all) _selected.addAll(pruneCandidates);
     notifyListeners();
   }
 
-  /// Trashes the user-selected orphan RAWs after an explicit confirm.
+  /// Trashes the user-selected candidates after an explicit confirm.
   ///
   /// Only reached once the user has reviewed the preview and confirmed — the
   /// destructive-actions-preview-first principle. Sends exactly the selected
@@ -959,7 +993,7 @@ class AppController extends ChangeNotifier {
     final paths = _selected.toList(growable: false);
     return _consume(
       _engine.trashPaths(paths),
-      startMessage: 'Moving ${paths.length} RAW file(s) to Trash…',
+      startMessage: 'Moving ${paths.length} file(s) to Trash…',
       total: paths.length,
     );
   }

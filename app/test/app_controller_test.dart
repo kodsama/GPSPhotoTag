@@ -8,6 +8,7 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_prefs.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/state/prune_direction.dart';
 
 import 'support/fakes.dart';
 
@@ -286,14 +287,47 @@ void main() {
         ..openAction(LibraryAction.pruneRaw);
 
       expect(c.selectedCount, 2);
-      c.selectAllOrphans(false);
+      c.selectAllCandidates(false);
       expect(c.selectedCount, 0);
       c.toggleSelected('/library/x.raf', true);
       expect(c.selectedPaths, {'/library/x.raf'});
       c.toggleSelected('/library/x.raf', false);
       expect(c.selectedPaths, isEmpty);
-      c.selectAllOrphans(true);
+      c.selectAllCandidates(true);
       expect(c.selectedCount, 2);
+    });
+
+    test('direction B targets orphan images and resets the selection', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(
+          fakeScan(
+            photos: const [
+              '/library/a.raf', // orphan RAW
+              '/library/b.raf', // paired RAW
+              '/library/b.jpg', // photo with RAW
+              '/library/c.jpg', // orphan image
+            ],
+          ),
+        )
+        ..openAction(LibraryAction.pruneRaw);
+
+      // Direction A (default): orphan RAWs are the candidates.
+      expect(c.pruneDirection, PruneDirection.removeOrphanRaws);
+      expect(c.selectedPaths, {'/library/a.raf'});
+      expect(c.isKindVisible(PairKind.orphanRaw), isTrue);
+
+      // Switching to B re-targets orphan images, resets selection + visibility.
+      c.setPruneDirection(PruneDirection.removeOrphanImages);
+      expect(c.pruneDirection, PruneDirection.removeOrphanImages);
+      expect(c.selectedPaths, {'/library/c.jpg'});
+      expect(c.isKindVisible(PairKind.photoWithoutRaw), isTrue);
+      expect(c.isKindVisible(PairKind.orphanRaw), isFalse);
+
+      // Setting the same direction again is a no-op (no re-selection churn).
+      c
+        ..selectAllCandidates(false)
+        ..setPruneDirection(PruneDirection.removeOrphanImages);
+      expect(c.selectedPaths, isEmpty);
     });
 
     test('runTrashSelected sends exactly the selected paths', () async {
@@ -305,7 +339,7 @@ void main() {
         ..openAction(LibraryAction.pruneRaw);
 
       c
-        ..selectAllOrphans(false)
+        ..selectAllCandidates(false)
         ..toggleSelected('/library/x.raf', true);
       await c.runTrashSelected();
 
@@ -318,7 +352,7 @@ void main() {
       final c = AppController(runner: fake)
         ..debugSetScan(fakeScan(photos: const ['/library/x.raf']))
         ..openAction(LibraryAction.pruneRaw)
-        ..selectAllOrphans(false);
+        ..selectAllCandidates(false);
       await c.runTrashSelected();
       expect(fake.calls, isEmpty);
     });
