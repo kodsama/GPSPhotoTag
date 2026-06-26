@@ -71,13 +71,32 @@ vendor_from_system() {
 }
 
 vendor_from_download() {
-  local ver tar
+  local ver workdir tar got u src pm
   ver="$(curl -fsSL https://exiftool.org/ver.txt 2>/dev/null || true)"
-  [ -n "$ver" ] || return 1
-  tar="$(mktemp -d)/et.tgz"
-  curl -fsSL "https://exiftool.org/Image-ExifTool-${ver}.tar.gz" -o "$tar" || return 1
-  tar xzf "$tar" -C "$(dirname "$tar")"
-  local src="$(dirname "$tar")/Image-ExifTool-${ver}"
+  workdir="$(mktemp -d)"
+  tar="$workdir/et.tgz"
+  # Try the official site (only ever hosts the current version), then the
+  # GitHub tag tarball (a stable mirror that keeps every release), then the
+  # GitHub master snapshot as a last resort. exiftool.org 404s the moment a
+  # newer version ships, so it cannot be the only source.
+  local urls=()
+  if [ -n "$ver" ]; then
+    urls+=("https://exiftool.org/Image-ExifTool-${ver}.tar.gz")
+    urls+=("https://github.com/exiftool/exiftool/archive/refs/tags/${ver}.tar.gz")
+  fi
+  urls+=("https://github.com/exiftool/exiftool/archive/refs/heads/master.tar.gz")
+  got=""
+  for u in "${urls[@]}"; do
+    if curl -fsSL "$u" -o "$tar"; then echo "downloaded $u"; got=1; break; fi
+  done
+  [ -n "$got" ] || return 1
+  tar xzf "$tar" -C "$workdir"
+  # Locate the distribution root generically (tarball layouts differ:
+  # Image-ExifTool-<ver>/ vs exiftool-<ver>/ vs exiftool-master/).
+  pm="$(find "$workdir" -type f -path '*/Image/ExifTool.pm' | head -1)"
+  [ -n "$pm" ] || return 1
+  src="${pm%/lib/Image/ExifTool.pm}"
+  [ -f "$src/exiftool" ] || return 1
   cp "$src/exiftool" "$DEST/exiftool"; chmod +x "$DEST/exiftool"
   cp -R "$src/lib/." "$DEST/lib/"
   return 0
