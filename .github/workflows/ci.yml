@@ -66,34 +66,34 @@ jobs:
         run: dart pub global activate coverage
 
       - name: Test engine (with coverage)
+        working-directory: packages/engine
         run: |
-          dart test --coverage=coverage packages/engine
+          dart test --coverage=coverage
           dart pub global run coverage:format_coverage \
             --lcov --check-ignore \
-            --in=packages/engine/coverage \
-            --out=packages/engine/coverage/lcov.info \
-            --report-on=packages/engine/lib
-        working-directory: packages/engine
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
 
       - name: Test cli (with coverage)
+        working-directory: packages/cli
         run: |
-          dart test --coverage=coverage packages/cli
+          dart test --coverage=coverage
           dart pub global run coverage:format_coverage \
             --lcov --check-ignore \
-            --in=packages/cli/coverage \
-            --out=packages/cli/coverage/lcov.info \
-            --report-on=packages/cli/lib
-        working-directory: packages/cli
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
 
       - name: Test mcp (with coverage)
+        working-directory: packages/mcp
         run: |
-          dart test --coverage=coverage packages/mcp
+          dart test --coverage=coverage
           dart pub global run coverage:format_coverage \
             --lcov --check-ignore \
-            --in=packages/mcp/coverage \
-            --out=packages/mcp/coverage/lcov.info \
-            --report-on=packages/mcp/lib
-        working-directory: packages/mcp
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
 
       - name: Test app (with coverage)
         working-directory: app
