@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
 import '../explore/explore_model.dart';
+import 'action_run_state.dart';
 import 'app_prefs.dart';
 import 'app_screen.dart';
 import 'duplicates_model.dart';
@@ -175,9 +177,14 @@ class AppController extends ChangeNotifier {
   /// The action whose focused panel is open (only on [AppScreen.action]).
   LibraryAction? get action => _action;
 
-  /// Opens the focused panel for [action] (resets any prior run state).
+  /// Opens the focused panel for [action], clearing its attention badge.
   ///
-  /// Destructive actions preview first: opening [LibraryAction.pruneRaw]
+  /// A background run keeps going across navigation, so opening an action that
+  /// is still running (or has finished and is waiting to be reviewed) returns to
+  /// its live progress / results rather than resetting it. Only an idle action
+  /// is reset to a fresh pre-run state.
+  ///
+  /// Destructive actions preview first: opening an idle [LibraryAction.pruneRaw]
   /// classifies the library (cheap, in-process) so the panel can show a
   /// reviewable, selectable list — nothing is removed until the user confirms.
   void openAction(LibraryAction action) {
@@ -188,23 +195,38 @@ class AppController extends ChangeNotifier {
       return;
     }
     _action = action;
-    _resetRun();
-    _duplicatePairs = null;
-    _findingDuplicates = false;
-    _hashProgress = HashProgress();
-    if (action == LibraryAction.pruneRaw) {
-      _preparePruneReview();
-    } else {
-      _pairing = null;
+    // Opening the action is the user's acknowledgement: clear its badge.
+    _clearAttention(action);
+    final state = _runStates[action] ?? ActionRunState.idle;
+    // A running or to-be-reviewed action keeps its live state; only a truly
+    // idle action is reset to a fresh pre-run surface.
+    if (!state.running && !state.needsReview) {
+      _resetRun();
+      _duplicatePairs = null;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      if (action == LibraryAction.pruneRaw) {
+        _preparePruneReview();
+      } else {
+        _pairing = null;
+      }
     }
     _screen = AppScreen.action;
     notifyListeners();
   }
 
-  /// Returns from an action panel to the workspace hub.
+  /// Returns from an action panel to the workspace hub WITHOUT cancelling any
+  /// run — the run keeps going in the background and its card shows progress.
+  ///
+  /// The live run fields are only reset when the action being left is idle, so a
+  /// finished-and-reviewed action returns to a clean slate next time.
   void backToLibrary() {
+    final action = _action;
+    final state = action == null
+        ? ActionRunState.idle
+        : (_runStates[action] ?? ActionRunState.idle);
     _action = null;
-    _resetRun();
+    if (!state.running) _resetRun();
     _screen = AppScreen.workspace;
     notifyListeners();
   }
@@ -220,6 +242,10 @@ class AppController extends ChangeNotifier {
     _roots.clear();
     _action = null;
     _resetRun();
+    _runStates.clear();
+    _activeAction = null;
+    _duplicatesCancelled = true;
+    _findingDuplicates = false;
     _excludedFiles.clear();
     _meta.clear();
     _metaLoading.clear();
@@ -533,6 +559,93 @@ class AppController extends ChangeNotifier {
     dryRun: _dryRun,
   );
 
+  // --- Per-action background run state -------------------------------------
+
+  /// The lifecycle phase of every action's background run, keyed by action.
+  /// Drives the workspace cards' progress ring and attention badge. An action
+  /// absent from the map is [ActionRunState.idle].
+  final Map<LibraryAction, ActionRunState> _runStates = {};
+
+  /// The action whose stream-backed run is currently consuming events, or null.
+  LibraryAction? _activeAction;
+
+  /// The background run state for [action] (idle when never run).
+  ActionRunState runStateFor(LibraryAction action) =>
+      _runStates[action] ?? ActionRunState.idle;
+
+  /// Whether ANY action's background run is currently in flight. Pure getter so
+  /// the close-while-running guard is testable.
+  bool get anyRunning => _runStates.values.any((s) => s.running);
+
+  /// The actions whose finished run is waiting to be reviewed (badge showing).
+  Set<LibraryAction> get actionsNeedingReview => {
+    for (final entry in _runStates.entries)
+      if (entry.value.attention) entry.key,
+  };
+
+  /// Sets [action]'s run state and notifies. Idle entries are dropped to keep
+  /// the map small and equality simple.
+  void _setRunState(LibraryAction action, ActionRunState state) {
+    if (state == ActionRunState.idle) {
+      _runStates.remove(action);
+    } else {
+      _runStates[action] = state;
+    }
+    notifyListeners();
+  }
+
+  /// Clears [action]'s attention badge (called when the user opens it).
+  void _clearAttention(LibraryAction action) {
+    final state = _runStates[action];
+    if (state == null || !state.needsReview) return;
+    _runStates.remove(action);
+  }
+
+  /// Cancels the running action's worker(s) and marks it idle.
+  ///
+  /// Cancelling the (sole) stream subscription tears down the worker isolate via
+  /// the runner's `onCancel`, so further events are ignored and nothing keeps
+  /// running. A cancelled run leaves no partial destructive side effects — trash
+  /// runs act atomically inside the worker, so cancelling before they finish
+  /// simply stops them.
+  void cancelAction(LibraryAction action) {
+    if (!runStateFor(action).running) return;
+    if (action == _activeAction) {
+      _sub?.cancel();
+      _sub = null;
+      _activeAction = null;
+      _running = false;
+      // A cancelled subscription never fires onDone, so settle the run's Future
+      // here — otherwise callers awaiting runTag()/etc. hang forever.
+      if (_runCompleter?.isCompleted == false) _runCompleter!.complete();
+      _runCompleter = null;
+    }
+    if (action == LibraryAction.duplicates) {
+      // The hashing future can't be force-stopped, but flagging it cancelled
+      // makes the controller ignore its result and reset its live state.
+      _duplicatesCancelled = true;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+    }
+    _setRunState(action, ActionRunState.idle);
+  }
+
+  /// The exit response for a quit/close request: cancel it while any action is
+  /// running (so the user must stop it first), otherwise allow it. Pure so the
+  /// close-while-running guard is testable without the OS exit plumbing.
+  AppExitResponse get exitDecision =>
+      anyRunning ? AppExitResponse.cancel : AppExitResponse.exit;
+
+  /// Cancels whichever action is currently running, if any.
+  void cancelActiveRun() {
+    for (final action in LibraryAction.all) {
+      if (runStateFor(action).running) {
+        cancelAction(action);
+        return;
+      }
+    }
+  }
+
   // --- Run state -----------------------------------------------------------
 
   int _done = 0;
@@ -542,6 +655,10 @@ class AppController extends ChangeNotifier {
   final List<PhotoRow> _rows = [];
   Map<String, int>? _lastSummary;
   StreamSubscription<EngineEvent>? _sub;
+
+  /// Completes the Future returned by the active stream run ([_consume]); kept so
+  /// [cancelAction] can settle it (a cancelled subscription never fires onDone).
+  Completer<void>? _runCompleter;
 
   /// Items completed so far in the current/last run.
   int get done => _done;
@@ -857,10 +974,12 @@ class AppController extends ChangeNotifier {
         googleFiles: _included(scan.googleFiles),
         options: buildTagOptions(),
       ),
+      owner: LibraryAction.tag,
       startMessage: _dryRun
           ? 'Previewing ${photos.length} photo(s)…'
           : 'Tagging ${photos.length} photo(s)…',
       total: photos.length,
+      reviewOnDone: true,
     );
   }
 
@@ -997,8 +1116,10 @@ class AppController extends ChangeNotifier {
     final paths = _selected.toList(growable: false);
     return _consume(
       _engine.trashPaths(paths),
+      owner: LibraryAction.pruneRaw,
       startMessage: 'Moving ${paths.length} file(s) to Trash…',
       total: paths.length,
+      reviewOnDone: true,
     );
   }
 
@@ -1008,6 +1129,9 @@ class AppController extends ChangeNotifier {
   bool _findingDuplicates = false;
   HashProgress _hashProgress = HashProgress();
   List<DuplicatePair>? _duplicatePairs;
+  // Set when the user cancels a hashing run so its (unstoppable) result Future
+  // is ignored instead of folded into reviewable pairs.
+  bool _duplicatesCancelled = false;
 
   /// The similarity slider value (0 = Exact, [similaritySteps] = Loose).
   int get similarity => _similarity;
@@ -1052,30 +1176,58 @@ class AppController extends ChangeNotifier {
     if (scan == null) return;
     final photos = _included(scan.photos);
     _findingDuplicates = true;
+    _duplicatesCancelled = false;
     _hashProgress = HashProgress(total: photos.length);
     _duplicatePairs = null;
     _errorMessage = null;
     _log('Hashing ${photos.length} photo(s) for duplicates…');
-    notifyListeners();
+    // A determinate run: the total is known up front, so the card ring tracks
+    // the hashing fraction.
+    _setRunState(
+      LibraryAction.duplicates,
+      ActionRunState.active(progress: photos.isEmpty ? null : 0),
+    );
     try {
       final groups = await _engine.findDuplicates(
         photos,
         threshold: similarityToThreshold(_similarity),
         onProgress: (done, total) {
+          if (_duplicatesCancelled) return;
           _hashProgress = HashProgress(done: done, total: total);
-          notifyListeners();
+          _setRunState(
+            LibraryAction.duplicates,
+            ActionRunState.active(progress: _hashProgress.fraction),
+          );
         },
       );
+      // A run the user cancelled mid-flight discards its result entirely.
+      if (_duplicatesCancelled) return;
       _duplicatePairs = pairsFromGroups(groups);
       _log('Found ${groups.length} duplicate group(s)');
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      // Finishing with matches pulses the card's attention badge — unless the
+      // user is watching this action (the results render in-panel) or none were
+      // found, in which case it returns to idle.
+      final watching =
+          _screen == AppScreen.action && _action == LibraryAction.duplicates;
+      _setRunState(
+        LibraryAction.duplicates,
+        (_duplicatePairs!.isEmpty || watching)
+            ? ActionRunState.idle
+            : ActionRunState.review(
+                summary: '${_duplicatePairs!.length} duplicate pair(s)',
+              ),
+      );
     } on Object catch (e) {
+      if (_duplicatesCancelled) return;
       _errorMessage = '$e';
       _duplicatePairs = const [];
       _log('Duplicate scan failed: $e', level: LogLevel.error);
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      _setRunState(LibraryAction.duplicates, ActionRunState.idle);
     }
-    _findingDuplicates = false;
-    _hashProgress = HashProgress();
-    notifyListeners();
   }
 
   /// Toggles whether the right-side file of the pair at [index] is selected for
@@ -1102,8 +1254,10 @@ class AppController extends ChangeNotifier {
     if (paths.isEmpty) return Future.value();
     return _consume(
       _engine.trashPaths(paths),
+      owner: LibraryAction.duplicates,
       startMessage: 'Moving ${paths.length} duplicate(s) to Trash…',
       total: paths.length,
+      reviewOnDone: true,
     );
   }
 
@@ -1116,12 +1270,23 @@ class AppController extends ChangeNotifier {
   }
 
   /// Subscribes to [events], resetting run state and folding each event in.
+  ///
+  /// [owner] is the action this run belongs to: its [ActionRunState] is moved to
+  /// running for the card's progress ring, then to idle (or needs-review, when
+  /// [reviewOnDone] is true and the run produced a summary and the user has
+  /// navigated away) when the stream closes.
   Future<void> _consume(
     Stream<EngineEvent> events, {
+    required LibraryAction owner,
     required String startMessage,
     required int total,
+    bool reviewOnDone = false,
   }) async {
-    await _sub?.cancel();
+    // Mark running SYNCHRONOUSLY (before any await) so the card's ring shows the
+    // instant a run starts, then tear down any prior subscription.
+    final prior = _sub;
+    _sub = null;
+    _activeAction = owner;
     _running = true;
     _errorMessage = null;
     _done = 0;
@@ -1129,17 +1294,19 @@ class AppController extends ChangeNotifier {
     _rows.clear();
     _lastSummary = null;
     _log(startMessage);
-    notifyListeners();
+    _setRunState(owner, ActionRunState.active(progress: total == 0 ? null : 0));
+    await prior?.cancel();
 
     final completer = Completer<void>();
+    _runCompleter = completer;
     _sub = events.listen(
       _handleEvent,
       onError: (Object e) {
         _errorMessage = '$e';
         _log('$e', level: LogLevel.error);
-        _finish(completer);
+        _finish(completer, owner, reviewOnDone: reviewOnDone);
       },
-      onDone: () => _finish(completer),
+      onDone: () => _finish(completer, owner, reviewOnDone: reviewOnDone),
     );
     return completer.future;
   }
@@ -1151,6 +1318,12 @@ class AppController extends ChangeNotifier {
       case ProgressEvent(:final done, :final total):
         _done = done;
         if (total > 0) _total = total;
+        final owner = _activeAction;
+        if (owner != null) {
+          _runStates[owner] = ActionRunState.active(
+            progress: _total == 0 ? null : _done / _total,
+          );
+        }
       case ItemEvent(:final row):
         _rows.insert(0, row);
         if (_rows.length > 200) _rows.removeLast();
@@ -1167,11 +1340,32 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _finish(Completer<void> completer) {
+  void _finish(
+    Completer<void> completer,
+    LibraryAction owner, {
+    bool reviewOnDone = false,
+  }) {
     _running = false;
-    notifyListeners();
+    _activeAction = null;
+    // Only badge a finished run the user has navigated AWAY from: if they are
+    // still on this action's screen they are watching it, so it returns to idle
+    // (the in-panel result table is the review). A run finishing with a summary
+    // while the user is elsewhere pulses the card until they open it.
+    final watching = _screen == AppScreen.action && _action == owner;
+    final wantsReview = reviewOnDone && _lastSummary != null && !watching;
+    _setRunState(
+      owner,
+      wantsReview
+          ? ActionRunState.review(summary: _summaryLine(_lastSummary!))
+          : ActionRunState.idle,
+    );
     if (!completer.isCompleted) completer.complete();
+    _runCompleter = null;
   }
+
+  /// A compact one-line summary ("tagged=3, skipped=1") for the card badge.
+  static String _summaryLine(Map<String, int> summary) =>
+      summary.entries.map((e) => '${e.key}=${e.value}').join(', ');
 
   @override
   void dispose() {

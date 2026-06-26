@@ -56,6 +56,7 @@ class WorkspaceScreen extends StatelessWidget {
                           child: ActionCard(
                             action: action,
                             readiness: action.readiness(scan),
+                            runState: controller.runStateFor(action),
                             onOpen: () => controller.openAction(action),
                           ),
                         ),

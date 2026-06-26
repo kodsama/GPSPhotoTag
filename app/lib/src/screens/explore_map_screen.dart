@@ -62,11 +62,16 @@ class PhotoMarker extends Marker {
 class ExploreMapScreen extends StatefulWidget {
   /// Creates the Explore screen. [savePathPicker] overrides the native
   /// save-location panel in tests; production uses [getSaveLocation].
-  const ExploreMapScreen({super.key, this.savePathPicker});
+  const ExploreMapScreen({super.key, this.savePathPicker, this.capturePng});
 
   /// Resolves the destination PNG path (null = user cancelled). Injectable so
   /// the save flow can be driven without the platform save dialog.
   final Future<String?> Function()? savePathPicker;
+
+  /// Captures the current map view as PNG bytes (null = capture failed).
+  /// Injectable so the save flow is testable without the real RepaintBoundary
+  /// raster, which doesn't render reliably in headless concurrent test runs.
+  final Future<Uint8List?> Function()? capturePng;
 
   @override
   State<ExploreMapScreen> createState() => _ExploreMapScreenState();
@@ -222,7 +227,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   Future<void> _saveView() async {
     final controller = ControllerScope.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
-    final bytes = await _capturePng();
+    final bytes = await (widget.capturePng ?? _capturePng)();
     if (bytes == null) {
       messenger?.showSnackBar(
         const SnackBar(content: Text("Couldn't capture the map view.")),
@@ -233,7 +238,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
       bytes,
       pickPath: widget.savePathPicker ?? _pickSavePath,
     );
-    if (saved != null) {
+    // The save can outlive this screen (the user may navigate away mid-write);
+    // don't touch a disposed messenger.
+    if (saved != null && mounted) {
       messenger?.showSnackBar(SnackBar(content: Text('Saved to $saved')));
     }
   }

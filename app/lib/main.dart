@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -79,9 +80,18 @@ class _StundaAppState extends State<StundaApp> {
         prefs: widget.prefs,
       );
 
+  /// Drives the close-while-running guard's warning SnackBar (the [AppShell]
+  /// Scaffold is below this widget, so a top-level messenger is needed).
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    // Guards quit/close while a background run is in flight.
+    _lifecycle = AppLifecycleListener(onExitRequested: _onExitRequested);
     // Always-on MCP endpoint for LLM clients, started only for the real app
     // (an injected controller in tests must not spawn a server isolate).
     if (widget.controller == null) {
@@ -92,8 +102,28 @@ class _StundaAppState extends State<StundaApp> {
     }
   }
 
+  /// Blocks quitting while any action is running, warning the user to cancel it
+  /// first; otherwise allows the app to exit. The decision itself is the
+  /// controller's pure [AppController.exitDecision].
+  Future<AppExitResponse> _onExitRequested() async {
+    final decision = _controller.exitDecision;
+    if (decision == AppExitResponse.cancel) {
+      _messengerKey.currentState
+        ?..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'A process is still running — cancel it before quitting.',
+            ),
+          ),
+        );
+    }
+    return decision;
+  }
+
   @override
   void dispose() {
+    _lifecycle.dispose();
     if (widget.controller == null) _controller.dispose();
     super.dispose();
   }
@@ -106,6 +136,7 @@ class _StundaAppState extends State<StundaApp> {
       builder: (context, _) => MaterialApp(
         title: 'Stunda',
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: _messengerKey,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: _controller.themeMode,

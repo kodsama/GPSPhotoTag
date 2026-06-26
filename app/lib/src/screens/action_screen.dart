@@ -26,10 +26,23 @@ class ActionScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextButton.icon(
-              onPressed: controller.running ? null : controller.backToLibrary,
-              icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Library'),
+            Row(
+              children: [
+                // Navigating back NEVER cancels the run — it keeps going in the
+                // background and the workspace card shows its progress.
+                TextButton.icon(
+                  onPressed: controller.backToLibrary,
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: const Text('Library'),
+                ),
+                const Spacer(),
+                if (controller.runStateFor(action).running)
+                  TextButton.icon(
+                    onPressed: () => controller.cancelAction(action),
+                    icon: const Icon(Icons.close, size: 18),
+                    label: const Text('Cancel'),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Row(

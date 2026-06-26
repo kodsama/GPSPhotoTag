@@ -275,6 +275,14 @@ class IsolateRunner implements EngineRunner {
       },
     );
 
+    // Cancelling the (sole) subscription tears down the worker: kill the
+    // isolate immediately and close the port so a cancelled run leaves nothing
+    // running. Safe to call before spawn resolves (isolate is then null).
+    controller.onCancel = () {
+      isolate?.kill(priority: Isolate.immediate);
+      receive.close();
+    };
+
     return controller.stream;
   }
 }
