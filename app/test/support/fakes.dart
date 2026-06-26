@@ -166,10 +166,15 @@ class FakeEngineRunner implements EngineRunner {
   /// How many times [extractPreview] actually ran (to prove memoization).
   int extractPreviewCalls = 0;
 
+  /// The `full` flag from the most recent [extractPreview] call (proves the
+  /// miniature requests the high-res preview).
+  final List<bool> extractFullFlags = [];
+
   @override
   Future<String?> extractPreview(String path, {bool full = false}) async {
     calls.add('extractPreview');
     extractPreviewCalls++;
+    extractFullFlags.add(full);
     return previews[path];
   }
 }

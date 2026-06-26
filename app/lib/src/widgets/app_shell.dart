@@ -17,9 +17,9 @@ import 'licenses.dart';
 import 'settings_dialog.dart';
 import 'warning_banner.dart';
 
-/// The app frame: a header bar (logo, wordmark, MCP chip, theme toggle), the
-/// active screen (welcome → scanning → workspace ⇄ action), a floating
-/// activity-log button with an unread badge, and the right-side log slide-over.
+/// The app frame: a header bar (logo, wordmark, the activity-log button with an
+/// unread badge, and the settings gear), the active screen (welcome → scanning →
+/// workspace ⇄ action), and the right-side log slide-over.
 class AppShell extends StatefulWidget {
   /// Creates the shell.
   const AppShell({super.key});
@@ -54,7 +54,7 @@ class _AppShellState extends State<AppShell> {
           ),
           Column(
             children: [
-              if (showHeader) const _Header(),
+              if (showHeader) _Header(onToggleLog: _toggleLog),
               const WarningBanner(),
               const Expanded(child: _ScreenBody()),
             ],
@@ -65,9 +65,6 @@ class _AppShellState extends State<AppShell> {
           ),
         ],
       ),
-      floatingActionButton: _logOpen
-          ? null
-          : _LogButton(unread: controller.unreadCount, onPressed: _toggleLog),
     );
   }
 }
@@ -99,7 +96,10 @@ class _ScreenBody extends StatelessWidget {
 
 /// The top header bar.
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.onToggleLog});
+
+  /// Toggles the activity-log slide-over (and marks it read).
+  final VoidCallback onToggleLog;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +125,7 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          _LogButton(unread: controller.unreadCount, onPressed: onToggleLog),
           _SettingsMenu(controller: controller),
         ],
       ),
@@ -213,7 +214,8 @@ void _showAbout(BuildContext context) {
   );
 }
 
-/// The floating activity-log button with an unread-count badge.
+/// The header activity-log button (an [IconButton] consistent with the settings
+/// gear) with an unread-count badge overlaid.
 class _LogButton extends StatelessWidget {
   const _LogButton({required this.unread, required this.onPressed});
 
@@ -225,28 +227,28 @@ class _LogButton extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        FloatingActionButton(
+        IconButton(
           onPressed: onPressed,
           tooltip: 'Activity log',
-          child: const Icon(Icons.receipt_long),
+          icon: const Icon(Icons.receipt_long),
         ),
         if (unread > 0)
           Positioned(
-            right: -2,
-            top: -2,
+            right: 2,
+            top: 2,
             child: Container(
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(
                 color: AppColors.danger,
                 shape: BoxShape.circle,
               ),
-              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               alignment: Alignment.center,
               child: Text(
                 unread > 99 ? '99+' : '$unread',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.w700,
                 ),
               ),

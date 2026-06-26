@@ -382,6 +382,48 @@ void main() {
       expect(fake.calls, contains('extractPreview'));
     });
 
+    testWidgets(
+      'miniature requests the high-res preview (full:true) at a bounded '
+      'cacheWidth',
+      (tester) async {
+        final dir = Directory.systemTemp.createTempSync('raw_mini');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final jpeg = p.join(dir.path, 'extracted.jpg');
+        File(
+          jpeg,
+        ).writeAsBytesSync(img.encodeJpg(img.Image(width: 64, height: 64)));
+
+        final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
+        final c = AppController(runner: fake);
+
+        await tester.pumpWidget(
+          _wrap(
+            // Constrain the box so cacheWidth is a finite, bounded value.
+            const SizedBox(
+              width: 320,
+              child: PhotoThumbnail(path: '/library/shot.raf', height: 100),
+            ),
+            controller: c,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // The miniature pulls the large PreviewImage, not the tiny thumbnail.
+        expect(fake.extractFullFlags, contains(true));
+        expect(fake.extractFullFlags, isNot(contains(false)));
+
+        // It is decoded through a ResizeImage (cacheWidth set) so a multi-MB
+        // preview is never decoded at native size for a small box.
+        final image = tester.widget<Image>(find.byType(Image));
+        expect(image.image, isA<ResizeImage>());
+        final resize = image.image as ResizeImage;
+        // ~2× the 320pt box at dpr 3 (test default) -> bounded, not unbounded.
+        expect(resize.width, isNotNull);
+        expect(resize.width, lessThanOrEqualTo(320 * 3 * 2));
+        expect(resize.width, greaterThan(320));
+      },
+    );
+
     testWidgets('falls back to the placeholder when no preview is produced', (
       tester,
     ) async {

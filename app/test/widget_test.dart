@@ -261,7 +261,39 @@ void main() {
     expect(controller.themeMode, isNot(ThemeMode.system));
   });
 
-  testWidgets('activity-log panel opens on FAB tap and shows entries', (
+  testWidgets(
+    'activity-log button lives in the header (not a FAB), toggles the panel',
+    (tester) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugAddLog('first event')
+        ..debugAddLog('second event');
+      await _pumpApp(tester, controller);
+
+      expect(find.byType(ActivityLogPanel), findsOneWidget);
+      // The log button is no longer a floating action button.
+      expect(find.byType(FloatingActionButton), findsNothing);
+
+      // It rides in the header as a tappable button.
+      final logButton = find.byTooltip('Activity log');
+      expect(logButton, findsOneWidget);
+
+      await tester.tap(logButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Activity log'), findsOneWidget);
+      expect(find.text('first event'), findsOneWidget);
+      expect(find.text('second event'), findsOneWidget);
+
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      // Still in the header, still not a FAB.
+      expect(find.byTooltip('Activity log'), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsNothing);
+    },
+  );
+
+  testWidgets('the header log button shows the unread-count badge', (
     tester,
   ) async {
     final controller = AppController(runner: FakeEngineRunner())
@@ -270,18 +302,36 @@ void main() {
       ..debugAddLog('second event');
     await _pumpApp(tester, controller);
 
-    expect(find.byType(ActivityLogPanel), findsOneWidget);
+    // Two unread entries -> the badge reads "2", overlaid on the header button.
+    expect(controller.unreadCount, 2);
+    // The badge "2" sits in the innermost Stack wrapping the log icon.
+    final logBadgeStack = find
+        .ancestor(
+          of: find.byIcon(Icons.receipt_long),
+          matching: find.byType(Stack),
+        )
+        .first;
+    expect(
+      find.descendant(of: logBadgeStack, matching: find.text('2')),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.byType(FloatingActionButton));
+    // Opening the log marks it read, so the badge disappears.
+    await tester.tap(find.byTooltip('Activity log'));
     await tester.pumpAndSettle();
-
-    expect(find.text('Activity log'), findsOneWidget);
-    expect(find.text('first event'), findsOneWidget);
-    expect(find.text('second event'), findsOneWidget);
-
-    await tester.tapAt(const Offset(20, 20));
-    await tester.pumpAndSettle();
-    expect(find.byType(FloatingActionButton), findsOneWidget);
+    expect(controller.unreadCount, 0);
+    expect(
+      find.descendant(
+        of: find
+            .ancestor(
+              of: find.byIcon(Icons.receipt_long),
+              matching: find.byType(Stack),
+            )
+            .first,
+        matching: find.text('2'),
+      ),
+      findsNothing,
+    );
   });
 }
 

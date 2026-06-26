@@ -284,12 +284,25 @@ class PhotoThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (needsPreviewExtraction(path)) {
-      return _ExtractedImage(
-        path: path,
-        full: false,
-        height: height,
-        cacheWidth: cacheWidth,
-        fit: BoxFit.cover,
+      // Decode the high-res PreviewImage (full: true) rather than the tiny
+      // embedded ThumbnailImage so the miniature is crisp, but bound the decode
+      // to ~2× the box's displayed pixel size so we never decode the multi-MB
+      // preview at native resolution just to fill a small box.
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final logicalWidth = constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : height;
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          final decodeWidth = (logicalWidth * dpr * 2).round();
+          return _ExtractedImage(
+            path: path,
+            full: true,
+            height: height,
+            cacheWidth: decodeWidth,
+            fit: BoxFit.cover,
+          );
+        },
       );
     }
     if (!isDecodableImage(path)) {
@@ -351,7 +364,9 @@ class _ExtractedImage extends StatelessWidget {
         return Image.file(
           File(jpeg),
           height: height,
-          width: full ? null : double.infinity,
+          // The miniature (cover) stretches to fill its box; the fullscreen view
+          // (contain) keeps the image's own aspect ratio.
+          width: fit == BoxFit.cover ? double.infinity : null,
           fit: fit,
           cacheWidth: cacheWidth,
           errorBuilder: (context, _, _) =>
