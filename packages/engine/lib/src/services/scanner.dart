@@ -15,7 +15,14 @@ const _googleMarkers = [
   '"timelineObjects"',
 ];
 
-/// Recursively scans folders, classifying every file and streaming progress.
+/// Recursively scans a mix of folders and individual files, classifying every
+/// file and streaming progress.
+///
+/// Each root may be a DIRECTORY (walked recursively as below) or a single FILE
+/// (classified directly). This lets a library be assembled from several folders
+/// and/or hand-picked images and GPS files. A file that appears under more than
+/// one root — for example a file root that also lives inside a directory root —
+/// is counted exactly once.
 ///
 /// Designed for trees with hundreds of thousands of files in arbitrary nesting
 /// (years/months, split jpg/raw/gps folders, or all mixed). A bounded worker
@@ -44,11 +51,12 @@ class FolderScanner {
   /// Minimum interval between progress events.
   final Duration throttle;
 
-  /// Scans [roots] recursively and streams classification events.
+  /// Scans [roots] (each a directory or a single file) and streams events.
   ///
   /// Emits throttled [ScanProgressEvent]s while walking, a [ScanLogEvent] for
   /// each unreadable directory (skipped, never fatal), and a final
-  /// [ScanDoneEvent] carrying the complete [FolderScanResult].
+  /// [ScanDoneEvent] carrying the complete [FolderScanResult]. A file that
+  /// appears under more than one root is counted once.
   Stream<ScanEvent> scan(List<String> roots) {
     final controller = StreamController<ScanEvent>();
     _run(roots, controller);
@@ -60,7 +68,25 @@ class FolderScanner {
     StreamController<ScanEvent> controller,
   ) async {
     final state = _ScanState();
-    final queue = <String>[...roots];
+    // Split roots into directories (walked) and individual files (classified
+    // directly). A root whose type can't be read (nonexistent, permission) is
+    // tolerated: it contributes nothing and never aborts the scan.
+    final queue = <String>[];
+    final fileRoots = <String>[];
+    for (final root in roots) {
+      final type = FileSystemEntity.typeSync(root, followLinks: false);
+      if (type == FileSystemEntityType.directory) {
+        queue.add(root);
+      } else if (type == FileSystemEntityType.file) {
+        fileRoots.add(root);
+      } else {
+        // Nonexistent, a broken link, or a special file: tolerated, never fatal.
+        controller.add(ScanLogEvent('skipped missing path: $root'));
+      }
+    }
+    for (final path in fileRoots) {
+      await state.classify(path);
+    }
     var active = 0;
     final completer = Completer<void>();
     var lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
@@ -157,7 +183,12 @@ class _ScanState {
   final googleFiles = <String>[];
   final unsupported = <UnsupportedFile>[];
 
+  /// Paths already classified, so a file reachable from more than one root
+  /// (e.g. a file root that also lives inside a directory root) counts once.
+  final _seen = <String>{};
+
   Future<void> classify(String path) async {
+    if (!_seen.add(path)) return;
     files++;
     final ext = PhotoFormats.extOf(path);
     byExtension.update(ext, (n) => n + 1, ifAbsent: () => 1);

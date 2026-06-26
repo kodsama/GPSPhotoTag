@@ -25,6 +25,23 @@ void main() {
       expect(PhotoFormats.isRaw('a.jpg'), isFalse);
       expect(PhotoFormats.isRaw('a.png'), isFalse);
     });
+
+    test('isGpsSource is true for tracks and json only', () {
+      expect(PhotoFormats.isGpsSource('a.gpx'), isTrue);
+      expect(PhotoFormats.isGpsSource('a.kml'), isTrue);
+      expect(PhotoFormats.isGpsSource('a.json'), isTrue);
+      expect(PhotoFormats.isGpsSource('a.jpg'), isFalse);
+      expect(PhotoFormats.isGpsSource('a.txt'), isFalse);
+    });
+
+    test('isSupported covers photos and GPS sources, not others', () {
+      expect(PhotoFormats.isSupported('a.jpg'), isTrue);
+      expect(PhotoFormats.isSupported('a.raf'), isTrue);
+      expect(PhotoFormats.isSupported('a.gpx'), isTrue);
+      expect(PhotoFormats.isSupported('a.json'), isTrue);
+      expect(PhotoFormats.isSupported('a.txt'), isFalse);
+      expect(PhotoFormats.isSupported('a.mp4'), isFalse);
+    });
   });
 
   group('SystemProcessRunner', () {

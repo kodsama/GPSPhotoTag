@@ -58,4 +58,19 @@ abstract final class PhotoFormats {
 
   /// Whether [path] is a RAW container by extension.
   static bool isRaw(String path) => raw.contains(extOf(path));
+
+  /// GPS-source extensions the engine can parse: `.gpx`/`.kml` tracks and the
+  /// `.json` of a Google location-history / Timeline export.
+  static const gpsSource = {'gpx', 'kml', 'json'};
+
+  /// Whether [path] is a GPS-source file by extension (track or Google JSON).
+  ///
+  /// Extension-only: a `.json` that turns out not to be Google history is still
+  /// "addable" here; the scanner validates its contents and buckets it as
+  /// unsupported if it isn't real location data.
+  static bool isGpsSource(String path) => gpsSource.contains(extOf(path));
+
+  /// Whether [path] is a supported library input — a taggable photo or a
+  /// GPS-source file. Used to classify individually added / dropped files.
+  static bool isSupported(String path) => isPhoto(path) || isGpsSource(path);
 }

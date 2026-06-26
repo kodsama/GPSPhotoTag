@@ -201,14 +201,56 @@ void main() {
     expect(r.dirs, 1);
   });
 
-  test('an unreadable directory is skipped with a log, not fatal', () async {
-    // A path that is not a directory: list() throws FileSystemException.
-    final notADir = File(p.join(root.path, 'notes.txt')).path;
-    final events = await FolderScanner().scan([notADir]).toList();
+  test('a nonexistent root is skipped with a log, not fatal', () async {
+    final missing = p.join(root.path, 'does', 'not', 'exist');
+    final events = await FolderScanner().scan([missing]).toList();
     expect(events.whereType<ScanLogEvent>(), isNotEmpty);
     expect(events.last, isA<ScanDoneEvent>());
     final r = (events.last as ScanDoneEvent).result;
     expect(r.files, 0);
+  });
+
+  test('a single file root is classified directly (not walked)', () async {
+    final r = await _resultOf(
+      await FolderScanner().scan([
+        p.join(root.path, '2025', '06', 'a.jpg'),
+        p.join(root.path, 'gps', 'track.gpx'),
+        p.join(root.path, 'gps', 'history.json'),
+        p.join(root.path, 'notes.txt'),
+      ]).toList(),
+    );
+    expect(r.files, 4);
+    expect(r.dirs, 0, reason: 'no directory was walked');
+    expect(r.photoCount, 1);
+    expect(r.trackCount, 1);
+    expect(r.googleCount, 1);
+    expect(r.unsupportedCount, 1);
+    expect(r.unsupported.single.category, UnsupportedCategory.other);
+  });
+
+  test('mixes directory roots and file roots into one result', () async {
+    final r = await _resultOf(
+      await FolderScanner().scan([
+        p.join(root.path, 'RAF'), // dir: c.raf, d.cr3
+        p.join(root.path, 'gps', 'track.gpx'), // file
+        p.join(root.path, 'media', 'clip.mp4'), // file (unsupported video)
+      ]).toList(),
+    );
+    expect(r.photoCount, 2);
+    expect(r.trackCount, 1);
+    expect(r.unsupportedCount, 1);
+    expect(r.unsupportedByCategory[UnsupportedCategory.video], 1);
+  });
+
+  test('a file reachable from two roots is counted once (dedupe)', () async {
+    final dirRoot = p.join(root.path, '2025'); // contains 06/a.jpg
+    final fileRoot = p.join(root.path, '2025', '06', 'a.jpg');
+    final r = await _resultOf(
+      await FolderScanner().scan([dirRoot, fileRoot]).toList(),
+    );
+    // a.jpg, b.png, e.webp under 2025/06 — a.jpg only once despite two roots.
+    expect(r.photoCount, 3);
+    expect(r.photos.where((path) => p.basename(path) == 'a.jpg').length, 1);
   });
 
   test('unsupported sample list is capped while counts stay exact', () async {

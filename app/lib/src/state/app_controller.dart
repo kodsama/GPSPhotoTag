@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../explore/explore_model.dart';
 import 'app_prefs.dart';
 import 'app_screen.dart';
 import 'library_action.dart';
+import 'library_roots.dart';
 import 'log_entry.dart';
 
 /// The single source of truth for the Stunda GUI.
@@ -209,6 +211,7 @@ class AppController extends ChangeNotifier {
     _explorePhotos.clear();
     _exploreLoading = false;
     _scan = null;
+    _roots.clear();
     _action = null;
     _resetRun();
     _excludedFiles.clear();
@@ -269,16 +272,31 @@ class AppController extends ChangeNotifier {
 
   // --- Library scan --------------------------------------------------------
 
-  String? _folder;
+  final List<String> _roots = [];
   FolderScanResult? _scan;
   ScanProgress? _scanProgress;
   StreamSubscription<ScanEvent>? _scanSub;
 
-  /// The picked library folder, or null when none is chosen.
-  String? get folder => _folder;
+  /// The ordered library roots (each a directory or an individual file).
+  List<String> get roots => List.unmodifiable(_roots);
 
-  /// The library folder's basename, for compact display.
-  String? get folderName => _folder == null ? null : p.basename(_folder!);
+  /// The first directory root, used as the default output location (e.g. for the
+  /// rendered heatmap) and for compact display; null when the library is empty
+  /// or made only of individual files.
+  String? get folder {
+    for (final root in _roots) {
+      if (FileSystemEntity.isDirectorySync(root)) return root;
+    }
+    return null;
+  }
+
+  /// A compact label for the library: the single root's basename, or
+  /// "N locations" when the library spans several roots; null when empty.
+  String? get folderName => switch (_roots.length) {
+    0 => null,
+    1 => rootLabel(_roots.first),
+    final n => '$n locations',
+  };
 
   /// The completed scan result, or null until a scan finishes.
   FolderScanResult? get scan => _scan;
@@ -286,27 +304,89 @@ class AppController extends ChangeNotifier {
   /// Live running totals while a scan is in flight, or null otherwise.
   ScanProgress? get scanProgress => _scanProgress;
 
-  /// Opens the folder picker; if one is chosen, starts scanning it.
+  /// Opens the folder picker; if one is chosen, makes it the sole library root
+  /// and scans it.
   Future<void> pickLibrary() async {
     final picked = await _pickFolder();
     if (picked == null) return;
-    await startScan(picked);
+    _roots
+      ..clear()
+      ..add(picked);
+    await startScan();
   }
 
-  /// Scans [folder] off the UI isolate, folding progress in, then lands on the
-  /// workspace when the [ScanDoneEvent] arrives.
-  Future<void> startScan(String folder) async {
+  /// Opens the folder picker and *adds* the chosen folder to the current
+  /// library, rescanning the combined roots. Used by the "+ Add folder"
+  /// affordance on the welcome screen and in the workspace.
+  Future<void> addFolder() async {
+    final picked = await _pickFolder();
+    if (picked == null) return;
+    await addRootPaths([picked]);
+  }
+
+  /// Merges [paths] into the library roots (deduped, order preserved) and
+  /// rescans the combined set. A no-op when nothing new is added.
+  Future<void> addRootPaths(Iterable<String> paths) async {
+    final next = addRoots(_roots, paths);
+    if (next.length == _roots.length) return;
+    _roots
+      ..clear()
+      ..addAll(next);
+    await startScan();
+  }
+
+  /// Classifies dropped [paths] and adds the directories + supported files to
+  /// the library, rescanning. Returns the number of dropped paths that were
+  /// ignored (unsupported type) so the UI can surface gentle feedback.
+  Future<int> addDroppedPaths(Iterable<String> paths) async {
+    final classified = classifyDropped(paths);
+    if (classified.ignored.isNotEmpty) {
+      _log(
+        'Ignored ${classified.ignored.length} unsupported dropped item(s)',
+        level: LogLevel.debug,
+      );
+    }
+    if (!classified.isEmpty) await addRootPaths(classified.accepted);
+    return classified.ignored.length;
+  }
+
+  /// Removes [path] from the library and rescans; returns to the welcome screen
+  /// when the last root is removed.
+  Future<void> removeLibraryRoot(String path) async {
+    final next = removeRoot(_roots, path);
+    if (next.length == _roots.length) return;
+    _roots
+      ..clear()
+      ..addAll(next);
+    if (_roots.isEmpty) {
+      changeLibrary();
+      return;
+    }
+    await startScan();
+  }
+
+  /// Scans the library off the UI isolate, folding progress in, then lands on
+  /// the workspace when the [ScanDoneEvent] arrives.
+  ///
+  /// With no argument it rescans the current [roots]. Passing [singleRoot]
+  /// replaces the library with that one root first (the classic single-folder
+  /// entry point).
+  Future<void> startScan([String? singleRoot]) async {
+    if (singleRoot != null) {
+      _roots
+        ..clear()
+        ..add(singleRoot);
+    }
     await _scanSub?.cancel();
-    _folder = folder;
     _scan = null;
     _scanProgress = const ScanProgress();
     _screen = AppScreen.scanning;
-    _log('Scanning $folder…');
+    _log('Scanning ${_roots.length} location(s)…');
     notifyListeners();
 
     final completer = Completer<void>();
     _scanSub = _engine
-        .scan([folder])
+        .scan(List<String>.of(_roots))
         .listen(
           _handleScanEvent,
           onError: (Object e) {
@@ -741,11 +821,11 @@ class AppController extends ChangeNotifier {
 
   /// Renders a heatmap PNG into the library folder; returns its path or null.
   Future<String?> renderMap({int? dpi}) async {
-    final folder = _folder;
+    final dir = folder ?? Directory.systemTemp.path;
     final scan = _scan;
-    if (folder == null || scan == null) return null;
+    if (scan == null) return null;
     final photos = _included(scan.photos);
-    final out = p.join(folder, 'stunda-heatmap.png');
+    final out = p.join(dir, 'stunda-heatmap.png');
     await _consume(
       _engine.map(
         photos: photos,
@@ -949,8 +1029,14 @@ class AppController extends ChangeNotifier {
 
   /// Lands the app on the workspace with [scan] as the library (tests only).
   @visibleForTesting
-  void debugSetScan(FolderScanResult scan, {String folder = '/library'}) {
-    _folder = folder;
+  void debugSetScan(
+    FolderScanResult scan, {
+    String folder = '/library',
+    List<String>? roots,
+  }) {
+    _roots
+      ..clear()
+      ..addAll(roots ?? [folder]);
     _scan = scan;
     _scanProgress = null;
     _screen = AppScreen.workspace;

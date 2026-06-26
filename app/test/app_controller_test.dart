@@ -754,11 +754,13 @@ void main() {
       expect(notified, 1);
     });
 
-    test('folder is null until a scan lands, then exposes the path', () {
+    test('folder is null until a scan lands, then exposes the dir root', () {
+      final dir = Directory.systemTemp.createTempSync('libfolder');
+      addTearDown(() => dir.deleteSync(recursive: true));
       final c = AppController(runner: FakeEngineRunner());
       expect(c.folder, isNull);
-      c.debugSetScan(fakeScan(), folder: '/my/library');
-      expect(c.folder, '/my/library');
+      c.debugSetScan(fakeScan(), folder: dir.path);
+      expect(c.folder, dir.path);
     });
 
     test('pruneFilter exposes the current filename filter', () {
@@ -814,5 +816,135 @@ void main() {
         c.dispose();
       },
     );
+  });
+
+  group('multi-root library', () {
+    test('pickLibrary sets a single root and scans it', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake, pickFolder: () async => '/pics');
+      await c.pickLibrary();
+      expect(c.roots, ['/pics']);
+      expect(fake.lastScanRoots, ['/pics']);
+    });
+
+    test('addRootPaths merges, dedupes, and rescans', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      await c.addRootPaths(['/b', '/a', '/c']);
+      expect(c.roots, ['/a', '/b', '/c']);
+      expect(fake.lastScanRoots, ['/a', '/b', '/c']);
+    });
+
+    test('addRootPaths with nothing new does not rescan', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      final before = fake.calls.where((x) => x == 'scan').length;
+      await c.addRootPaths(['/a']);
+      final after = fake.calls.where((x) => x == 'scan').length;
+      expect(after, before);
+    });
+
+    test('addFolder appends the picked folder', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake, pickFolder: () async => '/b');
+      await c.startScan('/a');
+      await c.addFolder();
+      expect(c.roots, ['/a', '/b']);
+    });
+
+    test('addFolder cancelled is a no-op', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake, pickFolder: () async => null);
+      await c.startScan('/a');
+      await c.addFolder();
+      expect(c.roots, ['/a']);
+    });
+
+    test('addDroppedPaths adds supported items and reports ignored', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      // A real file (a.jpg) + a real gpx vs an unsupported .mp4. Use disk so
+      // the classifier's default dir-probe sees real files (not dirs).
+      final dir = Directory.systemTemp.createTempSync('drop');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final jpg = File('${dir.path}/a.jpg')..writeAsStringSync('x');
+      final mp4 = File('${dir.path}/c.mp4')..writeAsStringSync('x');
+      final ignored = await c.addDroppedPaths([jpg.path, mp4.path]);
+      expect(ignored, 1);
+      expect(c.roots, ['/a', jpg.path]);
+    });
+
+    test('addDroppedPaths with only ignored items does not rescan', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      final dir = Directory.systemTemp.createTempSync('drop2');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final mp4 = File('${dir.path}/c.mp4')..writeAsStringSync('x');
+      final before = fake.calls.where((x) => x == 'scan').length;
+      final ignored = await c.addDroppedPaths([mp4.path]);
+      expect(ignored, 1);
+      expect(fake.calls.where((x) => x == 'scan').length, before);
+    });
+
+    test('removeLibraryRoot drops a root and rescans the rest', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      await c.addRootPaths(['/b']);
+      await c.removeLibraryRoot('/a');
+      expect(c.roots, ['/b']);
+      expect(fake.lastScanRoots, ['/b']);
+    });
+
+    test('removing the last root returns to welcome', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      await c.removeLibraryRoot('/a');
+      expect(c.roots, isEmpty);
+      expect(c.screen, AppScreen.welcome);
+    });
+
+    test('removeLibraryRoot of an absent root is a no-op', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.startScan('/a');
+      final before = fake.calls.where((x) => x == 'scan').length;
+      await c.removeLibraryRoot('/x');
+      expect(c.roots, ['/a']);
+      expect(fake.calls.where((x) => x == 'scan').length, before);
+    });
+
+    test('folderName reflects single vs multiple roots', () async {
+      final c = AppController(runner: FakeEngineRunner());
+      await c.startScan('/a');
+      expect(c.folderName, 'a');
+      await c.addRootPaths(['/b']);
+      expect(c.folderName, '2 locations');
+    });
+
+    test('changeLibrary clears the roots', () async {
+      final c = AppController(runner: FakeEngineRunner());
+      await c.startScan('/a');
+      c.changeLibrary();
+      expect(c.roots, isEmpty);
+      expect(c.folderName, isNull);
+    });
+
+    test('folder getter returns the first directory root', () async {
+      final dir = Directory.systemTemp.createTempSync('rootdir');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final jpg = File('${dir.path}/a.jpg')..writeAsStringSync('x');
+      final c = AppController(runner: FakeEngineRunner());
+      // A file root first, then a directory root: folder skips the file.
+      await c.startScan(jpg.path);
+      expect(c.folder, isNull, reason: 'a single file root has no folder');
+      await c.addRootPaths([dir.path]);
+      expect(c.folder, dir.path);
+    });
   });
 }

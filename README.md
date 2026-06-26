@@ -62,7 +62,9 @@ completed steps collapse with a check and stay tappable:
 
 1. **Toolkit** — checks exiftool / libheif / your package manager, with Install
    buttons; never claims "ready" when it isn't.
-2. **Photos** — native folder picker; shows a parsed summary.
+2. **Photos** — native folder picker, plus an **Add folder** affordance and
+   **drag-and-drop**: combine several folders and/or individual photos and GPS
+   files into one library, then review the parsed summary over the whole set.
 3. **Review** — per-format include/exclude checklist.
 4. **Options** — every option, smart defaults pre-selected.
 5. **Output** — in place, or copy to a destination folder.

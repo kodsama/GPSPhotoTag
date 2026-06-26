@@ -83,9 +83,13 @@ class FakeEngineRunner implements EngineRunner {
     if (keepOpen) await _gate.future;
   }
 
+  /// The roots passed to the most recent [scan] call, for assertions.
+  List<String>? lastScanRoots;
+
   @override
   Stream<ScanEvent> scan(List<String> roots) async* {
     calls.add('scan');
+    lastScanRoots = roots;
     for (final event in _scanEvents) {
       yield event;
     }

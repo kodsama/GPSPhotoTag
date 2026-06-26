@@ -56,6 +56,53 @@ void main() {
     expect(find.text('Choose photo library'), findsOneWidget);
   });
 
+  testWidgets('the welcome screen shows the drop hint and Add folder', (
+    tester,
+  ) async {
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')]);
+    await _pumpApp(tester, controller);
+
+    expect(find.text('Drop folders or photos here'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Add folder'), findsOneWidget);
+  });
+
+  testWidgets('tapping Add folder on welcome adds a root and scans', (
+    tester,
+  ) async {
+    final fake = FakeEngineRunner(scanEvents: [ScanDoneEvent(fakeScan())]);
+    final controller = AppController(
+      runner: fake,
+      pickFolder: () async => '/pics',
+    )..debugSetToolkit([_tool('exiftool')]);
+    await _pumpApp(tester, controller);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Add folder'));
+    await tester.pumpAndSettle();
+
+    expect(controller.roots, ['/pics']);
+    expect(controller.screen, AppScreen.workspace);
+  });
+
+  testWidgets('the workspace shows Add folder and removable root chips', (
+    tester,
+  ) async {
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')])
+      ..debugSetScan(fakeScan(), roots: ['/a', '/b']);
+    await _pumpApp(tester, controller);
+
+    expect(find.widgetWithText(OutlinedButton, 'Add folder'), findsOneWidget);
+    // One chip per root (basename labels).
+    expect(find.widgetWithText(Chip, 'a'), findsOneWidget);
+    expect(find.widgetWithText(Chip, 'b'), findsOneWidget);
+
+    // Deleting a chip rescans the remaining root.
+    await tester.tap(find.byTooltip('Remove from library').first);
+    await tester.pumpAndSettle();
+    expect(controller.roots.length, 1);
+  });
+
   testWidgets('the scanning screen shows live tallies and the folder name', (
     tester,
   ) async {

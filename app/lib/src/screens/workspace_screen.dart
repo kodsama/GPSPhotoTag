@@ -4,6 +4,7 @@ import '../state/controller_scope.dart';
 import '../state/library_action.dart';
 import '../widgets/action_card.dart';
 import '../widgets/content_panel.dart';
+import '../widgets/drop_zone.dart';
 import '../widgets/library_bar.dart';
 
 /// The hub: a library bar, an expandable content breakdown, and the responsive
@@ -23,45 +24,47 @@ class WorkspaceScreen extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 920),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LibraryBar(scan: scan),
-            const SizedBox(height: 16),
-            ContentPanel(scan: scan),
-            const SizedBox(height: 24),
-            Text('Actions', style: text.titleMedium),
-            const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, c) {
-                const gap = 16.0;
-                // Up to 3 across; reflow to 2 / 1 as the window narrows. Cards
-                // share the width equally so there's never a dead gap.
-                final cols = c.maxWidth >= 760
-                    ? 3
-                    : c.maxWidth >= 480
-                    ? 2
-                    : 1;
-                final w = (c.maxWidth - gap * (cols - 1)) / cols;
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: [
-                    for (final action in LibraryAction.all)
-                      SizedBox(
-                        width: w,
-                        height: 196,
-                        child: ActionCard(
-                          action: action,
-                          readiness: action.readiness(scan),
-                          onOpen: () => controller.openAction(action),
+        child: DropZone(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              LibraryBar(scan: scan),
+              const SizedBox(height: 16),
+              ContentPanel(scan: scan),
+              const SizedBox(height: 24),
+              Text('Actions', style: text.titleMedium),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, c) {
+                  const gap = 16.0;
+                  // Up to 3 across; reflow to 2 / 1 as the window narrows. Cards
+                  // share the width equally so there's never a dead gap.
+                  final cols = c.maxWidth >= 760
+                      ? 3
+                      : c.maxWidth >= 480
+                      ? 2
+                      : 1;
+                  final w = (c.maxWidth - gap * (cols - 1)) / cols;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      for (final action in LibraryAction.all)
+                        SizedBox(
+                          width: w,
+                          height: 196,
+                          child: ActionCard(
+                            action: action,
+                            readiness: action.readiness(scan),
+                            onOpen: () => controller.openAction(action),
+                          ),
                         ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ],
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
