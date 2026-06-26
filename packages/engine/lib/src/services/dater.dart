@@ -57,7 +57,11 @@ class Dater {
     var done = 0;
     for (final path in files) {
       try {
-        yield* switch (mode) {
+        // Consume the per-file stream with `await for` (not `yield*`): an error
+        // thrown inside the delegated async* body — e.g. _exif.read or
+        // setLastModified failing — is rethrown at the await point and caught
+        // here, so one bad file is recorded as an error and the run continues.
+        final stream = switch (mode) {
           FixDatesMode.exif => _fromExif(
             path,
             dryRun: dryRun,
@@ -70,6 +74,9 @@ class Dater {
           ),
           FixDatesMode.none => const Stream<EngineEvent>.empty(),
         };
+        await for (final event in stream) {
+          yield event;
+        }
       } on Object catch (e) {
         yield _item(path, PhotoStatus.error, summary, note: '$e');
       }

@@ -31,6 +31,24 @@ class FakeExifBackend implements ExifBackend {
   }) async => throw UnimplementedError();
 }
 
+/// An [ExifBackend] whose [read] always throws, to exercise per-file failure.
+class ThrowingExifBackend implements ExifBackend {
+  @override
+  bool supports(String path) => true;
+
+  @override
+  Future<PhotoMeta> read(String path) async =>
+      throw const FileSystemException('cannot read EXIF');
+
+  @override
+  Future<void> writeGps(
+    String path, {
+    required double latitude,
+    required double longitude,
+    DateTime? dateTimeOriginal,
+  }) async => throw UnimplementedError();
+}
+
 /// Records every invocation and returns a canned result (or throws).
 class FakeProcessRunner implements ProcessRunner {
   FakeProcessRunner({
@@ -234,5 +252,33 @@ void main() {
     expect(events.whereType<ItemEvent>(), isEmpty);
     final done = events.whereType<DoneEvent>().single;
     expect(done.summary, isEmpty);
+  });
+
+  test('a throwing read records a per-file error and the run continues', () async {
+    final other = p.join(dir.path, 'photo2.jpg');
+    File(other).writeAsStringSync('y');
+    final dater = Dater(
+      exif: ThrowingExifBackend(),
+      runner: FakeProcessRunner(),
+      operatingSystem: 'linux',
+    );
+
+    final events = await dater.fixDates([
+      photo,
+      other,
+    ], FixDatesMode.exif).toList();
+
+    // Both files surface as errors (not just the first) — the run did not abort.
+    final items = events.whereType<ItemEvent>().toList();
+    expect(items, hasLength(2));
+    expect(items.every((e) => e.row.status == PhotoStatus.error), isTrue);
+    expect(
+      items.every((e) => e.row.note!.contains('cannot read EXIF')),
+      isTrue,
+    );
+    // Progress is emitted for both, and a final DoneEvent tallies both errors.
+    expect(events.whereType<ProgressEvent>(), hasLength(2));
+    final done = events.whereType<DoneEvent>().single;
+    expect(done.summary[PhotoStatus.error.wire], 2);
   });
 }
