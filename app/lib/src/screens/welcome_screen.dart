@@ -45,7 +45,14 @@ class WelcomeScreen extends StatelessWidget {
                   icon: const Icon(Icons.folder_open),
                   label: const Text('Choose photo library'),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
+                Text(
+                  'or',
+                  style: text.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
