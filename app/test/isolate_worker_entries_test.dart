@@ -190,17 +190,46 @@ void main() {
       expect(events.whereType<DoneEvent>(), isNotEmpty);
     });
 
-    test('hashFilesEntry sends a HashedFile per decodable path', () async {
-      final jpg = await writeJpegWithDate(tmp, 'h.jpg');
-      final txt = File('${tmp.path}/notes.txt')..writeAsStringSync('not image');
+    test(
+      'hashFilesEntry hashes via the batch path and ticks per file',
+      () async {
+        final jpg = await writeJpegWithDate(tmp, 'h.jpg');
+        final txt = File('${tmp.path}/notes.txt')
+          ..writeAsStringSync('not image');
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [jpg, txt.path],
+              bundleDir: null,
+            ),
+          ),
+        );
+        // The JPEG hashes (via the batch fallback decode); the text file is
+        // skipped (undecodable) — but both still emit a progress tick.
+        final hashed = events.whereType<HashedFile>().toList();
+        expect(hashed.map((h) => h.path), [jpg]);
+        // One `1` tick per input file (hashed or skipped) keeps the bar moving.
+        final ticks = events.whereType<int>().toList();
+        expect(ticks, [1, 1]);
+      },
+    );
+
+    test('hashFilesEntry processes more than one chunk', () async {
+      // More paths than [hashBatchChunk] forces a second batch iteration. The
+      // files are non-images (skipped) but each still ticks, so progress reaches
+      // the total across both chunks.
+      final paths = [
+        for (var i = 0; i < hashBatchChunk + 5; i++)
+          (File('${tmp.path}/n$i.txt')..writeAsStringSync('x')).path,
+      ];
       final events = await _drain(
         (port) => hashFilesEntry(
-          HashFilesRequest(port: port, paths: [jpg, txt.path], bundleDir: null),
+          HashFilesRequest(port: port, paths: paths, bundleDir: null),
         ),
       );
-      // The JPEG hashes; the text file is skipped (undecodable).
-      final hashed = events.whereType<HashedFile>().toList();
-      expect(hashed.map((h) => h.path), [jpg]);
+      expect(events.whereType<HashedFile>(), isEmpty);
+      expect(events.whereType<int>(), hasLength(paths.length));
     });
 
     test('extractPreviewEntry returns null for a non-RAW file', () async {

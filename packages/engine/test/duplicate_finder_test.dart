@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -25,6 +26,90 @@ class _PreviewRunner implements ProcessRunner {
     File(
       p.join(dir, '${stem}_PreviewImage.jpg'),
     ).writeAsBytesSync(img.encodeJpg(_stripes(32, 32)));
+    return const ProcResult(0, '', '');
+  }
+}
+
+/// A [ProcessRunner] that emulates the batch hashing contract: it records every
+/// call, writes embedded thumbnails/previews the way `exiftool -b -W` would, and
+/// answers the `-json` dimension read.
+///
+/// [thumbs]/[previews] map a source basename (with extension) to the JPEG bytes
+/// to write for `-ThumbnailImage` / `-PreviewImage`; absent entries simulate a
+/// source lacking that embedded image. [dims] maps a source PATH to the original
+/// width/height the JSON read reports.
+class _BatchRunner implements ProcessRunner {
+  _BatchRunner({
+    this.thumbs = const {},
+    this.previews = const {},
+    this.dims = const {},
+    this.dimensionStdout,
+  });
+
+  final Map<String, List<int>> thumbs;
+  final Map<String, List<int>> previews;
+  final Map<String, (int, int)> dims;
+
+  /// When set, the `-json` dimension read returns this raw stdout verbatim
+  /// (used to exercise malformed JSON and non-int width/height values).
+  final String? dimensionStdout;
+
+  /// Every args list passed to [run], in order.
+  final List<List<String>> calls = [];
+
+  /// Args of calls that requested a given extract tag.
+  List<List<String>> extractCallsFor(String tag) => [
+    for (final c in calls)
+      if (c.contains('-$tag')) c,
+  ];
+
+  /// Args of the batched JSON dimension reads.
+  List<List<String>> get dimensionCalls => [
+    for (final c in calls)
+      if (c.contains('-json')) c,
+  ];
+
+  @override
+  Future<ProcResult> run(String executable, List<String> args) async {
+    calls.add(args);
+
+    if (args.contains('-json')) {
+      if (dimensionStdout != null) return ProcResult(0, dimensionStdout!, '');
+      final sources = args
+          .where((a) => !a.startsWith('-') && dims.containsKey(a))
+          .toList();
+      final entries = [
+        for (final src in sources)
+          {
+            'SourceFile': src,
+            'ImageWidth': dims[src]!.$1,
+            'ImageHeight': dims[src]!.$2,
+          },
+      ];
+      return ProcResult(0, jsonEncode(entries), '');
+    }
+
+    // An extract call: parse the -W template + the requested tag, write outputs.
+    final wIndex = args.indexOf('-W');
+    if (wIndex < 0) return const ProcResult(0, '', '');
+    final dir = p.dirname(args[wIndex + 1]);
+    final tag = args
+        .firstWhere(
+          (a) => a == '-ThumbnailImage' || a == '-PreviewImage',
+          orElse: () => '',
+        )
+        .replaceFirst('-', '');
+    if (tag.isEmpty) return const ProcResult(0, '', '');
+    final table = tag == 'ThumbnailImage' ? thumbs : previews;
+    final sources = args.where(
+      (a) => !a.startsWith('-') && a != args[wIndex + 1],
+    );
+    for (final src in sources) {
+      final bytes = table[p.basename(src)];
+      if (bytes == null) continue;
+      final stem = p.basenameWithoutExtension(src);
+      File(p.join(dir, '${stem}_$tag.jpg')).writeAsBytesSync(bytes);
+    }
     return const ProcResult(0, '', '');
   }
 }
@@ -319,6 +404,251 @@ void main() {
         cacheDir: p.join(tmp.path, 'cache'),
       );
       expect(hashed, isNull);
+    });
+  });
+
+  group('buildBatchExtractArgs', () {
+    test('extracts one tag for every source in a single arg list', () {
+      final args = buildBatchExtractArgs(
+        ['/a/x.raf', '/a/y.heic'],
+        '/tmp/out',
+        'ThumbnailImage',
+      );
+      expect(args, containsAll(['-b', '-m', '-W', '/tmp/out/%f_%t.%s']));
+      expect(args, contains('-ThumbnailImage'));
+      // Both sources ride on the same call (one spawn for the whole chunk).
+      expect(args.where((a) => !a.startsWith('-')), [
+        '/tmp/out/%f_%t.%s',
+        '/a/x.raf',
+        '/a/y.heic',
+      ]);
+    });
+  });
+
+  group('buildBatchDimensionArgs', () {
+    test('reads numeric width/height for every source via -fast2 -json', () {
+      final args = buildBatchDimensionArgs(['/a/x.jpg', '/a/y.jpg']);
+      expect(
+        args,
+        containsAll([
+          '-fast2',
+          '-json',
+          '-n',
+          '-ImageWidth',
+          '-ImageHeight',
+          '/a/x.jpg',
+          '/a/y.jpg',
+        ]),
+      );
+    });
+  });
+
+  group('hashFilesBatch', () {
+    late Directory tmp;
+    setUp(() => tmp = Directory.systemTemp.createTempSync('hashbatch'));
+    tearDown(() => tmp.deleteSync(recursive: true));
+
+    /// Writes [n] opaque source files so each has an on-disk size, returns paths.
+    List<String> writeSources(List<String> names) => [
+      for (final name in names)
+        (File(p.join(tmp.path, name))..writeAsBytesSync([1, 2, 3])).path,
+    ];
+
+    test(
+      'ONE thumbnail extraction + ONE dimension read for the whole chunk',
+      () async {
+        final paths = writeSources(['a.raf', 'b.raf', 'c.raf']);
+        final thumbJpeg = img.encodeJpg(_stripes(16, 16));
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': thumbJpeg, 'b.raf': thumbJpeg, 'c.raf': thumbJpeg},
+          dims: {for (final pth in paths) pth: (4000, 3000)},
+        );
+
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+
+        expect(out, hasLength(3));
+        // Batching: exactly ONE thumbnail extract for the 3 files (not 3), one
+        // dimension read, and ZERO preview extracts (all had thumbnails).
+        expect(runner.extractCallsFor('ThumbnailImage'), hasLength(1));
+        expect(runner.extractCallsFor('PreviewImage'), isEmpty);
+        expect(runner.dimensionCalls, hasLength(1));
+      },
+    );
+
+    test(
+      'dimensions come from the batched JSON, not the thumbnail size',
+      () async {
+        final paths = writeSources(['a.cr2']);
+        final runner = _BatchRunner(
+          thumbs: {'a.cr2': img.encodeJpg(_stripes(16, 16))},
+          dims: {paths.first: (6000, 4000)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+        // The thumb is 16×16 but the recorded resolution is the original 6000×4000.
+        expect(out.single.width, 6000);
+        expect(out.single.height, 4000);
+        expect(out.single.fileSize, greaterThan(0));
+        expect(out.single.isRaw, isTrue);
+      },
+    );
+
+    test(
+      'prefers the thumbnail; falls back to preview only when none',
+      () async {
+        final paths = writeSources(['thumbed.raf', 'previewed.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'thumbed.raf': img.encodeJpg(_stripes(16, 16))},
+          previews: {'previewed.raf': img.encodeJpg(_stripes(64, 64))},
+          dims: {for (final pth in paths) pth: (100, 100)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+        expect(out.map((h) => h.path), unorderedEquals(paths));
+        // The preview pass ran exactly once, over ONLY the thumb-less file.
+        final previewCalls = runner.extractCallsFor('PreviewImage');
+        expect(previewCalls, hasLength(1));
+        expect(previewCalls.single, contains(paths[1]));
+        expect(previewCalls.single, isNot(contains(paths[0])));
+      },
+    );
+
+    test(
+      'falls back to decoding the source when no embedded image exists',
+      () async {
+        // A real decodable JPEG on disk, but exiftool extracts nothing for it.
+        final path = p.join(tmp.path, 'plain.jpg');
+        File(path).writeAsBytesSync(img.encodeJpg(_stripes(40, 24)));
+        final runner = _BatchRunner(dims: {path: (40, 24)});
+
+        final out = await hashFilesBatch(
+          [path],
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+        // Hashed from the source bytes themselves (the slow fallback path).
+        expect(out, hasLength(1));
+        expect(out.single.width, 40);
+      },
+    );
+
+    test(
+      'skips a file with neither embedded image nor decodable source',
+      () async {
+        final path = p.join(tmp.path, 'broken.raf');
+        File(path).writeAsBytesSync([9, 9, 9]); // not a decodable image
+        final runner = _BatchRunner();
+        final ticks = <int>[];
+
+        final out = await hashFilesBatch(
+          [path],
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          onFileDone: () => ticks.add(1),
+        );
+        expect(out, isEmpty);
+        // Still ticked once for the skipped file so progress reaches the total.
+        expect(ticks, hasLength(1));
+      },
+    );
+
+    test(
+      'maps outputs back to sources by basename and ticks per file',
+      () async {
+        final paths = writeSources(['one.heic', 'two.heic']);
+        final runner = _BatchRunner(
+          thumbs: {
+            'one.heic': img.encodeJpg(_stripes(16, 16)),
+            'two.heic': img.encodeJpg(_stripes(16, 16, phase: 4)),
+          },
+          dims: {for (final pth in paths) pth: (200, 150)},
+        );
+        var ticks = 0;
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          onFileDone: () => ticks++,
+        );
+        expect(out.map((h) => h.path), paths); // mapped back to each source
+        expect(ticks, 2); // one tick per input file
+      },
+    );
+
+    test('empty input does nothing and returns empty', () async {
+      final runner = _BatchRunner();
+      final out = await hashFilesBatch(
+        const [],
+        runner: runner,
+        tmpDir: p.join(tmp.path, 'work'),
+      );
+      expect(out, isEmpty);
+      expect(runner.calls, isEmpty);
+    });
+
+    test(
+      'falls back to the thumbnail size when JSON lacks dimensions',
+      () async {
+        final paths = writeSources(['a.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': img.encodeJpg(_stripes(48, 36))},
+          // No dims entry for the path → JSON omits it.
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+        // Width/height come from the decoded thumbnail itself.
+        expect(out.single.width, 48);
+        expect(out.single.height, 36);
+      },
+    );
+
+    test('tolerates malformed dimension JSON (uses decoded size)', () async {
+      final paths = writeSources(['a.raf']);
+      final runner = _BatchRunner(
+        thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+        dimensionStdout: 'not valid json',
+      );
+      final out = await hashFilesBatch(
+        paths,
+        runner: runner,
+        tmpDir: p.join(tmp.path, 'work'),
+      );
+      expect(out.single.width, 20);
+    });
+
+    test('parses non-int width/height (num and string) from JSON', () async {
+      final paths = writeSources(['a.raf']);
+      // ImageWidth as a JSON number (double) and ImageHeight as a string.
+      final runner = _BatchRunner(
+        thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+        dimensionStdout: jsonEncode([
+          {
+            'SourceFile': paths.first,
+            'ImageWidth': 5000.0,
+            'ImageHeight': '4000',
+          },
+        ]),
+      );
+      final out = await hashFilesBatch(
+        paths,
+        runner: runner,
+        tmpDir: p.join(tmp.path, 'work'),
+      );
+      expect(out.single.width, 5000);
+      expect(out.single.height, 4000);
     });
   });
 }

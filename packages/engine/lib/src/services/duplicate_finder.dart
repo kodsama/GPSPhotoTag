@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as p;
 
 import '../data/photo_formats.dart';
 import '../data/ports/process_runner.dart';
@@ -289,4 +291,209 @@ Future<HashedFile?> hashFile(
     basename: basenameKey(path),
     isRaw: isRaw,
   );
+}
+
+/// The exiftool args that extract one embedded image tag for EVERY source in
+/// [paths] in a single process: `-b -m -W <tmpDir>/%f_%t.%s -<tag> PATHS…`.
+///
+/// `-b` writes the binary image to disk (not stdout); `-m` ignores minor
+/// warnings so a source lacking [tag] never fails the batch; `-W %f_%t.%s`
+/// names each output `{basename}_{tag}.{ext}` under [tmpDir]. One exiftool spawn
+/// covers the whole chunk instead of one spawn per file.
+List<String> buildBatchExtractArgs(
+  List<String> paths,
+  String tmpDir,
+  String tag,
+) => ['-b', '-m', '-W', '$tmpDir/%f_%t.%s', '-$tag', ...paths];
+
+/// The exiftool args that read pixel dimensions for EVERY source in [paths] in
+/// one process, mirroring [readImageMeta]'s fast batched JSON read.
+///
+/// `-fast2` skips MakerNotes/trailer (much faster on files with big trailers);
+/// `-json -n` emit numeric width/height keyed by `SourceFile`.
+List<String> buildBatchDimensionArgs(List<String> paths) => [
+  '-fast2',
+  '-json',
+  '-n',
+  '-ImageWidth',
+  '-ImageHeight',
+  ...paths,
+];
+
+/// The name exiftool writes for [source] + [tag] under `-W %f_%t.%s`:
+/// `{basename-without-ext}_{tag}.jpg` (embedded previews are JPEG).
+String _batchOutputName(String source, String tag) =>
+    '${p.basenameWithoutExtension(source)}_$tag.jpg';
+
+/// Original pixel dimensions for a source, as read from the batched JSON.
+typedef _Dims = ({int width, int height});
+
+/// Batch-hashes a whole [paths] slice into [HashedFile]s, minimising exiftool
+/// spawns: a fixed number of extractions for the entire slice (not per file).
+///
+/// The fast path decodes a *small embedded thumbnail* (≈160 px) rather than the
+/// multi-MP source, which is orders of magnitude cheaper:
+/// 1. One `exiftool -ThumbnailImage` over every path writes each file's small
+///    embedded thumbnail into a temp dir under [tmpDir] ([buildBatchExtractArgs]).
+/// 2. One `exiftool -PreviewImage` over ONLY the paths that produced no
+///    thumbnail (RAW/HEIC, thumb-less screenshots) writes their larger preview.
+/// 3. One `exiftool -fast2 -json` reads original pixel dimensions for the whole
+///    slice ([buildBatchDimensionArgs]) — no full-resolution decode.
+/// 4. Each path is hashed from its extracted thumbnail/preview; a path with
+///    neither falls back to decoding the source bytes directly (rare).
+///
+/// So N files cost 3 exiftool spawns total instead of N. Width/height come from
+/// the batched JSON (falling back to the decoded image's own size only when JSON
+/// lacks them); [HashedFile.fileSize] is the source's on-disk length.
+/// Unreadable/undecodable files are skipped (never throw). [onFileDone] fires
+/// once per input path (hashed or skipped) so a worker can tick progress.
+Future<List<HashedFile>> hashFilesBatch(
+  List<String> paths, {
+  required ProcessRunner runner,
+  required String tmpDir,
+  void Function()? onFileDone,
+}) async {
+  if (paths.isEmpty) return const [];
+  await Directory(tmpDir).create(recursive: true);
+  final dir = await Directory(tmpDir).createTemp('hashbatch_');
+  try {
+    // Pass 1: the small embedded thumbnail for every path, in one spawn.
+    await _safeRun(
+      runner,
+      buildBatchExtractArgs(paths, dir.path, 'ThumbnailImage'),
+    );
+    final thumbs = _collectOutputs(paths, dir.path, 'ThumbnailImage');
+
+    // Pass 2: the larger preview, but ONLY for paths with no thumbnail.
+    final noThumb = [
+      for (final path in paths)
+        if (!thumbs.containsKey(path)) path,
+    ];
+    var previews = const <String, String>{};
+    if (noThumb.isNotEmpty) {
+      await _safeRun(
+        runner,
+        buildBatchExtractArgs(noThumb, dir.path, 'PreviewImage'),
+      );
+      previews = _collectOutputs(noThumb, dir.path, 'PreviewImage');
+    }
+
+    // One batched read of original dimensions for the whole slice.
+    final dims = await _readBatchDimensions(runner, paths);
+
+    final results = <HashedFile>[];
+    for (final path in paths) {
+      final extracted = thumbs[path] ?? previews[path];
+      final hashed = _hashFromExtract(path, extracted, dims[path]);
+      if (hashed != null) results.add(hashed);
+      onFileDone?.call();
+    }
+    return results;
+  } finally {
+    if (dir.existsSync()) await dir.delete(recursive: true);
+  }
+}
+
+/// Runs [args] through [runner], swallowing a launch failure so a single bad
+/// chunk never aborts the batch (callers treat "no output" as "no thumbnail").
+Future<void> _safeRun(ProcessRunner runner, List<String> args) async {
+  try {
+    await runner.run('exiftool', args);
+  } on Object {
+    // exiftool missing / failed to launch → no files written; handled by the
+    // fallback decode of the source.
+  }
+}
+
+/// Maps each source in [paths] to the on-disk extract exiftool wrote for [tag]
+/// under [dir] (`{basename}_{tag}.jpg`), keeping only non-empty files. Sources
+/// that produced nothing are simply absent from the map.
+Map<String, String> _collectOutputs(
+  List<String> paths,
+  String dir,
+  String tag,
+) {
+  final out = <String, String>{};
+  for (final path in paths) {
+    final candidate = p.join(dir, _batchOutputName(path, tag));
+    final file = File(candidate);
+    if (file.existsSync() && file.lengthSync() > 0) out[path] = candidate;
+  }
+  return out;
+}
+
+/// Reads original pixel dimensions for [paths] in one batched exiftool JSON
+/// call, keyed by source path. Tolerant: a failed call or missing keys just
+/// leave a path absent (its [HashedFile] then falls back to the decoded size).
+Future<Map<String, _Dims>> _readBatchDimensions(
+  ProcessRunner runner,
+  List<String> paths,
+) async {
+  final ProcResult result;
+  try {
+    result = await runner.run('exiftool', buildBatchDimensionArgs(paths));
+  } on Object {
+    return const {};
+  }
+  final dims = <String, _Dims>{};
+  final decoded = _tryDecodeJsonList(result.stdout);
+  for (final entry in decoded) {
+    if (entry is! Map) continue;
+    final source = entry['SourceFile'];
+    final w = _asInt(entry['ImageWidth']);
+    final h = _asInt(entry['ImageHeight']);
+    if (source is String && w != null && h != null) {
+      dims[source] = (width: w, height: h);
+    }
+  }
+  return dims;
+}
+
+/// Builds a [HashedFile] for [path] from its [extracted] thumbnail/preview (or,
+/// when null, by decoding the source itself — the slow fallback). Returns null
+/// when nothing decodes. Dimensions prefer the batched [dims]; pixel size of
+/// the decoded image is the fallback. Never throws.
+HashedFile? _hashFromExtract(String path, String? extracted, _Dims? dims) {
+  final Uint8List bytes;
+  try {
+    bytes = File(extracted ?? path).readAsBytesSync();
+  } on Object {
+    return null; // unreadable
+  }
+  final decoded = _decode(bytes);
+  if (decoded == null) return null;
+
+  final int fileSize;
+  try {
+    fileSize = File(path).lengthSync();
+  } on Object {
+    return null; // source vanished between extract and hash
+  }
+
+  return HashedFile(
+    path: path,
+    hash: dHash(decoded),
+    width: dims?.width ?? decoded.width,
+    height: dims?.height ?? decoded.height,
+    fileSize: fileSize,
+    basename: basenameKey(path),
+    isRaw: PhotoFormats.isRaw(path),
+  );
+}
+
+List<dynamic> _tryDecodeJsonList(String text) {
+  if (text.trim().isEmpty) return const [];
+  try {
+    final decoded = jsonDecode(text);
+    return decoded is List ? decoded : const [];
+  } on FormatException {
+    return const [];
+  }
+}
+
+int? _asInt(Object? v) {
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v);
+  return null;
 }

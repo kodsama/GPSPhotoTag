@@ -545,18 +545,35 @@ Future<void> readImageMetaEntry(ReadImageMetaRequest req) async {
 Directory previewCacheDir() =>
     Directory(p.join(Directory.systemTemp.path, 'stunda_preview_cache'));
 
+/// How many paths each worker hands to one [hashFilesBatch] call: a single
+/// exiftool spawn covers the whole chunk, so larger chunks mean fewer spawns —
+/// capped so a chunk's argument list stays well within OS limits.
+@visibleForTesting
+const int hashBatchChunk = 150;
+
 @visibleForTesting
 Future<void> hashFilesEntry(HashFilesRequest req) async {
   try {
     final runner = buildWorkerRunner(req.bundleDir);
-    final cacheDir = previewCacheDir().path;
-    for (final path in req.paths) {
-      final hashed = await hashFile(path, runner: runner, cacheDir: cacheDir);
-      // Skip undecodable files (RAW with no preview, corrupt images, …).
-      if (hashed != null) req.port.send(hashed);
-      // One progress tick per file processed (even skips) so the aggregated
-      // `done` count reaches the total when the run finishes.
-      req.port.send(1);
+    final tmpDir = previewCacheDir().path;
+    // Batch the slice in chunks: one set of exiftool spawns per chunk (a small
+    // handful), NOT one spawn per file as the old per-file path did.
+    for (var i = 0; i < req.paths.length; i += hashBatchChunk) {
+      final end = (i + hashBatchChunk < req.paths.length)
+          ? i + hashBatchChunk
+          : req.paths.length;
+      final chunk = req.paths.sublist(i, end);
+      final hashed = await hashFilesBatch(
+        chunk,
+        runner: runner,
+        tmpDir: tmpDir,
+        // One progress tick per file processed (even skips) so the aggregated
+        // `done` count reaches the total when the run finishes.
+        onFileDone: () => req.port.send(1),
+      );
+      for (final h in hashed) {
+        req.port.send(h);
+      }
     }
   } on Object {
     // Best-effort: a failed worker just contributes no hashes.
