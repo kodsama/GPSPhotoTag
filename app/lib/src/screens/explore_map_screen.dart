@@ -19,6 +19,22 @@ import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
+/// The [CameraFit] that frames ALL [points] with sensible padding, or null when
+/// there are no points (so callers can no-op / disable a "fit" action).
+///
+/// Pure: reuses [boundsOf] and the same padding/maxZoom as the map's initial
+/// fit, so the default view and the reset button share one definition of
+/// "fit to photos" and it stays unit testable without a map.
+CameraFit? cameraFitForPoints(List<MapPoint> points) {
+  final bounds = boundsOf(points);
+  if (bounds == null) return null;
+  return CameraFit.bounds(
+    bounds: LatLngBounds(bounds.southWest, bounds.northEast),
+    padding: const EdgeInsets.all(48),
+    maxZoom: 16,
+  );
+}
+
 /// A flutter_map [Marker] that remembers the [MapPoint] it represents, so a tap
 /// can open the right photo(s) in the detail panel.
 class PhotoMarker extends Marker {
@@ -50,10 +66,36 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   final MapController _map = MapController();
   final ExploreInteractionController _detail = ExploreInteractionController();
   bool _focusHandled = false;
+  bool _initialFitDone = false;
   MapDisplayMode _mode = MapDisplayMode.numbers;
   Timer? _prefetchDebounce;
 
   void _cycleMode() => setState(() => _mode = _mode.next);
+
+  /// Moves the camera to fit ALL [points] into view (with sensible padding),
+  /// reusing the same bounds→[CameraFit] logic as the initial fit. No-op when
+  /// there are no points or the map isn't laid out yet.
+  void _fitToPoints(List<MapPoint> points) {
+    final fit = cameraFitForPoints(points);
+    if (fit == null) return;
+    try {
+      _map.fitCamera(fit);
+    } on Object {
+      /* map not laid out yet */
+    }
+  }
+
+  /// On first build with points available, fit the camera to them once the map
+  /// is laid out. Photos stream in after the first frame, so [initialCameraFit]
+  /// alone can fit an empty/partial set; this re-fits once they've settled.
+  void _maybeInitialFit(List<MapPoint> points) {
+    if (_initialFitDone || points.isEmpty) return;
+    _initialFitDone = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fitToPoints(points);
+    });
+  }
 
   @override
   void initState() {
@@ -163,8 +205,10 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
-    final points = groupPhotosIntoPoints(controller.explorePhotos);
+    final photos = controller.explorePhotos;
+    final points = groupPhotosIntoPoints(photos);
     _maybeHandleFocus(controller, points);
+    _maybeInitialFit(points);
     final selection = _detail.selection;
 
     return Stack(
@@ -172,6 +216,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         _MapShell(
           mapController: _map,
           points: points,
+          photos: photos,
           mode: _mode,
           onMapEvent: _onMapEvent,
           onMarkerTap: _onMarkerTap,
@@ -181,15 +226,27 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
           left: 12,
           child: _BackButton(onPressed: controller.closeExplore),
         ),
-        // Mode button top-right; the loading chip stacks just below it so the
-        // two never overlap.
+        // Top-right controls: a "fit to photos" reset button sits immediately
+        // left of the mode button; the loading chip stacks just below the row
+        // so nothing overlaps.
         Positioned(
           top: 12,
           right: 12,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _ModeButton(mode: _mode, onPressed: _cycleMode),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ResetButton(
+                    onPressed: points.isEmpty
+                        ? null
+                        : () => _fitToPoints(points),
+                  ),
+                  const SizedBox(width: 8),
+                  _ModeButton(mode: _mode, onPressed: _cycleMode),
+                ],
+              ),
               if (controller.exploreLoading) ...[
                 const SizedBox(height: 8),
                 _LoadingChip(
@@ -228,6 +285,7 @@ class _MapShell extends StatelessWidget {
   const _MapShell({
     required this.mapController,
     required this.points,
+    required this.photos,
     required this.mode,
     required this.onMapEvent,
     required this.onMarkerTap,
@@ -235,6 +293,7 @@ class _MapShell extends StatelessWidget {
 
   final MapController mapController;
   final List<MapPoint> points;
+  final List<ExplorePhoto> photos;
   final MapDisplayMode mode;
   final void Function(MapEvent) onMapEvent;
   final void Function(MapPoint) onMarkerTap;
@@ -292,7 +351,7 @@ class _MapShell extends StatelessWidget {
           keepBuffer: 4,
           panBuffer: 2,
         ),
-        if (mode.showsHeatmap) HeatmapLayer(points: points),
+        if (mode.showsHeatmap) HeatmapLayer(photos: photos),
         if (mode.showsMarkers)
           MarkerClusterLayerWidget(
             options: MarkerClusterLayerOptions(
@@ -310,6 +369,42 @@ class _MapShell extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The upper-right "fit to photos" button, sitting just left of the mode
+/// button. Tapping it re-frames the camera on all photo points; it's disabled
+/// (greyed, non-tappable) when [onPressed] is null (no points).
+class _ResetButton extends StatelessWidget {
+  const _ResetButton({required this.onPressed});
+
+  /// The fit action, or null to render disabled (no points to fit).
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    return Tooltip(
+      message: 'Fit to photos',
+      child: Material(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        elevation: 3,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Icon(
+              Icons.fit_screen,
+              size: 18,
+              color: enabled ? null : scheme.onSurface.withValues(alpha: 0.38),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

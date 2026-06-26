@@ -49,7 +49,33 @@ Future<void> _pump(
 Uint8List _realPng() =>
     Uint8List.fromList(img.encodePng(img.Image(width: 2, height: 2)));
 
+MapPoint _mapPoint(double lat, double lon) => MapPoint(
+  latitude: lat,
+  longitude: lon,
+  photos: [_gpsPhoto('/p.jpg', lat, lon)],
+);
+
 void main() {
+  group('cameraFitForPoints', () {
+    test('no points yields a null fit (so the action can no-op)', () {
+      expect(cameraFitForPoints(const []), isNull);
+    });
+
+    test('frames the bounds of all points with padding', () {
+      final fit = cameraFitForPoints([
+        _mapPoint(42.5, 18.1),
+        _mapPoint(43.0, 19.0),
+      ]);
+      expect(fit, isA<FitBounds>());
+      final bounds = (fit! as FitBounds).bounds;
+      // The fit spans the south-west / north-east extremes of the points.
+      expect(bounds.south, 42.5);
+      expect(bounds.north, 43.0);
+      expect(bounds.west, 18.1);
+      expect(bounds.east, 19.0);
+    });
+  });
+
   testWidgets('shows the loading chip while coordinates stream in', (
     tester,
   ) async {
@@ -233,5 +259,46 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Numbers'), findsOneWidget);
     expect(find.byType(HeatmapLayer), findsNothing);
+  });
+
+  testWidgets('the fit-to-photos button sits left of the mode button', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final fit = find.byIcon(Icons.fit_screen);
+    final mode = find.byIcon(Icons.tag); // Numbers mode icon
+    expect(fit, findsOneWidget);
+    expect(mode, findsOneWidget);
+    // The fit button is positioned to the LEFT of the mode button.
+    expect(tester.getCenter(fit).dx, lessThan(tester.getCenter(mode).dx));
+    // Tapping it (with points present) re-fits without error.
+    await tester.tap(fit);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the fit-to-photos button is a disabled no-op with no points', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const []))
+      ..debugSetExplore(const []);
+    await _pump(tester, c);
+
+    final fit = find.byIcon(Icons.fit_screen);
+    expect(fit, findsOneWidget);
+    // Disabled: the underlying InkWell has a null onTap, so tapping is inert.
+    final inkWell = tester.widget<InkWell>(
+      find.ancestor(of: fit, matching: find.byType(InkWell)),
+    );
+    expect(inkWell.onTap, isNull);
+    await tester.tap(fit);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 }
