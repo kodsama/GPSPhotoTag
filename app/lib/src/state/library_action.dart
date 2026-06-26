@@ -56,6 +56,14 @@ enum LibraryAction {
     icon: Icons.cleaning_services_outlined,
     title: 'Match Images to RAW',
     description: 'Trash RAW files or photos that have no matching partner.',
+  ),
+
+  /// Find visually-similar photos (perceptual hashing) and trash duplicates.
+  duplicates(
+    id: 'duplicates',
+    icon: Icons.filter_none,
+    title: 'Find duplicates',
+    description: 'Spot visually-similar photos and trash the extras.',
   );
 
   const LibraryAction({
@@ -91,6 +99,10 @@ enum LibraryAction {
       _rawCount(scan) > 0
           ? ActionReadiness.ready('${_rawCount(scan)} RAW files')
           : const ActionReadiness.blocked('No RAW files found'),
+    LibraryAction.duplicates =>
+      scan.photoCount > 1
+          ? ActionReadiness.ready('${scan.photoCount} photos')
+          : const ActionReadiness.blocked('Need at least 2 photos'),
   };
 
   static ActionReadiness _tagReadiness(FolderScanResult scan) {

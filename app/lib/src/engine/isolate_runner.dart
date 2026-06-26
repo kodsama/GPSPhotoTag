@@ -177,6 +177,64 @@ class IsolateRunner implements EngineRunner {
     return result is String ? result : null;
   }
 
+  /// Perceptually hashes [paths] across worker isolates, then groups the
+  /// returned [HashedFile]s within [threshold] on the UI isolate (cheap, pure).
+  ///
+  /// Fans the paths out round-robin across a CPU-bounded set of workers (each
+  /// running its own bundled exiftool for RAW/HEIC previews), collects every
+  /// hashed file, then runs [groupDuplicates]. Undecodable files and a worker
+  /// that fails to start are simply skipped.
+  @override
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required int threshold,
+  }) async {
+    if (paths.isEmpty) return const [];
+    final cores = Platform.numberOfProcessors;
+    final workers = paths.length <= 32
+        ? 1
+        : (cores - 2).clamp(2, 6).clamp(1, (paths.length / 32).ceil());
+
+    final results = <int, List<HashedFile>>{};
+    final futures = <Future<void>>[];
+
+    for (var w = 0; w < workers; w++) {
+      final slice = [for (var i = w; i < paths.length; i += workers) paths[i]];
+      final receive = ReceivePort();
+      final done = Completer<void>();
+      final collected = <HashedFile>[];
+      receive.listen((message) {
+        if (message == null) {
+          receive.close();
+          if (!done.isCompleted) done.complete();
+        } else if (message is HashedFile) {
+          collected.add(message);
+        }
+      });
+      final slot = w;
+      results[slot] = collected;
+      Isolate.spawn(
+        hashFilesEntry,
+        HashFilesRequest(
+          port: receive.sendPort,
+          paths: slice,
+          bundleDir: exiftoolBundleDir,
+        ),
+      ).catchError((Object _) {
+        // A worker that never starts contributes no hashes; unblock the join.
+        receive.close();
+        if (!done.isCompleted) done.complete();
+        return Isolate.current;
+      });
+      futures.add(done.future);
+    }
+
+    await Future.wait(futures);
+    // Concatenate worker outputs in worker order for deterministic grouping.
+    final all = <HashedFile>[for (var w = 0; w < workers; w++) ...?results[w]];
+    return groupDuplicates(all, threshold: threshold);
+  }
+
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
   /// by [makeRequest], and re-emits every event of type [E] it sends until the
   /// null sentinel. A spawn failure is surfaced via [onSpawnError].
@@ -297,6 +355,19 @@ class FixDatesRequest {
 @visibleForTesting
 class ReadImageMetaRequest {
   const ReadImageMetaRequest({
+    required this.port,
+    required this.paths,
+    required this.bundleDir,
+  });
+
+  final SendPort port;
+  final List<String> paths;
+  final String? bundleDir;
+}
+
+@visibleForTesting
+class HashFilesRequest {
+  const HashFilesRequest({
     required this.port,
     required this.paths,
     required this.bundleDir,
@@ -456,6 +527,23 @@ Future<void> readImageMetaEntry(ReadImageMetaRequest req) async {
 @visibleForTesting
 Directory previewCacheDir() =>
     Directory(p.join(Directory.systemTemp.path, 'stunda_preview_cache'));
+
+@visibleForTesting
+Future<void> hashFilesEntry(HashFilesRequest req) async {
+  try {
+    final runner = buildWorkerRunner(req.bundleDir);
+    final cacheDir = previewCacheDir().path;
+    for (final path in req.paths) {
+      final hashed = await hashFile(path, runner: runner, cacheDir: cacheDir);
+      // Skip undecodable files (RAW with no preview, corrupt images, …).
+      if (hashed != null) req.port.send(hashed);
+    }
+  } on Object {
+    // Best-effort: a failed worker just contributes no hashes.
+  } finally {
+    req.port.send(null);
+  }
+}
 
 @visibleForTesting
 Future<void> extractPreviewEntry(ExtractPreviewRequest req) async {

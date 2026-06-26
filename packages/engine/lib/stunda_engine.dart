@@ -32,6 +32,7 @@ export 'src/domain/photo_row.dart';
 export 'src/domain/status.dart';
 export 'src/domain/timed_point.dart';
 export 'src/services/dater.dart';
+export 'src/services/duplicate_finder.dart';
 export 'src/services/file_meta.dart';
 export 'src/services/locator.dart';
 export 'src/services/map_service.dart';

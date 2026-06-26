@@ -164,6 +164,31 @@ class FakeEngineRunner implements EngineRunner {
     extractFullFlags.add(full);
     return previews[path];
   }
+
+  /// Canned duplicate groups returned by [findDuplicates].
+  List<DuplicateGroup> duplicateGroups = const [];
+
+  /// The threshold passed to the last [findDuplicates] call.
+  int? lastDuplicateThreshold;
+
+  /// Paths passed to the last [findDuplicates] call.
+  List<String>? lastDuplicatePaths;
+
+  /// When set, [findDuplicates] waits on this before returning, so a test can
+  /// observe the in-flight `findingDuplicates` state.
+  Completer<void>? duplicatesGate;
+
+  @override
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required int threshold,
+  }) async {
+    calls.add('findDuplicates');
+    lastDuplicateThreshold = threshold;
+    lastDuplicatePaths = paths;
+    if (duplicatesGate != null) await duplicatesGate!.future;
+    return duplicateGroups;
+  }
 }
 
 /// An [EngineRunner] whose streams emit a stream-level error (rather than an
@@ -209,6 +234,12 @@ class ThrowingEngineRunner implements EngineRunner {
   @override
   Future<String?> extractPreview(String path, {bool full = false}) async =>
       throw StateError('extractPreview blew up');
+
+  @override
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required int threshold,
+  }) async => throw StateError('findDuplicates blew up');
 }
 
 /// Builds a [FolderScanResult] for tests with controllable tallies.

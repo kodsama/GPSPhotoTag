@@ -190,6 +190,19 @@ void main() {
       expect(events.whereType<DoneEvent>(), isNotEmpty);
     });
 
+    test('hashFilesEntry sends a HashedFile per decodable path', () async {
+      final jpg = await writeJpegWithDate(tmp, 'h.jpg');
+      final txt = File('${tmp.path}/notes.txt')..writeAsStringSync('not image');
+      final events = await _drain(
+        (port) => hashFilesEntry(
+          HashFilesRequest(port: port, paths: [jpg, txt.path], bundleDir: null),
+        ),
+      );
+      // The JPEG hashes; the text file is skipped (undecodable).
+      final hashed = events.whereType<HashedFile>().toList();
+      expect(hashed.map((h) => h.path), [jpg]);
+    });
+
     test('extractPreviewEntry returns null for a non-RAW file', () async {
       final txt = File('${tmp.path}/notes.txt')..writeAsStringSync('hi');
       final receive = ReceivePort();

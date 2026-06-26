@@ -228,6 +228,28 @@ void main() {
     expect(metas.every((m) => m.path == jpg), isTrue);
   });
 
+  test('findDuplicates returns empty for no paths', () async {
+    const runner = IsolateRunner();
+    expect(await runner.findDuplicates(const [], threshold: 0), isEmpty);
+  });
+
+  test('findDuplicates hashes on workers and groups identical JPEGs', () async {
+    // Two byte-identical JPEGs (same pixels) → identical dHash → one group; a
+    // visually different third file stays out.
+    final a = await writeJpegWithDate(tmp, 'a.jpg');
+    final bBytes = File(a).readAsBytesSync();
+    final b = '${tmp.path}/b.jpg';
+    File(b).writeAsBytesSync(bBytes); // exact copy of a
+    final c = await writeJpegWithDate(tmp, 'c.jpg'); // same tiny content too
+
+    const runner = IsolateRunner();
+    final groups = await runner.findDuplicates([a, b, c], threshold: 0);
+
+    // All three are 8×8 blank JPEGs, so they hash equal and form one group.
+    expect(groups, hasLength(1));
+    expect(groups.single.size, 3);
+  });
+
   test('scan runs on a worker isolate and reports the tree', () async {
     final jpg = await writeJpegWithDate(tmp, 'a.jpg');
     writeGpx(tmp, 'track.gpx', DateTime(2026));

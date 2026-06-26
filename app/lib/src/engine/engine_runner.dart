@@ -48,4 +48,13 @@ abstract interface class EngineRunner {
   /// when the file carries no usable embedded image. [full] picks the largest
   /// preview (fullscreen) vs the small thumbnail (list miniature).
   Future<String?> extractPreview(String path, {bool full = false});
+
+  /// Perceptually hashes [paths] across worker isolates and groups files whose
+  /// hashes are within [threshold] Hamming distance, returning the duplicate
+  /// groups (undecodable files and RAW companions are excluded). RAW/HEIC are
+  /// hashed via their embedded preview using the bundled exiftool.
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required int threshold,
+  });
 }

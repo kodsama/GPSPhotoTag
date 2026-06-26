@@ -13,6 +13,7 @@ import '../engine/mcp_service.dart';
 import '../explore/explore_model.dart';
 import 'app_prefs.dart';
 import 'app_screen.dart';
+import 'duplicates_model.dart';
 import 'library_action.dart';
 import 'library_roots.dart';
 import 'log_entry.dart';
@@ -188,6 +189,8 @@ class AppController extends ChangeNotifier {
     }
     _action = action;
     _resetRun();
+    _duplicatePairs = null;
+    _findingDuplicates = false;
     if (action == LibraryAction.pruneRaw) {
       _preparePruneReview();
     } else {
@@ -998,6 +1001,95 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------
+
+  int _similarity = 0;
+  bool _findingDuplicates = false;
+  List<DuplicatePair>? _duplicatePairs;
+
+  /// The similarity slider value (0 = Exact, [similaritySteps] = Loose).
+  int get similarity => _similarity;
+
+  /// Whether duplicate hashing is currently in flight.
+  bool get findingDuplicates => _findingDuplicates;
+
+  /// The reviewable duplicate pairs (best on the left, candidate on the right),
+  /// or null until a find run completes.
+  List<DuplicatePair>? get duplicatePairs =>
+      _duplicatePairs == null ? null : List.unmodifiable(_duplicatePairs!);
+
+  /// Paths still selected for removal across the reviewed pairs.
+  List<String> get duplicateRemovalPaths => _duplicatePairs == null
+      ? const []
+      : selectedRemovalPaths(_duplicatePairs!);
+
+  /// Number of files the "Remove duplicates" button will trash.
+  int get duplicateRemovalCount => duplicateRemovalPaths.length;
+
+  /// Sets the similarity slider (clamped to 0..[similaritySteps]).
+  void setSimilarity(int value) {
+    final clamped = value.clamp(0, similaritySteps);
+    if (_similarity == clamped) return;
+    _similarity = clamped;
+    notifyListeners();
+  }
+
+  /// Hashes every *included* photo off the UI isolate and folds the resulting
+  /// duplicate groups into reviewable pairs at the current similarity.
+  Future<void> runFindDuplicates() async {
+    final scan = _scan;
+    if (scan == null) return;
+    final photos = _included(scan.photos);
+    _findingDuplicates = true;
+    _duplicatePairs = null;
+    _errorMessage = null;
+    _log('Hashing ${photos.length} photo(s) for duplicates…');
+    notifyListeners();
+    try {
+      final groups = await _engine.findDuplicates(
+        photos,
+        threshold: similarityToThreshold(_similarity),
+      );
+      _duplicatePairs = pairsFromGroups(groups);
+      _log('Found ${groups.length} duplicate group(s)');
+    } on Object catch (e) {
+      _errorMessage = '$e';
+      _duplicatePairs = const [];
+      _log('Duplicate scan failed: $e', level: LogLevel.error);
+    }
+    _findingDuplicates = false;
+    notifyListeners();
+  }
+
+  /// Toggles whether the right-side file of the pair at [index] is selected for
+  /// removal (deselect = keep both).
+  void setDuplicateRemoval(int index, bool selected) {
+    final pairs = _duplicatePairs;
+    if (pairs == null || index < 0 || index >= pairs.length) return;
+    pairs[index] = pairs[index].withSelected(selected);
+    notifyListeners();
+  }
+
+  /// Swaps which side (kept vs to-remove) of the pair at [index] is which.
+  void swapDuplicatePair(int index) {
+    final pairs = _duplicatePairs;
+    if (pairs == null || index < 0 || index >= pairs.length) return;
+    pairs[index] = pairs[index].swap();
+    notifyListeners();
+  }
+
+  /// Trashes every right-side file still selected for removal, after the
+  /// silly-word confirm gate. A no-op when nothing is selected.
+  Future<void> runTrashDuplicates() {
+    final paths = duplicateRemovalPaths;
+    if (paths.isEmpty) return Future.value();
+    return _consume(
+      _engine.trashPaths(paths),
+      startMessage: 'Moving ${paths.length} duplicate(s) to Trash…',
+      total: paths.length,
+    );
+  }
+
   void _resetRun() {
     _rows.clear();
     _lastSummary = null;
@@ -1105,6 +1197,17 @@ class AppController extends ChangeNotifier {
     _screen = screen;
     _action = action;
     if (action == LibraryAction.pruneRaw) _preparePruneReview();
+    notifyListeners();
+  }
+
+  /// Seeds the duplicate-review pairs directly on the duplicates action panel
+  /// (tests only), bypassing the isolate-backed hashing.
+  @visibleForTesting
+  void debugSetDuplicatePairs(List<DuplicatePair> pairs) {
+    _screen = AppScreen.action;
+    _action = LibraryAction.duplicates;
+    _duplicatePairs = List.of(pairs);
+    _findingDuplicates = false;
     notifyListeners();
   }
 
