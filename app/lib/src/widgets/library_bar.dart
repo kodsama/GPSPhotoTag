@@ -97,7 +97,7 @@ class LibraryBar extends StatelessWidget {
   }
 
   static String _statLine(FolderScanResult scan) =>
-      '${scan.photoCount} photos · ${scan.gpxCount} GPX · '
-      '${scan.kmlCount} KML · ${scan.googleCount} Timeline · ${scan.dirs} '
-      'folders';
+      '${scan.dirs} folders · ${scan.photoCount} photos · '
+      '${scan.gpxCount} GPX · ${scan.kmlCount} KML · '
+      '${scan.googleCount} Timeline';
 }

@@ -56,31 +56,32 @@ void main() {
     expect(find.text('Choose photo library'), findsOneWidget);
   });
 
-  testWidgets('the welcome screen shows the drop hint and Add folder', (
-    tester,
-  ) async {
+  testWidgets('the welcome screen shows Choose-library + drop hint, no Add '
+      'folder', (tester) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
     await _pumpApp(tester, controller);
 
+    expect(find.text('Choose photo library'), findsOneWidget);
     expect(find.text('Drop folders or photos here'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Add folder'), findsOneWidget);
+    // Add folder belongs to the workspace, not the empty welcome screen.
+    expect(find.widgetWithText(OutlinedButton, 'Add folder'), findsNothing);
   });
 
-  testWidgets('tapping Add folder on welcome adds a root and scans', (
+  testWidgets('tapping Add folder in the workspace appends a root and scans', (
     tester,
   ) async {
     final fake = FakeEngineRunner(scanEvents: [ScanDoneEvent(fakeScan())]);
-    final controller = AppController(
-      runner: fake,
-      pickFolder: () async => '/pics',
-    )..debugSetToolkit([_tool('exiftool')]);
+    final controller =
+        AppController(runner: fake, pickFolder: () async => '/pics')
+          ..debugSetToolkit([_tool('exiftool')])
+          ..debugSetScan(fakeScan(), roots: ['/a']);
     await _pumpApp(tester, controller);
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Add folder'));
     await tester.pumpAndSettle();
 
-    expect(controller.roots, ['/pics']);
+    expect(controller.roots, ['/a', '/pics']);
     expect(controller.screen, AppScreen.workspace);
   });
 

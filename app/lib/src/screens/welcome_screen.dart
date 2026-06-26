@@ -5,8 +5,8 @@ import '../state/controller_scope.dart';
 import '../widgets/drop_zone.dart';
 
 /// The no-library hero: logo, name, value prop, a big "Choose photo library"
-/// button, an "Add folder" affordance, and a drag-and-drop zone. The way into
-/// the app.
+/// button, and a drag-and-drop zone. The way into the app. (Adding more folders
+/// to an existing library is offered later, in the workspace's library bar.)
 class WelcomeScreen extends StatelessWidget {
   /// Creates the welcome screen.
   const WelcomeScreen({super.key});
@@ -40,22 +40,10 @@ class WelcomeScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: controller.pickLibrary,
-                      icon: const Icon(Icons.folder_open),
-                      label: const Text('Choose photo library'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: controller.addFolder,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add folder'),
-                    ),
-                  ],
+                FilledButton.icon(
+                  onPressed: controller.pickLibrary,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Choose photo library'),
                 ),
                 const SizedBox(height: 24),
                 Container(
