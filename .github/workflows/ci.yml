@@ -30,6 +30,12 @@ jobs:
       - name: Print toolchain versions
         run: flutter --version
 
+      # exiftool must be on PATH for the worker-isolate integration tests (they
+      # run the real tool) and so the vendor step bundles a reliable system copy
+      # rather than a downloaded tarball.
+      - name: Install exiftool
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
       # Resolves the whole workspace (engine, cli, mcp, app) with one lockfile.
       - name: Resolve dependencies
         run: flutter pub get
