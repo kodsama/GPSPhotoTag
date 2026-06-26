@@ -329,11 +329,24 @@ class AppController extends ChangeNotifier {
   /// rescans the combined set. A no-op when nothing new is added.
   Future<void> addRootPaths(Iterable<String> paths) async {
     final next = addRoots(_roots, paths);
-    if (next.length == _roots.length) return;
+    // A no-op when the merge changed nothing — every addition was already
+    // covered (containment-aware), so the root list is identical. (A subsume
+    // can keep the length while swapping a child for its parent, so compare
+    // contents, not just length.)
+    if (_sameRoots(next, _roots)) return;
     _roots
       ..clear()
       ..addAll(next);
     await startScan();
+  }
+
+  /// Whether [a] and [b] hold the same roots in the same order.
+  static bool _sameRoots(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   /// Classifies dropped [paths] and adds the directories + supported files to

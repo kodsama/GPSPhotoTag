@@ -2,8 +2,19 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../data/photo_formats.dart';
 import '../domain/folder_scan.dart';
+
+/// A canonical key for [path], used to dedupe the same file or directory reached
+/// by more than one route (a file root that also lives under a directory root;
+/// nested directory roots; trailing-slash / `./` / `..` path-form differences).
+///
+/// Prefers [p.canonicalize] (absolute + normalized + lower-cased on
+/// case-insensitive platforms). It never touches the filesystem and never
+/// throws, so a broken or nonexistent path still yields a stable key.
+String _canonicalKey(String path) => p.canonicalize(path);
 
 /// Bytes of a `.json` file read when sniffing for Google location history.
 const int _jsonSniffBytes = 64 * 1024;
@@ -135,6 +146,10 @@ class FolderScanner {
     List<String> queue,
     StreamController<ScanEvent> controller,
   ) async {
+    // Dedupe directories the same way as files: a directory reached twice (a
+    // nested directory root that also lives under a parent root, or differently
+    // formed paths to the same directory) is walked and counted exactly once.
+    if (!state.addDir(dir)) return;
     state.dirs++;
     try {
       final entries = Directory(dir).list(followLinks: false);
@@ -183,12 +198,21 @@ class _ScanState {
   final googleFiles = <String>[];
   final unsupported = <UnsupportedFile>[];
 
-  /// Paths already classified, so a file reachable from more than one root
-  /// (e.g. a file root that also lives inside a directory root) counts once.
+  /// Canonical keys of files already classified, so a file reachable from more
+  /// than one root (e.g. a file root that also lives inside a directory root, or
+  /// the same file referred to by differently-formed paths) counts once.
   final _seen = <String>{};
 
+  /// Canonical keys of directories already walked, so an overlapping pair of
+  /// directory roots (e.g. `/pics` and `/pics/trip`) walks the shared subtree
+  /// once and the [dirs] count never double-counts.
+  final _seenDirs = <String>{};
+
+  /// Records [dir] as walked; returns false if it was already seen.
+  bool addDir(String dir) => _seenDirs.add(_canonicalKey(dir));
+
   Future<void> classify(String path) async {
-    if (!_seen.add(path)) return;
+    if (!_seen.add(_canonicalKey(path))) return;
     files++;
     final ext = PhotoFormats.extOf(path);
     byExtension.update(ext, (n) => n + 1, ifAbsent: () => 1);

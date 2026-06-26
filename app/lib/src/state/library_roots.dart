@@ -17,19 +17,52 @@ import 'package:stunda_engine/stunda_engine.dart';
 bool isAddableRoot(String path, {bool isDirectory = false}) =>
     isDirectory || PhotoFormats.isSupported(path);
 
-/// Returns [current] with [additions] appended, preserving order and dropping
-/// duplicates (a path already present, or repeated within [additions]).
+/// Returns [current] with [additions] merged in, preserving add order and
+/// keeping the set free of redundant roots via CONTAINMENT-aware dedup:
 ///
-/// Order is the user's add order: existing roots keep their position and new
-/// ones are appended in the order given.
-List<String> addRoots(List<String> current, Iterable<String> additions) {
-  final seen = current.toSet();
+///  * An addition already COVERED by an existing directory root — equal to it,
+///    or nested inside it — is skipped: it is already scanned through the
+///    parent (e.g. adding `/pics/trip` or `/pics/a.jpg` when `/pics` is a
+///    root). An exact duplicate of any existing root is likewise skipped.
+///  * A directory addition that CONTAINS existing roots SUBSUMES them: the now
+///    redundant nested children / files are dropped and the new ancestor is
+///    appended in add order.
+///
+/// Containment uses canonical paths (so trailing-slash / `./` / `..` forms of
+/// the same path agree) and [p.isWithin]. [isDirectory] probes whether a path
+/// is a directory (needed because only directory roots can contain others); it
+/// defaults to a real filesystem check but is injectable for tests.
+List<String> addRoots(
+  List<String> current,
+  Iterable<String> additions, {
+  bool Function(String path)? isDirectory,
+}) {
+  final isDir = isDirectory ?? _isDirectoryOnDisk;
   final out = [...current];
+
   for (final path in additions) {
-    if (seen.add(path)) out.add(path);
+    final key = _canonical(path);
+    // Skip when already covered by (equal to, or nested inside) an existing
+    // directory root, or an exact duplicate of any existing root.
+    final covered = out.any((root) {
+      final rootKey = _canonical(root);
+      if (rootKey == key) return true;
+      return isDir(root) && p.isWithin(rootKey, key);
+    });
+    if (covered) continue;
+
+    // A new directory subsumes any existing roots nested inside it.
+    if (isDir(path)) {
+      out.removeWhere((root) => p.isWithin(key, _canonical(root)));
+    }
+    out.add(path);
   }
   return out;
 }
+
+/// Canonical (absolute + normalized) form of [path] for containment checks.
+/// Never touches the filesystem and never throws on a broken path.
+String _canonical(String path) => p.canonicalize(path);
 
 /// Returns [current] without [path] (order preserved). A no-op when absent.
 List<String> removeRoot(List<String> current, String path) => [

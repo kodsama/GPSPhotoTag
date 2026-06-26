@@ -858,6 +858,26 @@ void main() {
       expect(after, before);
     });
 
+    test(
+      'addRootPaths subsumes a child root under a newly added parent',
+      () async {
+        // A real dir holding a file: start with the file root, then add the
+        // parent dir. Containment-aware merge swaps the child for the parent —
+        // the list length is unchanged (1 -> 1) but contents differ, so it must
+        // still rescan on the new single parent root.
+        final fake = FakeEngineRunner();
+        final c = AppController(runner: fake);
+        final dir = Directory.systemTemp.createTempSync('subsume');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final jpg = File('${dir.path}/a.jpg')..writeAsStringSync('x');
+        await c.startScan(jpg.path);
+        expect(c.roots, [jpg.path]);
+        await c.addRootPaths([dir.path]);
+        expect(c.roots, [dir.path]);
+        expect(fake.lastScanRoots, [dir.path]);
+      },
+    );
+
     test('addFolder appends the picked folder', () async {
       final fake = FakeEngineRunner();
       final c = AppController(runner: fake, pickFolder: () async => '/b');

@@ -3,21 +3,103 @@ import 'package:stunda/src/state/library_roots.dart';
 
 void main() {
   group('addRoots', () {
+    // Treat any path without a file extension as a directory, so the
+    // containment logic is exercised without touching disk.
+    bool isDir(String path) => !path.contains('.');
+
     test('appends new roots, preserving order', () {
-      expect(addRoots(['/a'], ['/b', '/c']), ['/a', '/b', '/c']);
+      expect(addRoots(['/a'], ['/b', '/c'], isDirectory: isDir), [
+        '/a',
+        '/b',
+        '/c',
+      ]);
     });
 
     test('drops paths already present', () {
-      expect(addRoots(['/a', '/b'], ['/b', '/c']), ['/a', '/b', '/c']);
+      expect(addRoots(['/a', '/b'], ['/b', '/c'], isDirectory: isDir), [
+        '/a',
+        '/b',
+        '/c',
+      ]);
     });
 
     test('dedupes repeats within the additions', () {
-      expect(addRoots([], ['/a', '/a', '/b']), ['/a', '/b']);
+      expect(addRoots([], ['/a', '/a', '/b'], isDirectory: isDir), [
+        '/a',
+        '/b',
+      ]);
     });
 
-    test('returns an equal-length list when nothing is new', () {
-      final out = addRoots(['/a'], ['/a']);
-      expect(out, ['/a']);
+    test('returns an equal list when nothing is new', () {
+      expect(addRoots(['/a'], ['/a'], isDirectory: isDir), ['/a']);
+    });
+
+    test('adding a child of an existing dir root is a no-op', () {
+      // /pics is a dir root; /pics/trip and /pics/a.jpg are already covered.
+      expect(
+        addRoots(['/pics'], ['/pics/trip', '/pics/a.jpg'], isDirectory: isDir),
+        ['/pics'],
+      );
+    });
+
+    test('adding a parent dir subsumes existing nested children and files', () {
+      expect(
+        addRoots(
+          ['/pics/trip', '/pics/a.jpg', '/other'],
+          ['/pics'],
+          isDirectory: isDir,
+        ),
+        ['/other', '/pics'],
+      );
+    });
+
+    test('unrelated roots are all kept', () {
+      expect(addRoots(['/a'], ['/b/x.jpg', '/c'], isDirectory: isDir), [
+        '/a',
+        '/b/x.jpg',
+        '/c',
+      ]);
+    });
+
+    test('a file root then its containing folder leaves only the folder', () {
+      final afterFile = addRoots([], ['/pics/a.jpg'], isDirectory: isDir);
+      expect(afterFile, ['/pics/a.jpg']);
+      final afterFolder = addRoots(afterFile, ['/pics'], isDirectory: isDir);
+      expect(afterFolder, ['/pics']);
+    });
+
+    test('a folder added then its child in the same batch is a no-op', () {
+      expect(
+        addRoots([], [
+          '/pics',
+          '/pics/trip',
+          '/pics/a.jpg',
+        ], isDirectory: isDir),
+        ['/pics'],
+      );
+    });
+
+    test('path-form differences resolve to the same coverage', () {
+      // Trailing slash, ./ and .. forms all canonicalize to /pics.
+      expect(addRoots(['/pics'], ['/pics/'], isDirectory: isDir), ['/pics']);
+      expect(addRoots(['/pics'], ['/x/../pics/trip'], isDirectory: isDir), [
+        '/pics',
+      ]);
+    });
+
+    test('a file root does not subsume a path that merely shares a prefix', () {
+      // /pics/a.jpg is a file, not a dir, so /pics/a.jpgx is unrelated.
+      expect(addRoots(['/pics/a.jpg'], ['/pics/a.jpgx'], isDirectory: isDir), [
+        '/pics/a.jpg',
+        '/pics/a.jpgx',
+      ]);
+    });
+
+    test('defaults to a real filesystem probe when isDirectory is omitted', () {
+      // No injected probe: a nonexistent dir-like path is not a directory, so
+      // it cannot cover the file added under it — both survive.
+      final out = addRoots(['/no/such/dir'], ['/no/such/dir/a.jpg']);
+      expect(out, ['/no/such/dir', '/no/such/dir/a.jpg']);
     });
   });
 
