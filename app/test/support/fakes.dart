@@ -178,14 +178,20 @@ class FakeEngineRunner implements EngineRunner {
   /// observe the in-flight `findingDuplicates` state.
   Completer<void>? duplicatesGate;
 
+  /// The most recent `onProgress` callback handed to [findDuplicates], so a
+  /// test can drive ticks and observe the controller's live hashing state.
+  void Function(int done, int total)? lastOnProgress;
+
   @override
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required int threshold,
+    void Function(int done, int total)? onProgress,
   }) async {
     calls.add('findDuplicates');
     lastDuplicateThreshold = threshold;
     lastDuplicatePaths = paths;
+    lastOnProgress = onProgress;
     if (duplicatesGate != null) await duplicatesGate!.future;
     return duplicateGroups;
   }
@@ -239,6 +245,7 @@ class ThrowingEngineRunner implements EngineRunner {
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required int threshold,
+    void Function(int done, int total)? onProgress,
   }) async => throw StateError('findDuplicates blew up');
 }
 

@@ -7,6 +7,7 @@ import '../explore/photo_detail_panel.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/duplicates_model.dart';
+import '../theme/app_theme.dart';
 import '../widgets/run_view.dart';
 
 /// The Find-Duplicates flow.
@@ -87,7 +88,7 @@ class _Review extends StatelessWidget {
         ),
         if (controller.findingDuplicates) ...[
           const SizedBox(height: 20),
-          const Center(child: CircularProgressIndicator()),
+          _HashingProgress(progress: controller.hashProgress),
         ],
         if (pairs != null && !controller.findingDuplicates) ...[
           const SizedBox(height: 20),
@@ -128,6 +129,38 @@ class _SimilaritySlider extends StatelessWidget {
             ),
             Text('Loose', style: text.bodySmall),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Determinate hashing progress shown while a find-duplicates run is in flight:
+/// a bar tracking files-hashed/total plus a "Hashing N / M" label. The bar is
+/// indeterminate (null value) only in the brief window before the total is
+/// known.
+class _HashingProgress extends StatelessWidget {
+  const _HashingProgress({required this.progress});
+
+  final HashProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: progress.fraction,
+            minHeight: 8,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          progress.label,
+          style: text.bodyMedium?.copyWith(fontFeatures: AppTheme.tabular),
         ),
       ],
     );

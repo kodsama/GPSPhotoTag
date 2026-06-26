@@ -208,25 +208,36 @@ void main() {
     expect(find.byType(ErrorBanner), findsOneWidget);
   });
 
-  testWidgets('disables the slider and shows a spinner while hashing', (
-    tester,
-  ) async {
-    final fake = FakeEngineRunner()..duplicatesGate = Completer<void>();
-    final c = AppController(runner: fake)
-      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates)
-      ..debugSetScan(fakeScan(photos: const ['/a.jpg', '/b.jpg']));
-    // Kick off hashing but hold it open via the gate so findingDuplicates stays
-    // true while we assert on the mid-flight UI.
-    final run = c.runFindDuplicates();
-    await tester.pumpWidget(_host(c));
-    await tester.pump();
+  testWidgets(
+    'disables the slider and shows determinate hashing progress while hashing',
+    (tester) async {
+      final fake = FakeEngineRunner()..duplicatesGate = Completer<void>();
+      final c = AppController(runner: fake)
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates)
+        ..debugSetScan(
+          fakeScan(photos: const ['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg']),
+        );
+      // Kick off hashing but hold it open via the gate so findingDuplicates
+      // stays true while we assert on the mid-flight UI.
+      final run = c.runFindDuplicates();
+      // Drive a progress tick directly (no real isolate timing): 1 of 4 hashed.
+      fake.lastOnProgress!(1, 4);
+      await tester.pumpWidget(_host(c));
+      await tester.pump();
 
-    expect(c.findingDuplicates, isTrue);
-    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    fake.duplicatesGate!.complete();
-    await run;
-  });
+      expect(c.findingDuplicates, isTrue);
+      expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+      // A determinate bar (value reflects 1/4), not the old indeterminate one.
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.value, closeTo(0.25, 1e-9));
+      expect(find.text('Hashing 1 / 4'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      fake.duplicatesGate!.complete();
+      await run;
+    },
+  );
 
   testWidgets('cancelling the confirm dialog trashes nothing', (tester) async {
     final fake = FakeEngineRunner();

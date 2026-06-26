@@ -188,8 +188,10 @@ class IsolateRunner implements EngineRunner {
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required int threshold,
+    void Function(int done, int total)? onProgress,
   }) async {
     if (paths.isEmpty) return const [];
+    final total = paths.length;
     final cores = Platform.numberOfProcessors;
     final workers = paths.length <= 32
         ? 1
@@ -197,6 +199,9 @@ class IsolateRunner implements EngineRunner {
 
     final results = <int, List<HashedFile>>{};
     final futures = <Future<void>>[];
+    // Running count of files every worker has finished (hashed or skipped),
+    // surfaced to [onProgress] against the fixed [total] as ticks arrive.
+    var hashedCount = 0;
 
     for (var w = 0; w < workers; w++) {
       final slice = [for (var i = w; i < paths.length; i += workers) paths[i]];
@@ -209,6 +214,10 @@ class IsolateRunner implements EngineRunner {
           if (!done.isCompleted) done.complete();
         } else if (message is HashedFile) {
           collected.add(message);
+        } else if (message is int) {
+          // A per-file progress tick (1 per file the worker processed).
+          hashedCount += message;
+          onProgress?.call(hashedCount, total);
         }
       });
       final slot = w;
@@ -537,6 +546,9 @@ Future<void> hashFilesEntry(HashFilesRequest req) async {
       final hashed = await hashFile(path, runner: runner, cacheDir: cacheDir);
       // Skip undecodable files (RAW with no preview, corrupt images, …).
       if (hashed != null) req.port.send(hashed);
+      // One progress tick per file processed (even skips) so the aggregated
+      // `done` count reaches the total when the run finishes.
+      req.port.send(1);
     }
   } on Object {
     // Best-effort: a failed worker just contributes no hashes.

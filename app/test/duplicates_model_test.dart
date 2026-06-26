@@ -123,4 +123,38 @@ void main() {
       expect(sillyWordMatches('nope', 'bananaphone'), isFalse);
     });
   });
+
+  group('HashProgress', () {
+    test('ticks accumulate into the done count', () {
+      var p = HashProgress(total: 5);
+      expect(p.done, 0);
+      p = p.tick(1);
+      expect(p.done, 1);
+      p = p.tick(2);
+      expect(p.done, 3);
+    });
+
+    test('fraction is done/total, and null when total is 0', () {
+      expect(HashProgress(done: 2, total: 8).fraction, closeTo(0.25, 1e-9));
+      expect(HashProgress().fraction, isNull);
+      expect(HashProgress(total: 4).fraction, 0);
+    });
+
+    test('clamps done into 0..total so the bar never overshoots', () {
+      expect(HashProgress(done: 9, total: 4).done, 4);
+      expect(HashProgress(done: -3, total: 4).done, 0);
+    });
+
+    test('label groups thousands', () {
+      expect(
+        HashProgress(done: 1234, total: 5000).label,
+        'Hashing 1,234 / 5,000',
+      );
+      expect(HashProgress(done: 7, total: 9).label, 'Hashing 7 / 9');
+      expect(
+        HashProgress(done: 1000000, total: 1000000).label,
+        'Hashing 1,000,000 / 1,000,000',
+      );
+    });
+  });
 }

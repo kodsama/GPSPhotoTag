@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/state/app_controller.dart';
@@ -68,6 +70,33 @@ void main() {
       final c = AppController(runner: FakeEngineRunner());
       await c.runFindDuplicates();
       expect(c.duplicatePairs, isNull);
+    });
+
+    test('folds worker progress ticks into live hashed/total state', () async {
+      final fake = FakeEngineRunner()..duplicatesGate = Completer<void>();
+      final c = AppController(runner: fake)
+        ..debugSetScan(fakeScan(photos: const ['/a.jpg', '/b.jpg', '/c.jpg']));
+      c.openAction(LibraryAction.duplicates);
+
+      final run = c.runFindDuplicates();
+      // Total is known immediately once a run starts; nothing hashed yet.
+      expect(c.duplicatesTotal, 3);
+      expect(c.duplicatesHashed, 0);
+      expect(c.hashProgress.fraction, 0);
+
+      // Ticks accumulate into the done count and the fraction.
+      fake.lastOnProgress!(1, 3);
+      expect(c.duplicatesHashed, 1);
+      fake.lastOnProgress!(2, 3);
+      expect(c.duplicatesHashed, 2);
+      expect(c.hashProgress.fraction, closeTo(2 / 3, 1e-9));
+      expect(c.hashProgress.label, 'Hashing 2 / 3');
+
+      fake.duplicatesGate!.complete();
+      await run;
+      // Reset when the run finishes.
+      expect(c.duplicatesTotal, 0);
+      expect(c.duplicatesHashed, 0);
     });
   });
 

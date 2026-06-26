@@ -243,11 +243,28 @@ void main() {
     final c = await writeJpegWithDate(tmp, 'c.jpg'); // same tiny content too
 
     const runner = IsolateRunner();
-    final groups = await runner.findDuplicates([a, b, c], threshold: 0);
+    final ticks = <int>[];
+    var lastTotal = 0;
+    final groups = await runner.findDuplicates(
+      [a, b, c],
+      threshold: 0,
+      onProgress: (done, total) {
+        ticks.add(done);
+        lastTotal = total;
+      },
+    );
 
     // All three are 8×8 blank JPEGs, so they hash equal and form one group.
     expect(groups, hasLength(1));
     expect(groups.single.size, 3);
+    // Progress reported the fixed total and counted up to every file hashed.
+    expect(lastTotal, 3);
+    expect(ticks, isNotEmpty);
+    expect(ticks.last, 3);
+    // The running count is monotonically non-decreasing.
+    for (var i = 1; i < ticks.length; i++) {
+      expect(ticks[i], greaterThanOrEqualTo(ticks[i - 1]));
+    }
   });
 
   test('scan runs on a worker isolate and reports the tree', () async {

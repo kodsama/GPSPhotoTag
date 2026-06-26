@@ -76,6 +76,45 @@ List<String> selectedRemovalPaths(List<DuplicatePair> pairs) {
   return out;
 }
 
+/// The live progress of a duplicate-hashing run: how many files have been
+/// hashed ([done]) out of the [total] to hash. Pure and immutable so the
+/// done/total → fraction + label mapping is unit-testable away from isolates.
+class HashProgress {
+  /// Creates a progress snapshot. [done] is clamped to `0..total` so a stray
+  /// extra tick can never push the bar past full.
+  HashProgress({int done = 0, this.total = 0})
+    : assert(total >= 0, 'total must be non-negative'),
+      done = done < 0 ? 0 : (done > total ? total : done);
+
+  /// Files hashed so far.
+  final int done;
+
+  /// Total files to hash (0 before the run's size is known).
+  final int total;
+
+  /// Folds a worker tick of [hashed] freshly-hashed files into a new snapshot.
+  HashProgress tick(int hashed) =>
+      HashProgress(done: done + hashed, total: total);
+
+  /// Completion fraction in 0..1, or null when [total] is 0 (size unknown →
+  /// the bar should render indeterminate).
+  double? get fraction => total == 0 ? null : done / total;
+
+  /// A human label like "Hashing 1,234 / 5,000" with grouped thousands.
+  String get label => 'Hashing ${_grouped(done)} / ${_grouped(total)}';
+
+  /// Formats [n] with comma thousands separators (e.g. 1234 → "1,234").
+  static String _grouped(int n) {
+    final digits = n.toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
+      buf.write(digits[i]);
+    }
+    return buf.toString();
+  }
+}
+
 /// A small built-in list of fun confirmation words for the trash gate.
 const List<String> sillyWords = [
   'bananaphone',

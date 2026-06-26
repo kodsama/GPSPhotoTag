@@ -191,6 +191,7 @@ class AppController extends ChangeNotifier {
     _resetRun();
     _duplicatePairs = null;
     _findingDuplicates = false;
+    _hashProgress = HashProgress();
     if (action == LibraryAction.pruneRaw) {
       _preparePruneReview();
     } else {
@@ -1005,6 +1006,7 @@ class AppController extends ChangeNotifier {
 
   int _similarity = 0;
   bool _findingDuplicates = false;
+  HashProgress _hashProgress = HashProgress();
   List<DuplicatePair>? _duplicatePairs;
 
   /// The similarity slider value (0 = Exact, [similaritySteps] = Loose).
@@ -1012,6 +1014,15 @@ class AppController extends ChangeNotifier {
 
   /// Whether duplicate hashing is currently in flight.
   bool get findingDuplicates => _findingDuplicates;
+
+  /// Files hashed so far in the current/last duplicate run.
+  int get duplicatesHashed => _hashProgress.done;
+
+  /// Total files being hashed in the current/last duplicate run.
+  int get duplicatesTotal => _hashProgress.total;
+
+  /// Live hashing progress (done/total → fraction + label) for the UI.
+  HashProgress get hashProgress => _hashProgress;
 
   /// The reviewable duplicate pairs (best on the left, candidate on the right),
   /// or null until a find run completes.
@@ -1041,6 +1052,7 @@ class AppController extends ChangeNotifier {
     if (scan == null) return;
     final photos = _included(scan.photos);
     _findingDuplicates = true;
+    _hashProgress = HashProgress(total: photos.length);
     _duplicatePairs = null;
     _errorMessage = null;
     _log('Hashing ${photos.length} photo(s) for duplicates…');
@@ -1049,6 +1061,10 @@ class AppController extends ChangeNotifier {
       final groups = await _engine.findDuplicates(
         photos,
         threshold: similarityToThreshold(_similarity),
+        onProgress: (done, total) {
+          _hashProgress = HashProgress(done: done, total: total);
+          notifyListeners();
+        },
       );
       _duplicatePairs = pairsFromGroups(groups);
       _log('Found ${groups.length} duplicate group(s)');
@@ -1058,6 +1074,7 @@ class AppController extends ChangeNotifier {
       _log('Duplicate scan failed: $e', level: LogLevel.error);
     }
     _findingDuplicates = false;
+    _hashProgress = HashProgress();
     notifyListeners();
   }
 
