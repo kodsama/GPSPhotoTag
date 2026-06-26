@@ -379,8 +379,12 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 50));
       await tester.tap(find.byIcon(Icons.save_alt));
-      // Let capture (toImage/toByteData) + the async write settle.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Capture (toImage/toByteData) + the async write run on the real event
+      // loop; poll until the file lands (robust on slow CI) instead of a fixed
+      // delay that can race under load.
+      for (var i = 0; i < 150 && !File(out).existsSync(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
       await tester.pump();
       await tester.pump();
     });
