@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
@@ -8,7 +10,9 @@ import '../explore/explore_markers.dart';
 import '../explore/explore_model.dart';
 import '../explore/heatmap.dart';
 import '../explore/map_display_mode.dart';
+import '../explore/map_tile_provider.dart';
 import '../explore/photo_detail_panel.dart';
+import '../explore/tile_cache.dart';
 import '../explore/tile_provider_scope.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
@@ -47,6 +51,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   final ExploreInteractionController _detail = ExploreInteractionController();
   bool _focusHandled = false;
   MapDisplayMode _mode = MapDisplayMode.numbers;
+  Timer? _prefetchDebounce;
 
   void _cycleMode() => setState(() => _mode = _mode.next);
 
@@ -58,6 +63,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
 
   @override
   void dispose() {
+    _prefetchDebounce?.cancel();
     _detail
       ..removeListener(_onDetailChanged)
       ..dispose();
@@ -78,8 +84,46 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   void _onMarkerTap(MapPoint point) =>
       _detail.open(point, atZoom: _cameraZoom());
 
-  void _onMapEvent(MapEvent event) =>
-      _detail.onZoom(event.source.name, event.camera.zoom);
+  void _onMapEvent(MapEvent event) {
+    _detail.onZoom(event.source.name, event.camera.zoom);
+    // Warm tiles around the view once a gesture/animation settles — debounced
+    // so it never fires mid-pan/zoom (a fresh event resets the timer).
+    if (_settlesPrefetch(event)) {
+      _prefetchDebounce?.cancel();
+      _prefetchDebounce = Timer(
+        const Duration(milliseconds: 400),
+        () => _prefetchAround(event.camera),
+      );
+    }
+  }
+
+  /// True for the map events that mark the END of a pan/zoom (so prefetch only
+  /// runs once the view has settled, not on every intermediate frame).
+  static bool _settlesPrefetch(MapEvent event) =>
+      event is MapEventMoveEnd ||
+      event is MapEventFlingAnimationEnd ||
+      event is MapEventDoubleTapZoomEnd ||
+      event is MapEventScrollWheelZoom ||
+      event is MapEventRotateEnd;
+
+  /// Warms the tiles around [camera] (viewport + margin ring + one zoom level
+  /// either side) into the disk cache at low priority. No-op without a caching
+  /// provider in scope (e.g. widget tests).
+  void _prefetchAround(MapCamera camera) {
+    final provider = TileProviderScope.maybeOf(context);
+    if (provider is! CachingTileProvider) return;
+    final bounds = camera.visibleBounds;
+    final coords = prefetchTileCoordinates(
+      north: bounds.north,
+      south: bounds.south,
+      east: bounds.east,
+      west: bounds.west,
+      zoom: camera.zoom.round(),
+    );
+    for (final (z, x, y) in coords) {
+      unawaited(provider.cache.prefetch(z, x, y));
+    }
+  }
 
   void _openFullscreen() {
     final selection = _detail.selection;

@@ -1,10 +1,20 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:image/image.dart' as img;
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/explore/explore_model.dart';
 import 'package:stunda/src/explore/heatmap.dart';
+import 'package:stunda/src/explore/map_tile_provider.dart';
 import 'package:stunda/src/explore/photo_detail_panel.dart';
+import 'package:stunda/src/explore/tile_cache.dart';
+import 'package:stunda/src/explore/tile_provider_scope.dart';
 import 'package:stunda/src/screens/explore_map_screen.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
@@ -15,19 +25,29 @@ import 'support/fakes.dart';
 ExplorePhoto _gpsPhoto(String path, double lat, double lon, {FileMeta? meta}) =>
     ExplorePhoto(path: path, latitude: lat, longitude: lon, meta: meta);
 
-Future<void> _pump(WidgetTester tester, AppController c) async {
+Future<void> _pump(
+  WidgetTester tester,
+  AppController c, {
+  TileProvider? tileProvider,
+}) async {
   tester.view.physicalSize = const Size(1000, 1400);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  const screen = MaterialApp(home: Scaffold(body: ExploreMapScreen()));
   await tester.pumpWidget(
     ControllerScope(
       controller: c,
-      child: const MaterialApp(home: Scaffold(body: ExploreMapScreen())),
+      child: tileProvider == null
+          ? screen
+          : TileProviderScope(tileProvider: tileProvider, child: screen),
     ),
   );
   await tester.pump();
 }
+
+Uint8List _realPng() =>
+    Uint8List.fromList(img.encodePng(img.Image(width: 2, height: 2)));
 
 void main() {
   testWidgets('shows the loading chip while coordinates stream in', (
@@ -137,6 +157,44 @@ void main() {
     await tester.tap(find.byIcon(Icons.close));
     await tester.pump();
     expect(find.byType(PhotoDetailPanel), findsNothing);
+  });
+
+  testWidgets('settling a pan warms tiles around the view through the cache', (
+    tester,
+  ) async {
+    final root = Directory.systemTemp.createTempSync('prefetch-screen');
+    addTearDown(() => root.deleteSync(recursive: true));
+    var fetches = 0;
+    final client = MockClient((_) async {
+      fetches++;
+      return http.Response.bytes(_realPng(), 200);
+    });
+    final cache = TileCache(client: client, root: root, sleep: (_) async {});
+    final provider = CachingTileProvider(cache: cache);
+
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+    await _pump(tester, c, tileProvider: provider);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Drive the whole gesture + debounce + warming on the REAL event loop so
+    // the real Timer fires and the cache's real disk/network I/O completes.
+    await tester.runAsync(() async {
+      // Drag the map; the gesture end fires MapEventMoveEnd, scheduling the
+      // (debounced) prefetch.
+      await tester.drag(find.byType(FlutterMap), const Offset(-100, -80));
+      await tester.pump();
+      // Wait past the 400ms debounce so the warming fetches start.
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+    });
+
+    // The settled pan triggered prefetch through the cache (>=1 tile fetched).
+    // That the fetched bytes are then persisted to disk is covered
+    // deterministically by the TileCache unit tests ('cache miss fetches,
+    // writes the tile to disk'); asserting the file here would race the
+    // fire-and-forget atomic write.
+    expect(fetches, greaterThan(0));
   });
 
   testWidgets('the mode button cycles Numbers -> Heatmap -> Both -> Numbers', (
