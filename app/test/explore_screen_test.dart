@@ -25,6 +25,27 @@ import 'support/fakes.dart';
 ExplorePhoto _gpsPhoto(String path, double lat, double lon, {FileMeta? meta}) =>
     ExplorePhoto(path: path, latitude: lat, longitude: lon, meta: meta);
 
+DateTime _d(int y, [int m = 1, int day = 1]) => DateTime(y, m, day);
+
+ExplorePhoto _datedPhoto(String path, double lat, double lon, DateTime date) =>
+    ExplorePhoto(
+      path: path,
+      latitude: lat,
+      longitude: lon,
+      meta: FileMeta(
+        path: path,
+        hasGps: true,
+        latitude: lat,
+        longitude: lon,
+        date: date,
+      ),
+    );
+
+/// The photos currently feeding the (live) [HeatmapLayer] — a direct read of
+/// what the filtered set hands the heatmap.
+List<ExplorePhoto> _heatmapPhotos(WidgetTester tester) =>
+    tester.widget<HeatmapLayer>(find.byType(HeatmapLayer)).photos;
+
 Future<void> _pump(
   WidgetTester tester,
   AppController c, {
@@ -300,5 +321,195 @@ void main() {
     await tester.tap(fit);
     await tester.pump();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the Timeline button is hidden when no photo carries a date', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+    await _pump(tester, c);
+
+    expect(find.text('Timeline'), findsNothing);
+  });
+
+  testWidgets('tapping Timeline toggles the range selector', (tester) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_datedPhoto('/library/a.heic', 42.5, 18.1, _d(2021))]);
+    await _pump(tester, c);
+
+    expect(find.byType(TimelinePanel), findsNothing);
+    await tester.tap(find.text('Timeline'));
+    await tester.pump();
+    expect(find.byType(TimelinePanel), findsOneWidget);
+
+    // A single dated photo is a zero-width span: labels show, no slider.
+    expect(find.byType(RangeSlider), findsNothing);
+
+    // Toggling again hides it.
+    await tester.tap(find.text('Timeline'));
+    await tester.pump();
+    expect(find.byType(TimelinePanel), findsNothing);
+  });
+
+  testWidgets(
+    'narrowing the range filters both markers and the heatmap input',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(
+          fakeScan(photos: const ['/library/a.heic', '/b.heic', '/c.heic']),
+        )
+        ..debugSetExplore([
+          _datedPhoto('/library/a.heic', 42.5, 18.1, _d(2020)),
+          _datedPhoto('/b.heic', 42.6, 18.2, _d(2021)),
+          _datedPhoto('/c.heic', 42.7, 18.3, _d(2022)),
+        ]);
+      await _pump(tester, c);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Switch to "Both" so the heatmap receives the filtered photo list too.
+      await tester.tap(find.text('Numbers'));
+      await tester.pump();
+      await tester.tap(find.text('Heatmap'));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // All three photos feed the heatmap before any filtering.
+      expect(_heatmapPhotos(tester), hasLength(3));
+
+      // Open the timeline and narrow the range to 2021-only via the panel.
+      await tester.tap(find.text('Timeline'));
+      await tester.pump();
+      final panel = tester.widget<TimelinePanel>(find.byType(TimelinePanel));
+      panel.onChanged((start: _d(2021), end: _d(2021, 12, 31)));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Only the 2021 photo survives, reflected to the heatmap AND the markers.
+      expect(_heatmapPhotos(tester), hasLength(1));
+      expect(_heatmapPhotos(tester).single.path, '/b.heic');
+
+      // Reset range restores the full set.
+      await tester.tap(find.text('Reset range'));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(_heatmapPhotos(tester), hasLength(3));
+    },
+  );
+
+  testWidgets('dragging the range slider narrows the visible photos', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic', '/b.heic']))
+      ..debugSetExplore([
+        _datedPhoto('/library/a.heic', 42.5, 18.1, _d(2020)),
+        _datedPhoto('/b.heic', 42.6, 18.2, _d(2024)),
+      ]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Numbers'));
+    await tester.pump();
+    await tester.tap(find.text('Heatmap'));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    await tester.tap(find.text('Timeline'));
+    await tester.pump();
+    expect(_heatmapPhotos(tester), hasLength(2));
+
+    // Drag the left (start) handle to the far right, pushing the start past the
+    // earlier photo so only the later one remains.
+    final slider = find.byType(RangeSlider);
+    final box = tester.getRect(slider);
+    await tester.dragFrom(
+      Offset(box.left + 8, box.center.dy),
+      Offset(box.width, 0),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(_heatmapPhotos(tester).length, lessThan(2));
+  });
+
+  testWidgets('the date label opens a picker and applies the chosen date', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic', '/b.heic']))
+      ..debugSetExplore([
+        _datedPhoto('/library/a.heic', 42.5, 18.1, _d(2020, 1, 1)),
+        _datedPhoto('/b.heic', 42.6, 18.2, _d(2020, 1, 31)),
+      ]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Timeline'));
+    await tester.pump();
+
+    // Tap the START label to open the date picker, pick a later day, confirm.
+    await tester.tap(find.text('2020-01-01 00:00'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('20'));
+    await tester.pump();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    // Then the time picker; accept its default.
+    expect(find.byType(TimePickerDialog), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // The start label moved off the span start — the range narrowed.
+    expect(find.text('2020-01-01 00:00'), findsNothing);
+  });
+
+  testWidgets('the end date label opens a picker and applies the chosen date', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic', '/b.heic']))
+      ..debugSetExplore([
+        _datedPhoto('/library/a.heic', 42.5, 18.1, _d(2020, 1, 1)),
+        _datedPhoto('/b.heic', 42.6, 18.2, _d(2020, 1, 31)),
+      ]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Timeline'));
+    await tester.pump();
+
+    // Tap the END label, pick an earlier day than the span end, confirm.
+    await tester.tap(find.text('2020-01-31 00:00'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('10'));
+    await tester.pump();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK')); // accept default time
+    await tester.pumpAndSettle();
+
+    // The end moved off the span end — the range narrowed.
+    expect(find.text('2020-01-31 00:00'), findsNothing);
+  });
+
+  testWidgets('cancelling the end date picker leaves the range unchanged', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic', '/b.heic']))
+      ..debugSetExplore([
+        _datedPhoto('/library/a.heic', 42.5, 18.1, _d(2020, 1, 1)),
+        _datedPhoto('/b.heic', 42.6, 18.2, _d(2020, 1, 31)),
+      ]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Timeline'));
+    await tester.pump();
+
+    await tester.tap(find.text('2020-01-01 00:00'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Dismissed without choosing: the range is untouched.
+    expect(find.text('2020-01-01 00:00'), findsOneWidget);
+    expect(find.text('2020-01-31 00:00'), findsOneWidget);
   });
 }

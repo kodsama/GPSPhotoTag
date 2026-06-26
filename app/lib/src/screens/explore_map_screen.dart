@@ -14,6 +14,7 @@ import '../explore/map_tile_provider.dart';
 import '../explore/photo_detail_panel.dart';
 import '../explore/tile_cache.dart';
 import '../explore/tile_provider_scope.dart';
+import '../explore/timeline_filter.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
@@ -70,7 +71,33 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   MapDisplayMode _mode = MapDisplayMode.numbers;
   Timer? _prefetchDebounce;
 
+  /// Whether the Timeline range selector is shown.
+  bool _timelineOpen = false;
+
+  /// The user-selected capture-time range, or null to use the full span (show
+  /// everything). Kept as raw [DateTime]s so it survives photos streaming in;
+  /// it's clamped to the live span at build time.
+  DateSpan? _range;
+
   void _cycleMode() => setState(() => _mode = _mode.next);
+
+  void _toggleTimeline() => setState(() => _timelineOpen = !_timelineOpen);
+
+  /// Replaces the active range (live as the slider drags), or clears it back to
+  /// the full span when [range] is null ("reset range").
+  void _setRange(DateSpan? range) => setState(() => _range = range);
+
+  /// The range to actually filter by, clamped to the live [span], or null when
+  /// nothing should be filtered (no dated photos, or the user hasn't narrowed
+  /// the range so the full span is shown).
+  DateSpan? _effectiveRange(DateSpan? span) {
+    if (span == null) return null;
+    final range = _range;
+    if (range == null) return null;
+    final start = range.start.isBefore(span.start) ? span.start : range.start;
+    final end = range.end.isAfter(span.end) ? span.end : range.end;
+    return (start: start, end: end);
+  }
 
   /// Moves the camera to fit ALL [points] into view (with sensible padding),
   /// reusing the same bounds→[CameraFit] logic as the initial fit. No-op when
@@ -205,7 +232,20 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
-    final photos = controller.explorePhotos;
+    final allPhotos = controller.explorePhotos;
+    // The full selectable span across every dated photo (null when none are
+    // dated — the Timeline button is then disabled and the selector hidden).
+    final span = dateSpanOf(allPhotos);
+    // The active range, clamped to the live span (which grows as photos stream
+    // in); null span means no filtering at all.
+    final active = _effectiveRange(span);
+    final photos = active == null
+        ? allPhotos
+        : filterPhotosByDateRange(
+            allPhotos,
+            start: active.start,
+            end: active.end,
+          );
     final points = groupPhotosIntoPoints(photos);
     _maybeHandleFocus(controller, points);
     _maybeInitialFit(points);
@@ -238,6 +278,15 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Timeline is offered only when something is datable; with no
+                  // dated photos there's no span to filter, so it's hidden.
+                  if (span != null) ...[
+                    _TimelineButton(
+                      active: _timelineOpen,
+                      onPressed: _toggleTimeline,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   _ResetButton(
                     onPressed: points.isEmpty
                         ? null
@@ -257,6 +306,23 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
             ],
           ),
         ),
+        if (_timelineOpen && span != null)
+          Positioned(
+            bottom: 16,
+            left: 12,
+            right: 12,
+            child: Center(
+              child: TimelinePanel(
+                span: span,
+                // The slider shows the full span until narrowed; once narrowed,
+                // the clamped active range.
+                selected: active ?? span,
+                onChanged: _setRange,
+                onReset: () => _setRange(null),
+                onClose: _toggleTimeline,
+              ),
+            ),
+          ),
         if (!controller.exploreLoading && points.isEmpty)
           const Center(child: _EmptyState()),
         if (selection != null)
@@ -409,6 +475,47 @@ class _ResetButton extends StatelessWidget {
   }
 }
 
+/// The upper-right "Timeline" pill that toggles the date/time range selector.
+/// Highlighted (filled with the primary colour) while the selector is [active].
+class _TimelineButton extends StatelessWidget {
+  const _TimelineButton({required this.active, required this.onPressed});
+
+  /// Whether the selector is currently shown (renders the pill highlighted).
+  final bool active;
+
+  /// Toggles the selector open/closed.
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = active ? scheme.onPrimary : scheme.onSurface;
+    return Tooltip(
+      message: 'Filter by date',
+      child: Material(
+        color: active ? scheme.primary : scheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        elevation: 3,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule, size: 18, color: fg),
+                const SizedBox(width: 8),
+                Text('Timeline', style: TextStyle(color: fg)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The upper-right button that cycles the map display mode (Numbers → Heatmap →
 /// Both). Shows an icon + label reflecting the current [mode].
 class _ModeButton extends StatelessWidget {
@@ -445,6 +552,180 @@ class _ModeButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The overlaid bottom panel that filters the map by a capture-time range.
+///
+/// A dual-handle [RangeSlider] spans the photos' full [span]; the [selected]
+/// start/end are shown as tappable labels that open precise date+time pickers.
+/// Dragging the slider or picking a date calls [onChanged] live (the screen
+/// re-filters markers AND heatmap on every change). A "reset range" affordance
+/// ([onReset]) restores the full span; [onClose] hides the panel.
+///
+/// Pure presentation: it holds no range state of its own — the active range
+/// lives in the screen — so the slider always reflects [selected].
+class TimelinePanel extends StatelessWidget {
+  /// Creates the range selector for [span], showing [selected] on the handles.
+  const TimelinePanel({
+    super.key,
+    required this.span,
+    required this.selected,
+    required this.onChanged,
+    required this.onReset,
+    required this.onClose,
+  });
+
+  /// The full selectable span (slider min/max).
+  final DateSpan span;
+
+  /// The currently selected sub-range (slider handle positions).
+  final DateSpan selected;
+
+  /// Called with the new range as a handle drags or a date is picked.
+  final ValueChanged<DateSpan> onChanged;
+
+  /// Resets the range back to the full [span].
+  final VoidCallback onReset;
+
+  /// Hides the panel.
+  final VoidCallback onClose;
+
+  /// Whether the user has narrowed the range from the full span (enables reset).
+  bool get _isNarrowed =>
+      selected.start != span.start || selected.end != span.end;
+
+  /// True when the whole library was captured at a single instant — there's
+  /// nothing to slide between, so the slider is omitted (labels still show).
+  bool get _zeroWidth => !span.end.isAfter(span.start);
+
+  String _label(DateTime dt) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)} '
+        '${two(dt.hour)}:${two(dt.minute)}';
+  }
+
+  Future<void> _pick(BuildContext context, {required bool isStart}) async {
+    final current = isStart ? selected.start : selected.end;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: span.start,
+      lastDate: span.end,
+    );
+    if (date == null || !context.mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+    final picked = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time?.hour ?? current.hour,
+      time?.minute ?? current.minute,
+    );
+    // Clamp into the span and keep start <= end.
+    final clamped = picked.isBefore(span.start)
+        ? span.start
+        : (picked.isAfter(span.end) ? span.end : picked);
+    if (isStart) {
+      final end = clamped.isAfter(selected.end) ? clamped : selected.end;
+      onChanged((start: clamped, end: end));
+    } else {
+      final start = clamped.isBefore(selected.start) ? clamped : selected.start;
+      onChanged((start: start, end: clamped));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: Card(
+        color: scheme.surface.withValues(alpha: 0.96),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.date_range, size: 16, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Text('Date range', style: text.titleSmall),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _isNarrowed ? onReset : null,
+                    icon: const Icon(Icons.restart_alt, size: 16),
+                    label: const Text('Reset range'),
+                  ),
+                  IconButton(
+                    onPressed: onClose,
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Hide timeline',
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _DateLabel(
+                    label: _label(selected.start),
+                    onTap: () => _pick(context, isStart: true),
+                  ),
+                  _DateLabel(
+                    label: _label(selected.end),
+                    onTap: () => _pick(context, isStart: false),
+                  ),
+                ],
+              ),
+              if (!_zeroWidth)
+                RangeSlider(
+                  min: dateTimeToSliderValue(span.start),
+                  max: dateTimeToSliderValue(span.end),
+                  values: RangeValues(
+                    dateTimeToSliderValue(selected.start),
+                    dateTimeToSliderValue(selected.end),
+                  ),
+                  labels: RangeLabels(
+                    _label(selected.start),
+                    _label(selected.end),
+                  ),
+                  onChanged: (values) => onChanged((
+                    start: sliderValueToDateTime(values.start),
+                    end: sliderValueToDateTime(values.end),
+                  )),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A tappable capture-time label inside [TimelinePanel] that opens a precise
+/// date+time picker for exact input.
+class _DateLabel extends StatelessWidget {
+  const _DateLabel({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(fontFeatures: AppTheme.tabular),
       ),
     );
   }

@@ -92,6 +92,10 @@ class ExplorePhoto {
 
   /// The coordinate as a flutter_map [LatLng].
   LatLng get position => LatLng(latitude, longitude);
+
+  /// The capture date from [meta], or null when unknown — the field the
+  /// Timeline range filter keys off (null-dated photos are never filtered out).
+  DateTime? get date => meta?.date;
 }
 
 /// A cluster of photos that share (to a rounding precision) one coordinate.
