@@ -50,12 +50,15 @@ Future<void> _pump(
   WidgetTester tester,
   AppController c, {
   TileProvider? tileProvider,
+  Future<String?> Function()? savePathPicker,
 }) async {
   tester.view.physicalSize = const Size(1000, 1400);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  const screen = MaterialApp(home: Scaffold(body: ExploreMapScreen()));
+  final screen = MaterialApp(
+    home: Scaffold(body: ExploreMapScreen(savePathPicker: savePathPicker)),
+  );
   await tester.pumpWidget(
     ControllerScope(
       controller: c,
@@ -319,6 +322,111 @@ void main() {
     );
     expect(inkWell.onTap, isNull);
     await tester.tap(fit);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the save-view button sits among the top-right controls', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+    await _pump(tester, c);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final save = find.byIcon(Icons.save_alt);
+    final mode = find.byIcon(Icons.tag); // Numbers mode icon
+    expect(save, findsOneWidget);
+    expect(find.byTooltip('Save view as PNG'), findsOneWidget);
+    // The save button sits left of the mode button (between fit and mode).
+    expect(tester.getCenter(save).dx, lessThan(tester.getCenter(mode).dx));
+    // It is enabled (tappable) when there are points to export.
+    final inkWell = tester.widget<InkWell>(
+      find.ancestor(of: save, matching: find.byType(InkWell)),
+    );
+    expect(inkWell.onTap, isNotNull);
+  });
+
+  testWidgets('tapping save captures the view, writes the PNG and reports', (
+    tester,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('explore-save');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final out = '${dir.path}/stunda-map.png';
+    // A caching provider backed by a mock client so no real tile network/cache
+    // I/O fires during the runAsync window.
+    final cacheRoot = Directory.systemTemp.createTempSync('explore-save-tiles');
+    addTearDown(() => cacheRoot.deleteSync(recursive: true));
+    final cache = TileCache(
+      client: MockClient((_) async => http.Response.bytes(_realPng(), 200)),
+      root: cacheRoot,
+      sleep: (_) async {},
+    );
+    final provider = CachingTileProvider(cache: cache);
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+
+    await tester.runAsync(() async {
+      // The capture's toImage runs on the real event loop, so drive the whole
+      // tap → capture → write → report flow under runAsync.
+      await _pump(
+        tester,
+        c,
+        savePathPicker: () async => out,
+        tileProvider: provider,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byIcon(Icons.save_alt));
+      // Let capture (toImage/toByteData) + the async write settle.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+      await tester.pump();
+    });
+    await tester.pump();
+
+    expect(File(out).existsSync(), isTrue);
+    expect(File(out).readAsBytesSync(), isNotEmpty);
+    expect(find.text('Saved to $out'), findsOneWidget);
+  });
+
+  testWidgets(
+    'cancelling the save panel writes nothing and shows no snackbar',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+        ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+
+      await tester.runAsync(() async {
+        await _pump(tester, c, savePathPicker: () async => null);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(find.byIcon(Icons.save_alt));
+        await tester.pump();
+        await tester.pump();
+      });
+      await tester.pump();
+
+      expect(find.textContaining('Saved to'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('the save-view button is disabled with no points', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const []))
+      ..debugSetExplore(const []);
+    await _pump(tester, c);
+
+    final save = find.byIcon(Icons.save_alt);
+    expect(save, findsOneWidget);
+    final inkWell = tester.widget<InkWell>(
+      find.ancestor(of: save, matching: find.byType(InkWell)),
+    );
+    expect(inkWell.onTap, isNull);
+    await tester.tap(save);
     await tester.pump();
     expect(tester.takeException(), isNull);
   });

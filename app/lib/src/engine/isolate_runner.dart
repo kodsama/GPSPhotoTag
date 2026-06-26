@@ -61,23 +61,6 @@ class IsolateRunner implements EngineRunner {
     onSpawnError: ErrorEvent.new,
   );
 
-  /// Renders a heatmap PNG from the GPS already embedded in [photos].
-  @override
-  Stream<EngineEvent> map({
-    required List<String> photos,
-    required MapOptions options,
-  }) => _spawn(
-    mapEntry,
-    (port) => MapRequest(
-      port: port,
-      photos: photos,
-      options: options,
-      exiftoolAvailable: exiftoolAvailable,
-      bundleDir: exiftoolBundleDir,
-    ),
-    onSpawnError: ErrorEvent.new,
-  );
-
   /// Prunes orphan RAW files under [roots].
   @override
   Stream<EngineEvent> prune({
@@ -267,23 +250,6 @@ class TagRequest {
 }
 
 @visibleForTesting
-class MapRequest {
-  const MapRequest({
-    required this.port,
-    required this.photos,
-    required this.options,
-    required this.exiftoolAvailable,
-    required this.bundleDir,
-  });
-
-  final SendPort port;
-  final List<String> photos;
-  final MapOptions options;
-  final bool? exiftoolAvailable;
-  final String? bundleDir;
-}
-
-@visibleForTesting
 class PruneRequest {
   const PruneRequest({
     required this.port,
@@ -434,25 +400,6 @@ Future<void> tagEntry(TagRequest req) async {
       options: req.options,
     );
     await pumpEvents(req.port, stream, onError: ErrorEvent.new);
-  } on Object catch (e) {
-    req.port.send(ErrorEvent('$e'));
-    req.port.send(null);
-  }
-}
-
-@visibleForTesting
-Future<void> mapEntry(MapRequest req) async {
-  try {
-    final exiftool = await resolveWorkerExiftool(req.exiftoolAvailable);
-    final service = MapService(
-      runner: buildWorkerRunner(req.bundleDir),
-      exiftoolAvailable: exiftool,
-    );
-    await pumpEvents(
-      req.port,
-      service.render(req.photos, req.options),
-      onError: ErrorEvent.new,
-    );
   } on Object catch (e) {
     req.port.send(ErrorEvent('$e'));
     req.port.send(null);

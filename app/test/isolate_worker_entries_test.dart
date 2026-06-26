@@ -124,26 +124,6 @@ void main() {
       expect(events.whereType<ItemEvent>().single.row.location, isNotNull);
     });
 
-    test('mapEntry without exiftool reports a missing_toolkit error', () async {
-      final jpg = await writeJpegWithDate(
-        tmp,
-        'm.jpg',
-        dateTimeOriginal: DateTime(2026, 1, 1, 9),
-      );
-      final events = await _drain(
-        (port) => mapEntry(
-          MapRequest(
-            port: port,
-            photos: [jpg],
-            options: MapOptions(outputPng: '${tmp.path}/h.png'),
-            exiftoolAvailable: false,
-            bundleDir: null,
-          ),
-        ),
-      );
-      expect(events.whereType<ErrorEvent>().single.code, 'missing_toolkit');
-    });
-
     test('pruneEntry over an empty tree ends cleanly', () async {
       final events = await _drain(
         (port) => pruneEntry(

@@ -20,12 +20,6 @@ abstract interface class EngineRunner {
     required TagOptions options,
   });
 
-  /// Renders a heatmap PNG from the GPS already embedded in [photos].
-  Stream<EngineEvent> map({
-    required List<String> photos,
-    required MapOptions options,
-  });
-
   /// Prunes orphan RAW files under [roots].
   Stream<EngineEvent> prune({
     required List<String> roots,

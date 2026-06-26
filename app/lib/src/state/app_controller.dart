@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -280,9 +281,9 @@ class AppController extends ChangeNotifier {
   /// The ordered library roots (each a directory or an individual file).
   List<String> get roots => List.unmodifiable(_roots);
 
-  /// The first directory root, used as the default output location (e.g. for the
-  /// rendered heatmap) and for compact display; null when the library is empty
-  /// or made only of individual files.
+  /// The first directory root, used as the default output location and for
+  /// compact display; null when the library is empty or made only of
+  /// individual files.
   String? get folder {
     for (final root in _roots) {
       if (FileSystemEntity.isDirectorySync(root)) return root;
@@ -741,6 +742,32 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves a captured PNG of the Explore view to a user-chosen path.
+  ///
+  /// The pick→write→report flow behind the "Save view as PNG" button, kept here
+  /// (off the widget) so it's fully unit-testable: [pickPath] resolves to the
+  /// destination path (or null when the user cancels the save panel), and
+  /// [bytes] are the already-captured PNG. Cancelling is a silent no-op; a
+  /// successful write and any failure are both surfaced in the activity log and
+  /// returned so the screen can show a matching SnackBar. Never throws.
+  Future<String?> savePng(
+    Uint8List bytes, {
+    required Future<String?> Function() pickPath,
+  }) async {
+    final path = await pickPath();
+    if (path == null) return null;
+    try {
+      await File(path).writeAsBytes(bytes);
+      _log('Saved map view to $path');
+      notifyListeners();
+      return path;
+    } on Object catch (e) {
+      _log('Failed to save map view: $e', level: LogLevel.error);
+      notifyListeners();
+      return null;
+    }
+  }
+
   void _loadExploreCoordinates() {
     final scan = _scan;
     if (scan == null) return;
@@ -817,24 +844,6 @@ class AppController extends ChangeNotifier {
           : 'Tagging ${photos.length} photo(s)…',
       total: photos.length,
     );
-  }
-
-  /// Renders a heatmap PNG into the library folder; returns its path or null.
-  Future<String?> renderMap({int? dpi}) async {
-    final dir = folder ?? Directory.systemTemp.path;
-    final scan = _scan;
-    if (scan == null) return null;
-    final photos = _included(scan.photos);
-    final out = p.join(dir, 'stunda-heatmap.png');
-    await _consume(
-      _engine.map(
-        photos: photos,
-        options: MapOptions(outputPng: out, dpi: dpi ?? 200),
-      ),
-      startMessage: 'Rendering heatmap…',
-      total: photos.length,
-    );
-    return _errorMessage == null ? out : null;
   }
 
   // --- Prune review (preview → select → confirm → execute) -----------------

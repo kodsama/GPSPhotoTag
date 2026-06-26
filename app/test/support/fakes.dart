@@ -37,7 +37,7 @@ class FakeEngineRunner implements EngineRunner {
     if (!_gate.isCompleted) _gate.complete();
   }
 
-  /// Names of the operations invoked, in order (`tag`, `map`, `prune`, ...).
+  /// Names of the operations invoked, in order (`tag`, `prune`, ...).
   final List<String> calls = [];
 
   /// The [TagOptions] passed to the last [tag] call, for assertions.
@@ -46,9 +46,6 @@ class FakeEngineRunner implements EngineRunner {
   /// Path lists passed to the last [tag] call, for exclusion assertions.
   List<String>? lastTagPhotos;
   List<String>? lastTagGpx;
-
-  /// The photos passed to the last [map] call, for exclusion assertions.
-  List<String>? lastMapPhotos;
 
   /// The paths passed to the last [trashPaths] call, for assertions.
   List<String>? lastTrashedPaths;
@@ -108,20 +105,6 @@ class FakeEngineRunner implements EngineRunner {
     lastTagOptions = options;
     lastTagPhotos = photos;
     lastTagGpx = gpxFiles;
-    return _emit();
-  }
-
-  @override
-  Stream<EngineEvent> map({
-    required List<String> photos,
-    required MapOptions options,
-  }) {
-    calls.add('map');
-    lastMapPhotos = photos;
-    // Write a tiny real PNG so result_step's Image.file has a file to point at.
-    File(
-      options.outputPng,
-    ).writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
     return _emit();
   }
 
@@ -200,12 +183,6 @@ class ThrowingEngineRunner implements EngineRunner {
     required List<String> kmlFiles,
     required List<String> googleFiles,
     required TagOptions options,
-  }) => _boom();
-
-  @override
-  Stream<EngineEvent> map({
-    required List<String> photos,
-    required MapOptions options,
   }) => _boom();
 
   @override

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../actions/map_action.dart';
 import '../actions/prune_action.dart';
 import '../actions/tag_action.dart';
 import '../state/controller_scope.dart';
@@ -49,7 +48,6 @@ class ActionScreen extends StatelessWidget {
 
   Widget _body(LibraryAction action) => switch (action) {
     LibraryAction.tag => const TagAction(),
-    LibraryAction.map => const MapAction(),
     LibraryAction.pruneRaw => const PruneAction(),
     // Explore is a full screen (AppScreen.explore), never an action panel.
     LibraryAction.explore => const SizedBox.shrink(),

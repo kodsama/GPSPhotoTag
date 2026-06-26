@@ -78,34 +78,6 @@ void main() {
     expect(b.existsSync(), isTrue);
   });
 
-  test('map runs the worker and reaches a terminal event', () async {
-    final jpg = await writeJpegWithDate(
-      tmp,
-      'g.jpg',
-      dateTimeOriginal: DateTime(2026, 1, 1, 9),
-    );
-    await const JpegExifBackend().writeGps(
-      jpg,
-      latitude: 42.5,
-      longitude: 18.1,
-    );
-
-    // The map service reads GPS via exiftool; without it the worker fails fast
-    // with a missing_toolkit error. Either way the worker plumbing runs and the
-    // stream terminates cleanly (no hang, single sentinel close).
-    final out = '${tmp.path}/heatmap.png';
-    const runner = IsolateRunner(exiftoolAvailable: false);
-    final events = await runner
-        .map(
-          photos: [jpg],
-          options: MapOptions(outputPng: out),
-        )
-        .toList();
-
-    final err = events.whereType<ErrorEvent>();
-    expect(err.single.code, 'missing_toolkit');
-  });
-
   test('fixDates runs on a worker and reports a result per file', () async {
     final jpg = await writeJpegWithDate(
       tmp,

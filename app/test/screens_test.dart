@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/main.dart';
-import 'package:stunda/src/actions/map_action.dart';
 import 'package:stunda/src/actions/prune_action.dart';
 import 'package:stunda/src/actions/tag_action.dart';
 import 'package:stunda/src/state/app_controller.dart';
@@ -64,11 +63,12 @@ void main() {
       expect(find.textContaining('photos ·'), findsOneWidget);
       expect(find.text('Change library'), findsOneWidget);
 
-      // One card per action.
+      // One card per action; the removed "Generate map" action is gone.
       expect(find.byType(ActionCard), findsNWidgets(LibraryAction.all.length));
       expect(find.text('Tag with GPS'), findsOneWidget);
-      expect(find.text('Generate map'), findsOneWidget);
+      expect(find.text('Explore on map'), findsOneWidget);
       expect(find.text('Remove orphan RAWs'), findsOneWidget);
+      expect(find.text('Generate map'), findsNothing);
 
       // Content panel groups unsupported files.
       expect(find.textContaining('Videos (1)'), findsOneWidget);
@@ -135,8 +135,8 @@ void main() {
       // Tag has no GPS sources; prune has no RAWs.
       expect(find.text('No GPS sources found'), findsOneWidget);
       expect(find.text('No RAW files found'), findsOneWidget);
-      // Map and Explore are both ready (1 photo).
-      expect(find.text('1 photos'), findsNWidgets(2));
+      // Explore is ready (1 photo).
+      expect(find.text('1 photos'), findsOneWidget);
     });
 
     testWidgets('tapping a ready card opens its action', (tester) async {
@@ -326,39 +326,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.errorMessage, 'boom tagging');
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
-    });
-  });
-
-  group('map action', () {
-    testWidgets('renders the heatmap and returns to library', (tester) async {
-      final fake = FakeEngineRunner();
-      final controller = AppController(runner: fake)
-        ..debugSetToolkit([_tool('exiftool')])
-        ..debugSetScan(fakeScan(), folder: tmp.path)
-        ..debugSetScreen(AppScreen.action, action: LibraryAction.map);
-      await _pump(tester, controller);
-
-      expect(find.byType(MapAction), findsOneWidget);
-      // Pick a different DPI then render.
-      await tester.tap(find.text('300 dpi'));
-      await tester.pump();
-
-      await tester.runAsync(() async {
-        await tester.tap(find.text('Render heatmap'));
-        while (controller.running) {
-          await Future<void>.delayed(const Duration(milliseconds: 10));
-        }
-      });
-      await tester.pump();
-
-      expect(fake.calls, contains('map'));
-      expect(File('${tmp.path}/stunda-heatmap.png').existsSync(), isTrue);
-      expect(find.text('Heatmap'), findsOneWidget);
-      expect(find.byType(Image), findsWidgets);
-
-      await tester.tap(find.text('Done — back to library'));
-      await tester.pumpAndSettle();
-      expect(controller.screen, AppScreen.workspace);
     });
   });
 
@@ -577,9 +544,8 @@ void main() {
         ..debugSetScreen(AppScreen.action, action: LibraryAction.explore);
       await _pump(tester, controller);
 
-      // The action chrome (title) shows, but no tag/map/prune body renders.
+      // The action chrome (title) shows, but no tag/prune body renders.
       expect(find.byType(TagAction), findsNothing);
-      expect(find.byType(MapAction), findsNothing);
       expect(find.byType(PruneAction), findsNothing);
     });
   });
@@ -589,7 +555,7 @@ void main() {
       final controller = AppController(runner: FakeEngineRunner())
         ..debugSetToolkit([_tool('exiftool')])
         ..debugSetScan(fakeScan())
-        ..debugSetScreen(AppScreen.action, action: LibraryAction.map);
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.tag);
       await _pump(tester, controller);
 
       await tester.tap(find.text('Library'));
@@ -695,41 +661,6 @@ void main() {
       expect(controller.errorMessage, 'prune boom');
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
-
-    testWidgets('map shows a live progress bar while running', (tester) async {
-      final fake = FakeEngineRunner(
-        keepOpen: true,
-        events: const [ProgressEvent(done: 0, total: 1)],
-      );
-      addTearDown(fake.release);
-      final controller = openWith(LibraryAction.map, fake);
-      await _pump(tester, controller);
-
-      await tester.tap(find.text('Render heatmap'));
-      await tester.pump();
-      await tester.pump();
-      expect(controller.running, isTrue);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
-
-      fake.release();
-      await tester.pumpAndSettle();
-    });
-
-    testWidgets('map surfaces an error event', (tester) async {
-      final fake = FakeEngineRunner(events: const [ErrorEvent('map boom')]);
-      final controller = openWith(LibraryAction.map, fake);
-      await _pump(tester, controller);
-
-      await tester.runAsync(() async {
-        await tester.tap(find.text('Render heatmap'));
-        while (controller.running) {
-          await Future<void>.delayed(const Duration(milliseconds: 10));
-        }
-      });
-      await tester.pump();
-      expect(controller.errorMessage, 'map boom');
-      expect(find.byIcon(Icons.error_outline), findsOneWidget);
-    });
   });
 
   group('action card', () {
@@ -743,18 +674,18 @@ void main() {
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       await tester.pump();
-      await gesture.moveTo(tester.getCenter(find.text('Generate map')));
+      await gesture.moveTo(tester.getCenter(find.text('Explore on map')));
       await tester.pumpAndSettle();
 
       // On hover the card's border takes the primary accent (the onEnter path).
       final scheme = Theme.of(
-        tester.element(find.text('Generate map')),
+        tester.element(find.text('Explore on map')),
       ).colorScheme;
       Border borderOf() {
         final container = tester.widget<AnimatedContainer>(
           find
               .ancestor(
-                of: find.text('Generate map'),
+                of: find.text('Explore on map'),
                 matching: find.byType(AnimatedContainer),
               )
               .first,

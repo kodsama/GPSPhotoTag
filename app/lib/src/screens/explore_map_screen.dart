@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -56,8 +60,13 @@ class PhotoMarker extends Marker {
 /// (see [shouldCloseOnZoom]). The [FlutterMap] glue here is a thin shell; the
 /// grouping, paging and close-rule logic live in pure, unit-tested classes.
 class ExploreMapScreen extends StatefulWidget {
-  /// Creates the Explore screen.
-  const ExploreMapScreen({super.key});
+  /// Creates the Explore screen. [savePathPicker] overrides the native
+  /// save-location panel in tests; production uses [getSaveLocation].
+  const ExploreMapScreen({super.key, this.savePathPicker});
+
+  /// Resolves the destination PNG path (null = user cancelled). Injectable so
+  /// the save flow can be driven without the platform save dialog.
+  final Future<String?> Function()? savePathPicker;
 
   @override
   State<ExploreMapScreen> createState() => _ExploreMapScreenState();
@@ -66,6 +75,9 @@ class ExploreMapScreen extends StatefulWidget {
 class _ExploreMapScreenState extends State<ExploreMapScreen> {
   final MapController _map = MapController();
   final ExploreInteractionController _detail = ExploreInteractionController();
+
+  /// Wraps the map stack so the current view can be captured to a PNG.
+  final GlobalKey _captureKey = GlobalKey();
   bool _focusHandled = false;
   bool _initialFitDone = false;
   MapDisplayMode _mode = MapDisplayMode.numbers;
@@ -200,6 +212,60 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     openFullscreen(context, selection.current.path);
   }
 
+  /// Captures the current on-screen map view (tiles + heatmap + markers as
+  /// framed) and saves it to a user-chosen PNG path.
+  ///
+  /// The two side-effecting shells — capturing the [RepaintBoundary] to PNG
+  /// bytes and opening the native save panel — are the only uncovered parts;
+  /// the pick→write→report logic lives in [AppController.savePng]. Reports the
+  /// outcome via a SnackBar (and the activity log) and never throws.
+  Future<void> _saveView() async {
+    final controller = ControllerScope.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final bytes = await _capturePng();
+    if (bytes == null) {
+      messenger?.showSnackBar(
+        const SnackBar(content: Text("Couldn't capture the map view.")),
+      );
+      return;
+    }
+    final saved = await controller.savePng(
+      bytes,
+      pickPath: widget.savePathPicker ?? _pickSavePath,
+    );
+    if (saved != null) {
+      messenger?.showSnackBar(SnackBar(content: Text('Saved to $saved')));
+    }
+  }
+
+  /// Opens the native save panel and returns the chosen path (null on cancel).
+  /// The only genuinely-untestable shell of the save flow.
+  Future<String?> _pickSavePath() async {
+    final location = await getSaveLocation(
+      suggestedName: 'stunda-map.png',
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'PNG image', extensions: ['png']),
+      ],
+    );
+    return location?.path;
+  }
+
+  /// Renders the captured map [RepaintBoundary] to PNG bytes at the screen's
+  /// device pixel ratio, or null when the boundary isn't laid out yet or the
+  /// encode produced nothing.
+  Future<Uint8List?> _capturePng() async {
+    final boundary =
+        _captureKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) return null;
+    final image = await boundary.toImage(
+      pixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return data?.buffer.asUint8List();
+  }
+
   /// If the controller asked to focus a specific photo (deep-link from the file
   /// list), open its detail immediately and schedule a camera move to it.
   ///
@@ -253,13 +319,16 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
 
     return Stack(
       children: [
-        _MapShell(
-          mapController: _map,
-          points: points,
-          photos: photos,
-          mode: _mode,
-          onMapEvent: _onMapEvent,
-          onMarkerTap: _onMarkerTap,
+        RepaintBoundary(
+          key: _captureKey,
+          child: _MapShell(
+            mapController: _map,
+            points: points,
+            photos: photos,
+            mode: _mode,
+            onMapEvent: _onMapEvent,
+            onMarkerTap: _onMarkerTap,
+          ),
         ),
         Positioned(
           top: 12,
@@ -292,6 +361,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
                         ? null
                         : () => _fitToPoints(points),
                   ),
+                  const SizedBox(width: 8),
+                  _SaveButton(onPressed: points.isEmpty ? null : _saveView),
                   const SizedBox(width: 8),
                   _ModeButton(mode: _mode, onPressed: _cycleMode),
                 ],
@@ -465,6 +536,43 @@ class _ResetButton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Icon(
               Icons.fit_screen,
+              size: 18,
+              color: enabled ? null : scheme.onSurface.withValues(alpha: 0.38),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The upper-right "Save view as PNG" button, sitting between the fit and mode
+/// buttons. Tapping it captures the current map view and opens a native save
+/// panel; it's disabled (greyed, non-tappable) when [onPressed] is null (no
+/// points to export).
+class _SaveButton extends StatelessWidget {
+  const _SaveButton({required this.onPressed});
+
+  /// The save action, or null to render disabled (no points to export).
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    return Tooltip(
+      message: 'Save view as PNG',
+      child: Material(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        elevation: 3,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Icon(
+              Icons.save_alt,
               size: 18,
               color: enabled ? null : scheme.onSurface.withValues(alpha: 0.38),
             ),

@@ -41,14 +41,6 @@ enum LibraryAction {
         'found.',
   ),
 
-  /// Render a heatmap PNG of where the photos were taken.
-  map(
-    id: 'map',
-    icon: Icons.map_outlined,
-    title: 'Generate map',
-    description: 'See where your photos were taken.',
-  ),
-
   /// Open a live, pannable/zoomable world map of the geotagged photos.
   explore(
     id: 'explore',
@@ -90,10 +82,6 @@ enum LibraryAction {
   /// Computes whether this action can run against [scan].
   ActionReadiness readiness(FolderScanResult scan) => switch (this) {
     LibraryAction.tag => _tagReadiness(scan),
-    LibraryAction.map =>
-      scan.photoCount > 0
-          ? ActionReadiness.ready('${scan.photoCount} photos')
-          : const ActionReadiness.blocked('No photos found'),
     LibraryAction.explore =>
       scan.photoCount > 0
           ? ActionReadiness.ready('${scan.photoCount} photos')

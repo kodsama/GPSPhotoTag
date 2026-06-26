@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,10 +79,10 @@ void main() {
       expect(r.label, contains('1'));
     });
 
-    test('map needs photos', () {
-      expect(LibraryAction.map.readiness(fakeScan()).enabled, isTrue);
+    test('explore needs photos', () {
+      expect(LibraryAction.explore.readiness(fakeScan()).enabled, isTrue);
       expect(
-        LibraryAction.map.readiness(fakeScan(photos: const [])).enabled,
+        LibraryAction.explore.readiness(fakeScan(photos: const [])).enabled,
         isFalse,
       );
     });
@@ -213,20 +214,6 @@ void main() {
       expect(c.running, isFalse);
     });
 
-    test('renderMap returns null without a scan, runs with one', () async {
-      final noLib = AppController(runner: FakeEngineRunner());
-      expect(await noLib.renderMap(), isNull);
-
-      final tmp = Directory.systemTemp.createTempSync('rendermap');
-      addTearDown(() => tmp.deleteSync(recursive: true));
-      final fake = FakeEngineRunner();
-      final c = AppController(runner: fake)
-        ..debugSetScan(fakeScan(), folder: tmp.path);
-      final path = await c.renderMap(dpi: 300);
-      expect(fake.calls, contains('map'));
-      expect(path, endsWith('stunda-heatmap.png'));
-    });
-
     test('opening prune classifies the library and pre-selects orphans', () {
       final c = AppController(runner: FakeEngineRunner())
         ..debugSetScan(
@@ -256,7 +243,7 @@ void main() {
         ..debugSetScan(fakeScan(photos: const ['/library/a.raf']))
         ..openAction(LibraryAction.pruneRaw);
       expect(c.pairing, isNotNull);
-      c.openAction(LibraryAction.map);
+      c.openAction(LibraryAction.tag);
       expect(c.pairing, isNull);
     });
 
@@ -352,6 +339,45 @@ void main() {
       final c = AppController(runner: ThrowingEngineRunner());
       await c.startScan('/library');
       expect(c.logEntries.any((e) => e.level == LogLevel.error), isTrue);
+    });
+  });
+
+  group('savePng', () {
+    final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
+
+    test('cancel (null path) writes nothing and returns null', () async {
+      final c = AppController(runner: FakeEngineRunner());
+      final logsBefore = c.logEntries.length;
+      final result = await c.savePng(bytes, pickPath: () async => null);
+      expect(result, isNull);
+      // No success/failure entry was logged on a cancel.
+      expect(c.logEntries.length, logsBefore);
+    });
+
+    test('a chosen path writes the bytes and reports success', () async {
+      final dir = Directory.systemTemp.createTempSync('savepng');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final out = '${dir.path}/stunda-map.png';
+      final c = AppController(runner: FakeEngineRunner());
+
+      final result = await c.savePng(bytes, pickPath: () async => out);
+
+      expect(result, out);
+      expect(File(out).readAsBytesSync(), bytes);
+      expect(c.logEntries.last.message, contains(out));
+      expect(c.logEntries.last.level, LogLevel.info);
+    });
+
+    test('a write failure is reported and never throws', () async {
+      // A path inside a non-existent directory makes writeAsBytes fail.
+      final bad = '${Directory.systemTemp.path}/no_such_dir_xyz/map.png';
+      final c = AppController(runner: FakeEngineRunner());
+
+      final result = await c.savePng(bytes, pickPath: () async => bad);
+
+      expect(result, isNull);
+      expect(c.logEntries.last.level, LogLevel.error);
+      expect(c.logEntries.last.message, contains('Failed to save map view'));
     });
   });
 
@@ -644,20 +670,6 @@ void main() {
       await c.runTag();
       expect(fake.lastTagPhotos, ['/keep.jpg']);
       expect(fake.lastTagGpx, ['/keep.gpx']);
-    });
-
-    test('renderMap receives only included photos', () async {
-      final dir = Directory.systemTemp.createTempSync('map_excl');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final fake = FakeEngineRunner();
-      final c = AppController(runner: fake)
-        ..debugSetScan(
-          fakeScan(photos: const ['/keep.jpg', '/drop.jpg']),
-          folder: dir.path,
-        );
-      c.setFileIncluded('/drop.jpg', false);
-      await c.renderMap();
-      expect(fake.lastMapPhotos, ['/keep.jpg']);
     });
 
     test('changeLibrary clears exclusions and metadata', () async {
