@@ -802,7 +802,117 @@ void main() {
       expect(out.single.width, 28);
       expect(out.single.peopleScore, 1.0);
     });
+
+    group('Tier-2 detector fallback', () {
+      test(
+        'fills peopleScore from the detector when Tier-1 metadata is silent',
+        () async {
+          final paths = writeSources(['a.raf']);
+          final runner = _BatchRunner(
+            thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+            dims: {paths.first: (100, 100)},
+            // no people tags → Tier-1 score is 0
+          );
+          final out = await hashFilesBatch(
+            paths,
+            runner: runner,
+            tmpDir: p.join(tmp.path, 'work'),
+            detector: _FakeDetector(0.77),
+          );
+          expect(out.single.peopleScore, closeTo(0.77, 1e-9));
+        },
+      );
+
+      test('does NOT override an existing Tier-1 score', () async {
+        final paths = writeSources(['face.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'face.raf': img.encodeJpg(_stripes(20, 20))},
+          dims: {paths.first: (100, 100)},
+          peopleTags: {
+            paths[0]: {'RegionName': 'Alice'}, // Tier-1 → 1.0
+          },
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          detector: _FakeDetector(0.2),
+        );
+        // Tier-1 wins; the detector is not consulted.
+        expect(out.single.peopleScore, 1.0);
+      });
+
+      test('an unavailable detector leaves Tier-1 (0) unchanged', () async {
+        final paths = writeSources(['a.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+          dims: {paths.first: (100, 100)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          detector: _FakeDetector(0.9, available: false),
+        );
+        expect(out.single.peopleScore, 0.0);
+      });
+
+      test(
+        'a null/zero detection result leaves Tier-1 (0) unchanged',
+        () async {
+          final paths = writeSources(['a.raf', 'b.raf']);
+          final runner = _BatchRunner(
+            thumbs: {
+              'a.raf': img.encodeJpg(_stripes(20, 20)),
+              'b.raf': img.encodeJpg(_stripes(20, 20, phase: 4)),
+            },
+            dims: {for (final pth in paths) pth: (100, 100)},
+          );
+          final out = await hashFilesBatch(
+            paths,
+            runner: runner,
+            tmpDir: p.join(tmp.path, 'work'),
+            detector: _FakeDetector(null), // can't decide
+          );
+          for (final h in out) {
+            expect(h.peopleScore, 0.0);
+          }
+        },
+      );
+
+      test('the default detector is the no-op (no Tier-2)', () async {
+        final paths = writeSources(['a.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+          dims: {paths.first: (100, 100)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+        expect(out.single.peopleScore, 0.0);
+      });
+    });
   });
+}
+
+/// A [PeopleDetector] that returns a fixed [_score] for any image, used to drive
+/// the Tier-2 fallback branches without a model.
+class _FakeDetector implements PeopleDetector {
+  _FakeDetector(this._score, {this.available = true});
+
+  final double? _score;
+  final bool available;
+
+  @override
+  bool get isAvailable => available;
+
+  @override
+  Future<double?> scoreImage(Uint8List imageBytes) async => _score;
+
+  @override
+  Future<double?> scoreDecoded(img.Image image) async => _score;
 }
 
 /// Total number of files that ended up in any group.

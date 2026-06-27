@@ -140,12 +140,38 @@ app/               Flutter desktop GUI over the engine (+ always-on MCP server)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
+## Duplicate detection & the people keep-rule
+
+When grouping near-duplicates, Stunda picks which copy to **keep** with an
+ordered keep-rule cascade (resolution → quality → people). The `people` rule
+favours the candidate that most looks like it contains a person or pet, in two
+tiers:
+
+- **Tier 1 (metadata)** — face regions, person names, and subject/keyword hints
+  read from the file's existing metadata (no extra work).
+- **Tier 2 (on-device detection)** — when metadata is silent, a small
+  Apache-2.0 **SSD-MobileNet** COCO model runs over the thumbnail through a
+  bundled **ONNX Runtime** via `dart:ffi`. This is engine-wide: it works in the
+  desktop app's worker isolates **and** headlessly from plain `dart run`
+  (CLI/MCP), with no Flutter dependency. When the model isn't bundled, the rule
+  cleanly degrades to Tier-1-only.
+
+The ONNX Runtime library and the model are vendored at build time (kept out of
+git), exactly like exiftool:
+
+```bash
+bash tool/fetch-exiftool.sh           # exiftool + lib into app/assets/exiftool/
+bash tool/fetch-onnx.sh               # ORT lib + SSD-MobileNet into app/assets/onnx/
+```
+
 ## Development
 
 ```bash
 flutter pub get                       # resolves the whole workspace
-dart analyze packages                 # engine + cli
-dart test packages/engine packages/cli
+bash tool/fetch-exiftool.sh           # vendor exiftool (bundled assets)
+bash tool/fetch-onnx.sh               # vendor ONNX Runtime + detector model
+dart analyze packages                 # engine + cli + mcp
+dart test packages/engine packages/cli packages/mcp
 cd app && flutter analyze && flutter test
 ```
 
@@ -154,3 +180,6 @@ cd app && flutter analyze && flutter test
 Copyright © 2026 Kodsama (Alexandre Martins). Stunda is free software under
 the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see
 [LICENSE](LICENSE). It comes with no warranty, to the extent permitted by law.
+
+Bundled at build time: **exiftool** (Artistic/GPL), **ONNX Runtime** (MIT), and
+the **SSD-MobileNet v1** detector model from the ONNX Model Zoo (**Apache-2.0**).

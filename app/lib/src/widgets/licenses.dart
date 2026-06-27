@@ -35,6 +35,12 @@ const _attached = <_Component>[
     'lic_role_cluster',
   ),
   _Component('image', 'Apache-2.0', 'lic_role_image'),
+  _Component('ONNX Runtime', 'MIT', 'lic_role_onnxruntime'),
+  _Component(
+    'SSD-MobileNet v1 (ONNX Model Zoo)',
+    'Apache-2.0',
+    'lic_role_ssd_mobilenet',
+  ),
   _Component('xml', 'MIT', 'lic_role_xml'),
   _Component('http', 'BSD-3', 'lic_role_http'),
   _Component('archive', 'MIT / Apache', 'lic_role_archive'),

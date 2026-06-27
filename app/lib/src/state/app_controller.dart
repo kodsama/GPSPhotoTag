@@ -40,8 +40,13 @@ class AppController extends ChangeNotifier {
     Future<String?> Function()? pickFolder,
     Future<List<ToolStatus>> Function()? probeToolkit,
     String? exiftoolBundleDir,
+    String? onnxBundleDir,
     AppPrefs? prefs,
-  }) : _pickFolder = pickFolder ?? getDirectoryPath,
+  }) : // A public param name mapping to a private field can't be an
+       // initializing formal (that would expose `_onnxBundleDir` as the param).
+       // ignore: prefer_initializing_formals
+       _onnxBundleDir = onnxBundleDir,
+       _pickFolder = pickFolder ?? getDirectoryPath,
        _exiftoolBundleDir = exiftoolBundleDir,
        _prefs = prefs,
        _probeToolkit =
@@ -74,6 +79,10 @@ class AppController extends ChangeNotifier {
   /// On-disk dir of the app-bundled exiftool, or null when none is bundled.
   final String? _exiftoolBundleDir;
 
+  /// On-disk dir of the app-bundled ONNX Runtime lib + detector model, or null
+  /// when none is bundled (then duplicate hashing uses Tier-1 metadata only).
+  final String? _onnxBundleDir;
+
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
   /// only spawns its isolate when [McpService.start] is called from `main`.
   final McpService mcp;
@@ -85,6 +94,7 @@ class AppController extends ChangeNotifier {
   EngineRunner get _engine => _runner ??= IsolateRunner(
     exiftoolAvailable: exiftoolAvailable,
     exiftoolBundleDir: _exiftoolBundleDir,
+    onnxBundleDir: _onnxBundleDir,
   );
 
   // --- Theme ---------------------------------------------------------------

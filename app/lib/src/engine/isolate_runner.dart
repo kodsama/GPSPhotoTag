@@ -20,13 +20,21 @@ class IsolateRunner implements EngineRunner {
   /// probe for itself. [exiftoolBundleDir] is the on-disk directory of the
   /// app-bundled exiftool (null = use whatever is on `PATH`); each worker builds
   /// its own [ExiftoolRunner] from it since runners aren't isolate-sendable.
-  const IsolateRunner({this.exiftoolAvailable, this.exiftoolBundleDir});
+  const IsolateRunner({
+    this.exiftoolAvailable,
+    this.exiftoolBundleDir,
+    this.onnxBundleDir,
+  });
 
   /// Whether exiftool was detected; null means "detect inside the worker".
   final bool? exiftoolAvailable;
 
   /// On-disk dir of the bundled exiftool, or null to use `PATH`.
   final String? exiftoolBundleDir;
+
+  /// On-disk dir of the bundled ONNX Runtime lib + detector model, or null when
+  /// no model is bundled (then duplicate hashing uses Tier-1 metadata only).
+  final String? onnxBundleDir;
 
   /// Scans [roots] on a worker isolate, streaming [ScanEvent]s back.
   @override
@@ -240,6 +248,7 @@ class IsolateRunner implements EngineRunner {
           port: receive.sendPort,
           paths: slice,
           bundleDir: exiftoolBundleDir,
+          onnxBundleDir: onnxBundleDir,
         ),
       ).catchError((Object _) {
         // A worker that never starts contributes no hashes; unblock the join.
@@ -399,11 +408,13 @@ class HashFilesRequest {
     required this.port,
     required this.paths,
     required this.bundleDir,
+    this.onnxBundleDir,
   });
 
   final SendPort port;
   final List<String> paths;
   final String? bundleDir;
+  final String? onnxBundleDir;
 }
 
 @visibleForTesting
@@ -564,6 +575,10 @@ const int hashBatchChunk = 150;
 
 @visibleForTesting
 Future<void> hashFilesEntry(HashFilesRequest req) async {
+  // The Tier-2 detector is built INSIDE the worker (FFI handles aren't isolate-
+  // sendable). It's unavailable when no model is bundled, so hashing falls back
+  // to Tier-1 metadata. Closed in the finally so the native session is freed.
+  final detector = OrtPeopleDetector.fromBundleDir(req.onnxBundleDir);
   try {
     final runner = buildWorkerRunner(req.bundleDir);
     final tmpDir = previewCacheDir().path;
@@ -578,6 +593,7 @@ Future<void> hashFilesEntry(HashFilesRequest req) async {
         chunk,
         runner: runner,
         tmpDir: tmpDir,
+        detector: detector,
         // One progress tick per file processed (even skips) so the aggregated
         // `done` count reaches the total when the run finishes.
         onFileDone: () => req.port.send(1),
@@ -589,6 +605,7 @@ Future<void> hashFilesEntry(HashFilesRequest req) async {
   } on Object {
     // Best-effort: a failed worker just contributes no hashes.
   } finally {
+    detector.close();
     req.port.send(null);
   }
 }

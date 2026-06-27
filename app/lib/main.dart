@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'src/engine/exiftool_bundle.dart';
+import 'src/engine/onnx_bundle.dart';
 import 'src/i18n/app_localizations.dart';
 import 'src/explore/map_tile_provider.dart';
 import 'src/explore/tile_cache.dart';
@@ -33,6 +34,7 @@ Future<void> main() async {
   runApp(
     StundaApp(
       exiftoolBundleDir: locateBundledExiftool(),
+      onnxBundleDir: locateBundledOnnx(),
       prefs: prefs,
       tileProvider: CachingTileProvider(cache: tileCache),
     ),
@@ -51,6 +53,7 @@ class StundaApp extends StatefulWidget {
     super.key,
     this.controller,
     this.exiftoolBundleDir,
+    this.onnxBundleDir,
     this.prefs,
     this.tileProvider,
   });
@@ -61,6 +64,10 @@ class StundaApp extends StatefulWidget {
   /// On-disk dir of the bundled exiftool, forwarded into a freshly built
   /// controller (ignored when [controller] is injected).
   final String? exiftoolBundleDir;
+
+  /// On-disk dir of the bundled ONNX Runtime lib + detector model, forwarded
+  /// into a freshly built controller (ignored when [controller] is injected).
+  final String? onnxBundleDir;
 
   /// Persisted preferences forwarded into a freshly built controller (ignored
   /// when [controller] is injected).
@@ -79,6 +86,7 @@ class _StundaAppState extends State<StundaApp> {
       widget.controller ??
       AppController(
         exiftoolBundleDir: widget.exiftoolBundleDir,
+        onnxBundleDir: widget.onnxBundleDir,
         prefs: widget.prefs,
       );
 

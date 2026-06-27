@@ -5,8 +5,10 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/engine/isolate_runner.dart';
+import 'package:stunda/src/engine/onnx_bundle.dart';
 
 import 'support/fakes.dart';
 
@@ -215,6 +217,38 @@ void main() {
       },
     );
 
+    test(
+      'hashFilesEntry runs Tier-2 detection when a model is bundled',
+      () async {
+        final bundleDir = _onnxBundleDir();
+        final hasBundle =
+            bundleDir != null &&
+            (resolveOnnxBundle(bundleDir)?.isComplete ?? false);
+        if (!hasBundle) {
+          markTestSkipped('no ONNX bundle (run tool/fetch-onnx.sh)');
+          return;
+        }
+        // A real photo of a person, hashed with NO people metadata, so the only
+        // way it gets a non-zero peopleScore is the Tier-2 native detector.
+        final person = p.join(tmp.path, 'person.jpg');
+        File(
+          person,
+        ).writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [person],
+              bundleDir: null,
+              onnxBundleDir: bundleDir,
+            ),
+          ),
+        );
+        final hashed = events.whereType<HashedFile>().single;
+        expect(hashed.peopleScore, greaterThan(0.5));
+      },
+    );
+
     test('hashFilesEntry processes more than one chunk', () async {
       // More paths than [hashBatchChunk] forces a second batch iteration. The
       // files are non-images (skipped) but each still ticks, so progress reaches
@@ -249,4 +283,32 @@ void main() {
       expect(result, isNull);
     });
   });
+}
+
+/// An image fixture under test/fixtures/ (cwd is the package root in tests).
+String _fixture(String name) {
+  for (final base in const [
+    ['test', 'fixtures'],
+    ['app', 'test', 'fixtures'],
+  ]) {
+    final path = p.joinAll([Directory.current.path, ...base, name]);
+    if (File(path).existsSync()) return path;
+  }
+  return p.join('test', 'fixtures', name);
+}
+
+/// The repo's `app/assets/onnx/<platform>/` bundle dir (populated by
+/// tool/fetch-onnx.sh), found by walking up from the working directory, or null.
+String? _onnxBundleDir() {
+  final platform = onnxPlatformSubdir(Platform.operatingSystem);
+  if (platform == null) return null;
+  var dir = Directory.current.absolute.path;
+  for (var i = 0; i < 6; i++) {
+    final candidate = p.join(dir, 'app', 'assets', 'onnx', platform);
+    if (Directory(candidate).existsSync()) return candidate;
+    final parent = p.dirname(dir);
+    if (parent == dir) break;
+    dir = parent;
+  }
+  return null;
 }

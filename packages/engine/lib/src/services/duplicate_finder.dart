@@ -9,6 +9,7 @@ import '../data/photo_formats.dart';
 import '../data/ports/process_runner.dart';
 import 'image_quality.dart';
 import 'keep_pipeline.dart';
+import 'people_detector.dart';
 import 'people_signals.dart';
 import 'preview_extract.dart';
 
@@ -157,6 +158,20 @@ class HashedFile {
 
   /// Resolution (pixel area) used to pick the best of a group.
   int get resolution => width * height;
+
+  /// A copy of this record with [peopleScore] replaced — used to fold a Tier-2
+  /// detection result onto a record whose Tier-1 metadata score was 0.
+  HashedFile withPeopleScore(double peopleScore) => HashedFile(
+    path: path,
+    hash: hash,
+    width: width,
+    height: height,
+    fileSize: fileSize,
+    basename: basename,
+    isRaw: isRaw,
+    quality: quality,
+    peopleScore: peopleScore,
+  );
 
   /// JSON view of the record (dimensions, size, RAW-ness, quality, and the
   /// people/pet score).
@@ -373,6 +388,7 @@ Future<List<HashedFile>> hashFilesBatch(
   required ProcessRunner runner,
   required String tmpDir,
   void Function()? onFileDone,
+  PeopleDetector detector = const NoopPeopleDetector(),
 }) async {
   if (paths.isEmpty) return const [];
   await Directory(tmpDir).create(recursive: true);
@@ -406,7 +422,9 @@ Future<List<HashedFile>> hashFilesBatch(
     for (final path in paths) {
       final extracted = thumbs[path] ?? previews[path];
       final hashed = _hashFromExtract(path, extracted, meta[path]);
-      if (hashed != null) results.add(hashed);
+      if (hashed != null) {
+        results.add(await _withTier2(hashed.file, hashed.decoded, detector));
+      }
       onFileDone?.call();
     }
     return results;
@@ -475,12 +493,21 @@ Future<Map<String, _Meta>> _readBatchMeta(
   return meta;
 }
 
+/// A hashed file plus the decoded thumbnail it was built from, so a caller can
+/// run Tier-2 detection over the SAME pixels without re-decoding.
+typedef _HashedWithPixels = ({HashedFile file, img.Image decoded});
+
 /// Builds a [HashedFile] for [path] from its [extracted] thumbnail/preview (or,
 /// when null, by decoding the source itself — the slow fallback). Returns null
 /// when nothing decodes. Dimensions prefer the batched [meta] (a width/height of
 /// 0 means "unknown" → use the decoded image's own size); the Tier-1 people
-/// score comes from the same [meta]. Never throws.
-HashedFile? _hashFromExtract(String path, String? extracted, _Meta? meta) {
+/// score comes from the same [meta]. Also returns the decoded image so the
+/// caller can run Tier-2 over it. Never throws.
+_HashedWithPixels? _hashFromExtract(
+  String path,
+  String? extracted,
+  _Meta? meta,
+) {
   final Uint8List bytes;
   try {
     bytes = File(extracted ?? path).readAsBytesSync();
@@ -499,18 +526,37 @@ HashedFile? _hashFromExtract(String path, String? extracted, _Meta? meta) {
 
   final w = meta?.width ?? 0;
   final h = meta?.height ?? 0;
-  return HashedFile(
-    path: path,
-    hash: dHash(decoded),
-    width: w > 0 ? w : decoded.width,
-    height: h > 0 ? h : decoded.height,
-    fileSize: fileSize,
-    basename: basenameKey(path),
-    isRaw: PhotoFormats.isRaw(path),
-    // Reuse the already-decoded thumbnail to score quality (no re-decode).
-    quality: qualityScore(decoded),
-    peopleScore: meta?.peopleScore ?? 0,
+  return (
+    file: HashedFile(
+      path: path,
+      hash: dHash(decoded),
+      width: w > 0 ? w : decoded.width,
+      height: h > 0 ? h : decoded.height,
+      fileSize: fileSize,
+      basename: basenameKey(path),
+      isRaw: PhotoFormats.isRaw(path),
+      // Reuse the already-decoded thumbnail to score quality (no re-decode).
+      quality: qualityScore(decoded),
+      peopleScore: meta?.peopleScore ?? 0,
+    ),
+    decoded: decoded,
   );
+}
+
+/// The Tier-2 fallback: when [file] carries NO Tier-1 people score (metadata was
+/// silent) and [detector] is available, score the already-[decoded] thumbnail
+/// and return [file] with that [HashedFile.peopleScore]. Otherwise (a Tier-1
+/// score is already present, no detector, or the detector can't decide) [file]
+/// is returned unchanged. Never throws — a null/failed detection leaves Tier-1.
+Future<HashedFile> _withTier2(
+  HashedFile file,
+  img.Image decoded,
+  PeopleDetector detector,
+) async {
+  if (file.peopleScore != 0 || !detector.isAvailable) return file;
+  final score = await detector.scoreDecoded(decoded);
+  if (score == null || score <= 0) return file;
+  return file.withPeopleScore(score);
 }
 
 List<dynamic> _tryDecodeJsonList(String text) {

@@ -47,6 +47,13 @@ jobs:
       - name: Vendor bundled exiftool
         run: bash tool/fetch-exiftool.sh
 
+      # Vendor the ONNX Runtime native lib + Apache-2.0 SSD-MobileNet model into
+      # app/assets/onnx/ so the Tier-2 people/animal detector's integration test
+      # (engine) runs and the app build/test sees the declared assets. The Linux
+      # runner gets the linux-x64 ORT build; the model is shared.
+      - name: Vendor ONNX Runtime + detector model
+        run: bash tool/fetch-onnx.sh
+
       - name: Format check
         # Scoped to source dirs (kept in sync with .githooks/pre-commit) so
         # generated build/ output is never considered.

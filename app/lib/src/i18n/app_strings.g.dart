@@ -234,6 +234,8 @@ const Map<String, String> kEnglishStrings = {
   'lic_role_http': 'Map tiles & geocoding',
   'lic_role_archive': 'Takeout zip',
   'lic_role_files': 'File picking, links, app storage',
+  'lic_role_onnxruntime': 'On-device people/animal detection runtime (bundled)',
+  'lic_role_ssd_mobilenet': 'On-device people/animal detection model (bundled)',
   'settings_title': 'Settings',
   'settings_appearance': 'Appearance',
   'settings_light': 'Light',

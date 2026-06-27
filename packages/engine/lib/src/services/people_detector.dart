@@ -16,6 +16,8 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
+
 /// Estimates a people/pet likelihood (0..1) for an image from its pixels.
 ///
 /// Implementations are the Tier-2 fallback consulted only when Tier-1 metadata
@@ -24,23 +26,26 @@ import 'dart:typed_data';
 abstract interface class PeopleDetector {
   /// Whether this detector can actually score images right now (a model is
   /// loaded and the runtime is available). When false, callers must not call
-  /// [scoreImage] and should rely on Tier-1 metadata alone.
+  /// [scoreImage]/[scoreDecoded] and should rely on Tier-1 metadata alone.
   bool get isAvailable;
 
   /// A people/pet likelihood in 0..1 for the image encoded in [imageBytes]
   /// (a thumbnail/preview JPEG/PNG), or null when this detector can't decide
   /// (unavailable, undecodable, or inconclusive). Never throws.
   Future<double?> scoreImage(Uint8List imageBytes);
+
+  /// Like [scoreImage] but for an already-decoded [image] — used by the hashing
+  /// pipeline, which has decoded the thumbnail already, to avoid a re-decode.
+  /// Returns a 0..1 score or null when it can't decide. Never throws.
+  Future<double?> scoreDecoded(img.Image image);
 }
 
-// TODO(Tier-2): wire a real on-device detector behind this seam for the GUI.
-// Needs: a small COCO-class model (person/cat/dog/bird/horse…) bundled like
-// exiftool (asset + fetch script, gitignored if large) and a desktop runtime
-// (onnxruntime or opencv_dart/dartcv) that resolves with the current Flutter
-// and keeps `flutter build macos --release` green. It was left stubbed because
-// adding native ML libs is a build-stability / app-size risk that the spec said
-// not to force; Tier 1 (metadata) ships and the rule falls through cleanly when
-// metadata is silent and no detector is available.
+// The real Tier-2 implementation behind this seam is [OrtPeopleDetector] (see
+// people/ort_people_detector.dart): a small COCO-class SSD-MobileNet model run
+// through a bundled ONNX Runtime via dart:ffi, both vendored like exiftool
+// (tool/fetch-onnx.sh). Callers construct it from a resolved bundle dir and fall
+// back to [NoopPeopleDetector] when the lib + model are absent, so Tier 1
+// (metadata) still ships and the rule falls through cleanly with no detector.
 
 /// The default [PeopleDetector]: always unavailable, scores nothing.
 ///
@@ -55,4 +60,7 @@ class NoopPeopleDetector implements PeopleDetector {
 
   @override
   Future<double?> scoreImage(Uint8List imageBytes) async => null;
+
+  @override
+  Future<double?> scoreDecoded(img.Image image) async => null;
 }
