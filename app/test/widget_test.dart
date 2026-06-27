@@ -302,7 +302,7 @@ void main() {
     await _pumpApp(tester, controller);
 
     // The standalone toggle is gone — the theme lives in the overflow menu.
-    await tester.tap(find.byTooltip('Menu'));
+    await tester.tap(find.byTooltip('Open settings, licenses, and appearance'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Appearance:'));
     await tester.pumpAndSettle();
@@ -323,7 +323,7 @@ void main() {
       expect(find.byType(FloatingActionButton), findsNothing);
 
       // It rides in the header as a tappable button.
-      final logButton = find.byTooltip('Activity log');
+      final logButton = find.byTooltip('Show the activity log of recent runs');
       expect(logButton, findsOneWidget);
 
       await tester.tap(logButton);
@@ -336,7 +336,10 @@ void main() {
       await tester.tapAt(const Offset(20, 20));
       await tester.pumpAndSettle();
       // Still in the header, still not a FAB.
-      expect(find.byTooltip('Activity log'), findsOneWidget);
+      expect(
+        find.byTooltip('Show the activity log of recent runs'),
+        findsOneWidget,
+      );
       expect(find.byType(FloatingActionButton), findsNothing);
     },
   );
@@ -365,7 +368,7 @@ void main() {
     );
 
     // Opening the log marks it read, so the badge disappears.
-    await tester.tap(find.byTooltip('Activity log'));
+    await tester.tap(find.byTooltip('Show the activity log of recent runs'));
     await tester.pumpAndSettle();
     expect(controller.unreadCount, 0);
     expect(

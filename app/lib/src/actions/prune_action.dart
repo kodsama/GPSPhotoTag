@@ -115,11 +115,13 @@ class _DirectionToggle extends StatelessWidget {
           value: PruneDirection.removeOrphanRaws,
           label: Text(context.tr('prune_dir_orphan_raws')),
           icon: const Icon(Icons.raw_on, size: 18),
+          tooltip: context.tr('tt_prune_dir_orphan_raws'),
         ),
         ButtonSegment(
           value: PruneDirection.removeOrphanImages,
           label: Text(context.tr('prune_dir_orphan_images')),
           icon: const Icon(Icons.image_outlined, size: 18),
+          tooltip: context.tr('tt_prune_dir_orphan_images'),
         ),
       ],
       selected: {controller.pruneDirection},
@@ -156,6 +158,7 @@ class _FilterRow extends StatelessWidget {
             // Orphan RAWs — selectable deletion candidates in direction A.
             FilterChip(
               label: Text(context.tr('prune_chip_orphan_raws')),
+              tooltip: context.tr('tt_prune_chip'),
               selected: controller.isKindVisible(PairKind.orphanRaw),
               onSelected: (v) =>
                   controller.setKindVisible(PairKind.orphanRaw, v),
@@ -164,6 +167,7 @@ class _FilterRow extends StatelessWidget {
             // their JPG twins (was two chips describing the same pairing).
             FilterChip(
               label: Text(context.tr('prune_chip_paired')),
+              tooltip: context.tr('tt_prune_chip'),
               selected:
                   controller.isKindVisible(PairKind.pairedRaw) &&
                   controller.isKindVisible(PairKind.photoWithRaw),
@@ -175,6 +179,7 @@ class _FilterRow extends StatelessWidget {
             // Orphan images — selectable deletion candidates in direction B.
             FilterChip(
               label: Text(context.tr('prune_chip_photos_no_raw')),
+              tooltip: context.tr('tt_prune_chip'),
               selected: controller.isKindVisible(PairKind.photoWithoutRaw),
               onSelected: (v) =>
                   controller.setKindVisible(PairKind.photoWithoutRaw, v),
@@ -344,10 +349,13 @@ class _ConfirmButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = controller.selectedCount;
-    return FilledButton.icon(
-      onPressed: n == 0 ? null : () => _confirm(context),
-      icon: const Icon(Icons.delete_outline),
-      label: Text(context.tr('prune_move_selected', {'count': n})),
+    return Tooltip(
+      message: context.tr('tt_prune_move_selected'),
+      child: FilledButton.icon(
+        onPressed: n == 0 ? null : () => _confirm(context),
+        icon: const Icon(Icons.delete_outline),
+        label: Text(context.tr('prune_move_selected', {'count': n})),
+      ),
     );
   }
 

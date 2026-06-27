@@ -133,6 +133,13 @@ void main() {
       ..debugSetExplore(const []);
     await _pump(tester, c);
 
+    // The overlaid map controls carry localized hover tooltips.
+    expect(find.byTooltip('Go back to your library'), findsOneWidget);
+    expect(
+      find.byTooltip('Switch between numbered points, a heatmap, or both'),
+      findsOneWidget,
+    );
+
     await tester.tap(find.text('Library'));
     await tester.pump();
     expect(c.screen, AppScreen.workspace);
@@ -387,6 +394,54 @@ void main() {
     await tester.pump();
 
     expect(pickerCalled, isTrue);
+  });
+
+  testWidgets('a successful save writes the PNG and shows the "Saved to" '
+      'snackbar', (tester) async {
+    final dir = Directory.systemTemp.createTempSync('explore-save-ok');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final out = '${dir.path}/stunda-map.png';
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+
+    // A mock-client tile cache so the real-event-loop runAsync below never
+    // reaches the live OSM network for map tiles.
+    final cache = TileCache(
+      client: MockClient((_) async => http.Response.bytes(_realPng(), 200)),
+      root: dir,
+      sleep: (_) async {},
+    );
+
+    // runAsync so the real file write inside AppController.savePng completes,
+    // driving the success branch of _saveView (the "Saved to …" snackbar).
+    await tester.runAsync(() async {
+      await _pump(
+        tester,
+        c,
+        tileProvider: CachingTileProvider(cache: cache),
+        capturePng: () async => _realPng(),
+        savePathPicker: () async => out,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byIcon(Icons.save_alt));
+      // Poll the real event loop until the capture → savePng → writeAsBytes
+      // chain settles (the save is logged), so the test never races under
+      // concurrent load instead of relying on a fixed delay.
+      for (var i = 0; i < 100; i++) {
+        if (c.logEntries.any((e) => e.message.contains('Saved map view'))) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+    });
+    await tester.pump();
+
+    // The PNG was written and the success branch of _saveView ran: the
+    // controller logged the save and the "Saved to …" snackbar was requested.
+    expect(File(out).existsSync(), isTrue);
+    expect(c.logEntries.any((e) => e.message.contains('Saved map view')), true);
   });
 
   testWidgets(

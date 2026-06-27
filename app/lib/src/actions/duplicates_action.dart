@@ -137,15 +137,18 @@ class _SimilaritySlider extends StatelessWidget {
           children: [
             Text(context.tr('dup_exact'), style: text.bodySmall),
             Expanded(
-              child: Slider(
-                value: controller.similarity.toDouble(),
-                min: 0,
-                max: similaritySteps.toDouble(),
-                divisions: similaritySteps,
-                label: selected,
-                onChanged: controller.findingDuplicates
-                    ? null
-                    : (v) => controller.setSimilarity(v.round()),
+              child: Tooltip(
+                message: context.tr('tt_dup_similarity'),
+                child: Slider(
+                  value: controller.similarity.toDouble(),
+                  min: 0,
+                  max: similaritySteps.toDouble(),
+                  divisions: similaritySteps,
+                  label: selected,
+                  onChanged: controller.findingDuplicates
+                      ? null
+                      : (v) => controller.setSimilarity(v.round()),
+                ),
               ),
             ),
             Text(context.tr('dup_loose'), style: text.bodySmall),
@@ -218,9 +221,12 @@ class _KeepPipelinePanel extends StatelessWidget {
                   children: [
                     ReorderableDragStartListener(
                       index: i,
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Icon(Icons.drag_handle, size: 20),
+                      child: Tooltip(
+                        message: context.tr('tt_dup_drag_handle'),
+                        child: const Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Icon(Icons.drag_handle, size: 20),
+                        ),
                       ),
                     ),
                     Text('${i + 1}.', style: text.labelLarge),
@@ -228,10 +234,13 @@ class _KeepPipelinePanel extends StatelessWidget {
                     Expanded(
                       child: Text(keepRuleLabel(steps[i].rule, context.tr)),
                     ),
-                    Switch(
-                      value: steps[i].enabled,
-                      onChanged: (v) =>
-                          controller.setKeepRuleEnabled(steps[i].rule, v),
+                    Tooltip(
+                      message: context.tr('tt_dup_rule_switch'),
+                      child: Switch(
+                        value: steps[i].enabled,
+                        onChanged: (v) =>
+                            controller.setKeepRuleEnabled(steps[i].rule, v),
+                      ),
                     ),
                   ],
                 ),
@@ -311,12 +320,15 @@ class _Results extends StatelessWidget {
             child: _PairRow(controller: controller, index: i, pair: pairs[i]),
           ),
         const SizedBox(height: 8),
-        FilledButton.icon(
-          onPressed: n == 0
-              ? null
-              : () => _confirm(context, controller, random),
-          icon: const Icon(Icons.delete_outline),
-          label: Text(context.tr('dup_remove_button', {'count': n})),
+        Tooltip(
+          message: context.tr('tt_dup_remove_button'),
+          child: FilledButton.icon(
+            onPressed: n == 0
+                ? null
+                : () => _confirm(context, controller, random),
+            icon: const Icon(Icons.delete_outline),
+            label: Text(context.tr('dup_remove_button', {'count': n})),
+          ),
         ),
       ],
     );
@@ -379,10 +391,17 @@ class _PairRow extends StatelessWidget {
           ),
           Row(
             children: [
-              Checkbox(
-                value: pair.removeSelected,
-                onChanged: (v) =>
-                    controller.setDuplicateRemoval(index, v ?? false),
+              Tooltip(
+                message: context.tr(
+                  pair.removeSelected
+                      ? 'tt_dup_remove_right'
+                      : 'tt_dup_keep_both',
+                ),
+                child: Checkbox(
+                  value: pair.removeSelected,
+                  onChanged: (v) =>
+                      controller.setDuplicateRemoval(index, v ?? false),
+                ),
               ),
               Flexible(
                 child: Text(

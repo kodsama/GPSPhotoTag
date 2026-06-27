@@ -144,7 +144,7 @@ class _SettingsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return PopupMenuButton<String>(
-      tooltip: context.tr('menu_tooltip'),
+      tooltip: context.tr('tt_settings'),
       icon: const Icon(Icons.settings),
       position: PopupMenuPosition.under,
       onSelected: (v) {
@@ -231,7 +231,7 @@ class _LogButton extends StatelessWidget {
       children: [
         IconButton(
           onPressed: onPressed,
-          tooltip: context.tr('activity_log_tooltip'),
+          tooltip: context.tr('tt_activity_log'),
           icon: const Icon(Icons.receipt_long),
         ),
         if (unread > 0)

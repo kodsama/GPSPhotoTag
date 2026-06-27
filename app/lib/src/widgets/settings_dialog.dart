@@ -89,24 +89,27 @@ class SettingsDialog extends StatelessWidget {
                   style: text.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                SegmentedButton<ThemeMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: ThemeMode.light,
-                      label: Text(context.tr('settings_light')),
-                    ),
-                    ButtonSegment(
-                      value: ThemeMode.dark,
-                      label: Text(context.tr('settings_dark')),
-                    ),
-                    ButtonSegment(
-                      value: ThemeMode.system,
-                      label: Text(context.tr('settings_auto')),
-                    ),
-                  ],
-                  selected: {controller.themeMode},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) => controller.setThemeMode(s.first),
+                Tooltip(
+                  message: context.tr('tt_settings_theme'),
+                  child: SegmentedButton<ThemeMode>(
+                    segments: [
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        label: Text(context.tr('settings_light')),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        label: Text(context.tr('settings_dark')),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        label: Text(context.tr('settings_auto')),
+                      ),
+                    ],
+                    selected: {controller.themeMode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) => controller.setThemeMode(s.first),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 _LanguageSection(controller: controller),
@@ -224,18 +227,21 @@ class _LanguageSection extends StatelessWidget {
       children: [
         Text(context.tr('settings_language'), style: text.titleMedium),
         const SizedBox(height: 8),
-        DropdownButton<String?>(
-          key: const Key('settings-language'),
-          value: controller.localeCode,
-          isExpanded: true,
-          onChanged: controller.setLocaleCode,
-          items: [
-            for (final (code, key) in _entries)
-              DropdownMenuItem<String?>(
-                value: code,
-                child: Text(context.tr(key)),
-              ),
-          ],
+        Tooltip(
+          message: context.tr('tt_settings_language'),
+          child: DropdownButton<String?>(
+            key: const Key('settings-language'),
+            value: controller.localeCode,
+            isExpanded: true,
+            onChanged: controller.setLocaleCode,
+            items: [
+              for (final (code, key) in _entries)
+                DropdownMenuItem<String?>(
+                  value: code,
+                  child: Text(context.tr(key)),
+                ),
+            ],
+          ),
         ),
       ],
     );
@@ -266,15 +272,21 @@ class _BackgroundSection extends StatelessWidget {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            OutlinedButton.icon(
-              onPressed: onPick,
-              icon: const Icon(Icons.image_outlined, size: 18),
-              label: Text(context.tr('settings_choose_image')),
+            Tooltip(
+              message: context.tr('tt_settings_choose_image'),
+              child: OutlinedButton.icon(
+                onPressed: onPick,
+                icon: const Icon(Icons.image_outlined, size: 18),
+                label: Text(context.tr('settings_choose_image')),
+              ),
             ),
             if (path != null)
-              TextButton(
-                onPressed: () => controller.setBackgroundImagePath(null),
-                child: Text(context.tr('settings_reset_default')),
+              Tooltip(
+                message: context.tr('tt_settings_reset_background'),
+                child: TextButton(
+                  onPressed: () => controller.setBackgroundImagePath(null),
+                  child: Text(context.tr('settings_reset_default')),
+                ),
               ),
           ],
         ),
@@ -289,13 +301,16 @@ class _BackgroundSection extends StatelessWidget {
           context.tr('settings_background_intensity_help'),
           style: text.bodySmall,
         ),
-        Slider(
-          value: controller.backgroundVeil,
-          label: context.tr('settings_intensity_value', {
-            'percent': (controller.backgroundVeil * 100).round(),
-          }),
-          divisions: 20,
-          onChanged: controller.setBackgroundVeil,
+        Tooltip(
+          message: context.tr('tt_settings_intensity'),
+          child: Slider(
+            value: controller.backgroundVeil,
+            label: context.tr('settings_intensity_value', {
+              'percent': (controller.backgroundVeil * 100).round(),
+            }),
+            divisions: 20,
+            onChanged: controller.setBackgroundVeil,
+          ),
         ),
       ],
     );

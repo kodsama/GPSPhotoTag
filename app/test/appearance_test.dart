@@ -120,7 +120,10 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
       expect(controller.screen, AppScreen.welcome);
-      expect(find.byTooltip('Menu'), findsOneWidget);
+      expect(
+        find.byTooltip('Open settings, licenses, and appearance'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('present on workspace', (tester) async {
@@ -129,7 +132,10 @@ void main() {
         ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
       await _pump(tester, controller);
       expect(controller.screen, AppScreen.workspace);
-      expect(find.byTooltip('Menu'), findsOneWidget);
+      expect(
+        find.byTooltip('Open settings, licenses, and appearance'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('absent on scanning', (tester) async {
@@ -138,7 +144,10 @@ void main() {
         ..debugSetScreen(AppScreen.scanning);
       await _pump(tester, controller);
       expect(controller.screen, AppScreen.scanning);
-      expect(find.byTooltip('Menu'), findsNothing);
+      expect(
+        find.byTooltip('Open settings, licenses, and appearance'),
+        findsNothing,
+      );
     });
 
     testWidgets('absent on action', (tester) async {
@@ -148,7 +157,10 @@ void main() {
         ..debugSetScreen(AppScreen.action, action: LibraryAction.tag);
       await _pump(tester, controller);
       expect(controller.screen, AppScreen.action);
-      expect(find.byTooltip('Menu'), findsNothing);
+      expect(
+        find.byTooltip('Open settings, licenses, and appearance'),
+        findsNothing,
+      );
     });
 
     testWidgets('absent on explore', (tester) async {
@@ -158,7 +170,10 @@ void main() {
         ..debugSetExplore(const <ExplorePhoto>[]);
       await _pump(tester, controller);
       expect(controller.screen, AppScreen.explore);
-      expect(find.byTooltip('Menu'), findsNothing);
+      expect(
+        find.byTooltip('Open settings, licenses, and appearance'),
+        findsNothing,
+      );
     });
   });
 
@@ -169,7 +184,9 @@ void main() {
         prefs: AppPrefs(),
       )..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Settings…'));
       await tester.pumpAndSettle();

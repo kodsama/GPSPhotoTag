@@ -41,7 +41,9 @@ void main() {
       expect(find.byTooltip('Switch to light'), findsNothing);
       expect(find.byTooltip('Switch to dark'), findsNothing);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       expect(find.textContaining('Appearance:'), findsOneWidget);
       expect(find.text('Settings…'), findsOneWidget);
@@ -58,7 +60,9 @@ void main() {
       )..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Settings…'));
       await tester.pumpAndSettle();
@@ -94,7 +98,9 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Licenses'));
       await tester.pumpAndSettle();
@@ -113,7 +119,9 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('About'));
       await tester.pumpAndSettle();
@@ -133,7 +141,9 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('Appearance:'));
       await tester.pumpAndSettle();

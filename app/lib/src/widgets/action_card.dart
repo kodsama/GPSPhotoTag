@@ -71,56 +71,61 @@ class _ActionCardState extends State<ActionCard> {
       ),
     );
 
-    return MouseRegion(
-      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: Opacity(
-        opacity: enabled ? 1 : 0.55,
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              width: double.infinity,
-              decoration: decoration,
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  borderRadius: radius,
-                  onTap: enabled ? widget.onOpen : null,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            _IconWithRing(
-                              icon: widget.action.icon,
-                              run: run,
-                              color: scheme.primary,
-                            ),
-                            const Spacer(),
-                            if (run.attention) const _AttentionBadge(),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          widget.action.title(context.tr),
-                          style: text.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          widget.action.description(context.tr),
-                          style: text.bodySmall,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const Spacer(),
-                        _ReadinessChip(readiness: widget.readiness),
-                      ],
+    return Tooltip(
+      message: context.tr('tt_action_card', {
+        'description': widget.action.description(context.tr),
+      }),
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: Opacity(
+          opacity: enabled ? 1 : 0.55,
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: double.infinity,
+                decoration: decoration,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    borderRadius: radius,
+                    onTap: enabled ? widget.onOpen : null,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              _IconWithRing(
+                                icon: widget.action.icon,
+                                run: run,
+                                color: scheme.primary,
+                              ),
+                              const Spacer(),
+                              if (run.attention) const _AttentionBadge(),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            widget.action.title(context.tr),
+                            style: text.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.action.description(context.tr),
+                            style: text.bodySmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const Spacer(),
+                          _ReadinessChip(readiness: widget.readiness),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -226,36 +231,39 @@ class _ReadinessChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = readiness.enabled ? AppColors.success : AppColors.inkSoft;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            readiness.enabled
-                ? Icons.check_circle_outline
-                : Icons.do_not_disturb_on_outlined,
-            size: 13,
-            color: color,
-          ),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              readiness.label(context.tr),
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+    return Tooltip(
+      message: context.tr('tt_readiness_chip'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              readiness.enabled
+                  ? Icons.check_circle_outline
+                  : Icons.do_not_disturb_on_outlined,
+              size: 13,
+              color: color,
+            ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                readiness.label(context.tr),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

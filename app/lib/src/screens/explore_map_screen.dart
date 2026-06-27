@@ -659,22 +659,25 @@ class _ModeButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (icon, labelKey) = _face(mode);
     final label = context.tr(labelKey);
-    return Material(
-      color: scheme.surface,
-      borderRadius: BorderRadius.circular(AppTheme.radius),
-      elevation: 3,
-      child: InkWell(
-        onTap: onPressed,
+    return Tooltip(
+      message: context.tr('tt_explore_mode'),
+      child: Material(
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18),
-              const SizedBox(width: 8),
-              Text(label),
-            ],
+        elevation: 3,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18),
+                const SizedBox(width: 8),
+                Text(label),
+              ],
+            ),
           ),
         ),
       ),
@@ -867,22 +870,25 @@ class _BackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(AppTheme.radius),
-      elevation: 3,
-      child: InkWell(
-        onTap: onPressed,
+    return Tooltip(
+      message: context.tr('tt_explore_back'),
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.arrow_back, size: 18),
-              const SizedBox(width: 8),
-              Text(context.tr('explore_back')),
-            ],
+        elevation: 3,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.arrow_back, size: 18),
+                const SizedBox(width: 8),
+                Text(context.tr('explore_back')),
+              ],
+            ),
           ),
         ),
       ),

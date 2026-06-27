@@ -40,10 +40,13 @@ class WelcomeScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                FilledButton.icon(
-                  onPressed: controller.pickLibrary,
-                  icon: const Icon(Icons.folder_open),
-                  label: Text(context.tr('welcome_choose_library')),
+                Tooltip(
+                  message: context.tr('tt_welcome_choose_library'),
+                  child: FilledButton.icon(
+                    onPressed: controller.pickLibrary,
+                    icon: const Icon(Icons.folder_open),
+                    label: Text(context.tr('welcome_choose_library')),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -53,30 +56,36 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: scheme.outline,
-                      style: BorderStyle.solid,
+                Tooltip(
+                  message: context.tr('tt_welcome_drop_zone'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.move_to_inbox_outlined, color: scheme.primary),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          context.tr('welcome_drop_hint'),
-                          style: text.bodyMedium,
-                        ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: scheme.outline,
+                        style: BorderStyle.solid,
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.move_to_inbox_outlined,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            context.tr('welcome_drop_hint'),
+                            style: text.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

@@ -76,7 +76,11 @@ class _Panel extends StatelessWidget {
               children: [
                 Text(context.tr('activity_log_title'), style: text.titleMedium),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.close), onPressed: onClose),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: context.tr('file_close'),
+                  onPressed: onClose,
+                ),
               ],
             ),
           ),

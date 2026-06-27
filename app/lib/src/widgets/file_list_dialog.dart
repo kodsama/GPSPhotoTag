@@ -183,13 +183,19 @@ class _Header extends StatelessWidget {
         Row(
           children: [
             if (supported) ...[
-              TextButton(
-                onPressed: () => controller.setGroupIncluded(paths, true),
-                child: Text(context.tr('file_select_all')),
+              Tooltip(
+                message: context.tr('tt_file_select_all'),
+                child: TextButton(
+                  onPressed: () => controller.setGroupIncluded(paths, true),
+                  child: Text(context.tr('file_select_all')),
+                ),
               ),
-              TextButton(
-                onPressed: () => controller.setGroupIncluded(paths, false),
-                child: Text(context.tr('file_select_none')),
+              Tooltip(
+                message: context.tr('tt_file_select_none'),
+                child: TextButton(
+                  onPressed: () => controller.setGroupIncluded(paths, false),
+                  child: Text(context.tr('file_select_none')),
+                ),
               ),
               const Spacer(),
             ] else
@@ -265,19 +271,22 @@ class _FileRow extends StatelessWidget {
                     )
                   // Image rows: tapping the filename opens the standalone photo
                   // preview (thumbnail + metadata + expand), not the map.
-                  : InkWell(
-                      onTap: () => showPhotoPreviewDialog(
-                        context,
-                        path: path,
-                        meta: controller.fileMeta(path),
-                      ),
-                      child: Text(
-                        p.basename(path),
-                        overflow: TextOverflow.ellipsis,
-                        style: text.bodyMedium?.copyWith(
-                          decoration: TextDecoration.underline,
-                          decorationColor: scheme.onSurface.withValues(
-                            alpha: 0.3,
+                  : Tooltip(
+                      message: context.tr('tt_file_open_preview'),
+                      child: InkWell(
+                        onTap: () => showPhotoPreviewDialog(
+                          context,
+                          path: path,
+                          meta: controller.fileMeta(path),
+                        ),
+                        child: Text(
+                          p.basename(path),
+                          overflow: TextOverflow.ellipsis,
+                          style: text.bodyMedium?.copyWith(
+                            decoration: TextDecoration.underline,
+                            decorationColor: scheme.onSurface.withValues(
+                              alpha: 0.3,
+                            ),
                           ),
                         ),
                       ),

@@ -66,15 +66,21 @@ class LibraryBar extends StatelessWidget {
             runSpacing: 8,
             alignment: WrapAlignment.end,
             children: [
-              OutlinedButton.icon(
-                onPressed: controller.addFolder,
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(context.tr('library_add_folder')),
+              Tooltip(
+                message: context.tr('tt_library_add_folder'),
+                child: OutlinedButton.icon(
+                  onPressed: controller.addFolder,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text(context.tr('library_add_folder')),
+                ),
               ),
-              OutlinedButton.icon(
-                onPressed: controller.changeLibrary,
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: Text(context.tr('library_change')),
+              Tooltip(
+                message: context.tr('tt_library_change'),
+                child: OutlinedButton.icon(
+                  onPressed: controller.changeLibrary,
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  label: Text(context.tr('library_change')),
+                ),
               ),
             ],
           ),
