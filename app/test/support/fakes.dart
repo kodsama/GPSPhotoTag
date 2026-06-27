@@ -209,6 +209,24 @@ class FakeEngineRunner implements EngineRunner {
     if (duplicatesGate != null) await duplicatesGate!.future;
     return duplicateGroups;
   }
+
+  /// Canned hashed files returned by [hashFiles] (carrying quality scores).
+  List<HashedFile> hashedFiles = const [];
+
+  /// Paths passed to the last [hashFiles] call.
+  List<String>? lastHashFilesPaths;
+
+  @override
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    calls.add('hashFiles');
+    lastHashFilesPaths = paths;
+    lastOnProgress = onProgress;
+    if (duplicatesGate != null) await duplicatesGate!.future;
+    return hashedFiles;
+  }
 }
 
 /// An [EngineRunner] whose streams emit a stream-level error (rather than an
@@ -261,6 +279,12 @@ class ThrowingEngineRunner implements EngineRunner {
     required int threshold,
     void Function(int done, int total)? onProgress,
   }) async => throw StateError('findDuplicates blew up');
+
+  @override
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    void Function(int done, int total)? onProgress,
+  }) async => throw StateError('hashFiles blew up');
 }
 
 /// Builds a [FolderScanResult] for tests with controllable tallies.

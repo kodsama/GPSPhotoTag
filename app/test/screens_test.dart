@@ -136,8 +136,8 @@ void main() {
       // Tag has no GPS sources; prune has no RAWs.
       expect(find.text('No GPS sources found'), findsOneWidget);
       expect(find.text('No RAW files found'), findsOneWidget);
-      // Explore is ready (1 photo).
-      expect(find.text('1 photos'), findsOneWidget);
+      // Explore and Shrink are both ready with 1 photo.
+      expect(find.text('1 photos'), findsNWidgets(2));
     });
 
     testWidgets('tapping a ready card opens its action', (tester) async {

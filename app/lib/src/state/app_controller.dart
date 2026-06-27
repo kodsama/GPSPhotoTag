@@ -20,6 +20,7 @@ import 'library_action.dart';
 import 'library_roots.dart';
 import 'log_entry.dart';
 import 'prune_direction.dart';
+import 'shrink_model.dart';
 
 /// The single source of truth for the Stunda GUI.
 ///
@@ -229,6 +230,9 @@ class AppController extends ChangeNotifier {
       _hashProgress = HashProgress();
       if (action == LibraryAction.pruneRaw) {
         _preparePruneReview();
+      } else if (action == LibraryAction.shrink) {
+        _pairing = null;
+        _prepareShrink();
       } else {
         _pairing = null;
       }
@@ -639,12 +643,14 @@ class AppController extends ChangeNotifier {
       if (_runCompleter?.isCompleted == false) _runCompleter!.complete();
       _runCompleter = null;
     }
-    if (action == LibraryAction.duplicates) {
+    if (action == LibraryAction.duplicates || action == LibraryAction.shrink) {
       // The hashing future can't be force-stopped, but flagging it cancelled
-      // makes the controller ignore its result and reset its live state.
+      // makes the controller ignore its result and reset its live state. The
+      // shrink wizard's hashing stages share this machinery.
       _duplicatesCancelled = true;
       _findingDuplicates = false;
       _hashProgress = HashProgress();
+      _shrinkBusy = false;
     }
     _setRunState(action, ActionRunState.idle);
   }
@@ -1358,6 +1364,323 @@ class AppController extends ChangeNotifier {
       total: paths.length,
       reviewOnDone: true,
     );
+  }
+
+  // --- Shrink wizard (cumulative trash set across opt-in stages) -----------
+
+  /// The cumulative trash set the wizard builds across stages (first reason
+  /// wins). Reset each time the wizard is opened idle.
+  StagedSet _staged = StagedSet();
+
+  /// Per-stage opt-in toggles (default: every stage included).
+  final Map<ShrinkStage, bool> _stageIncluded = {
+    for (final s in ShrinkStage.values) s: true,
+  };
+
+  /// The outcome of each stage that has been run (added candidates + tallies +
+  /// running total), keyed by stage. Drives the per-stage review panels.
+  final Map<ShrinkStage, ShrinkStageOutcome> _stageOutcomes = {};
+
+  // Orphans stage: which side(s) to flag.
+  bool _shrinkOrphanRaws = true;
+  bool _shrinkOrphanImages = false;
+  // Redundant-pairs stage: which side to drop.
+  PairDropSide _shrinkPairDrop = PairDropSide.dropRaw;
+  // Low-quality stage threshold (0..1 composite quality).
+  double _shrinkQualityThreshold = 0.35;
+  bool _shrinkBusy = false;
+
+  /// The currently-staged candidates across every run stage (cumulative).
+  List<ShrinkCandidate> get shrinkStaged => _staged.all;
+
+  /// The grand total over the currently-selected staged files.
+  ShrinkTally get shrinkTotal => _staged.selectedTally;
+
+  /// Whether [stage] is opted in.
+  bool isShrinkStageIncluded(ShrinkStage stage) =>
+      _stageIncluded[stage] ?? true;
+
+  /// The outcome of [stage] if it has been run, else null.
+  ShrinkStageOutcome? shrinkOutcome(ShrinkStage stage) => _stageOutcomes[stage];
+
+  /// Whether the orphan-RAW side is flagged in the orphans stage.
+  bool get shrinkOrphanRaws => _shrinkOrphanRaws;
+
+  /// Whether the orphan-image side is flagged in the orphans stage.
+  bool get shrinkOrphanImages => _shrinkOrphanImages;
+
+  /// Which side the redundant-pairs stage drops.
+  PairDropSide get shrinkPairDrop => _shrinkPairDrop;
+
+  /// The low-quality stage threshold (0..1 composite quality).
+  double get shrinkQualityThreshold => _shrinkQualityThreshold;
+
+  /// Whether a stage computation is currently in flight (hashing/classifying).
+  bool get shrinkBusy => _shrinkBusy;
+
+  /// Whether [path] is staged AND still selected for deletion.
+  bool isShrinkSelected(String path) => _staged.isSelected(path);
+
+  /// The paths the wizard will trash (staged and not deselected).
+  List<String> get shrinkSelectedPaths => _staged.selectedPaths;
+
+  /// Number of files the wizard will trash.
+  int get shrinkSelectedCount => _staged.selectedPaths.length;
+
+  /// Resets the wizard to a fresh, empty cumulative set (called when opened).
+  void _prepareShrink() {
+    _staged = StagedSet();
+    _stageOutcomes.clear();
+    for (final s in ShrinkStage.values) {
+      _stageIncluded[s] = true;
+    }
+  }
+
+  /// Opts [stage] in or out. Toggling a stage off rolls its candidates back out
+  /// of the cumulative set; toggling on leaves it un-run until the user runs it.
+  void setShrinkStageIncluded(ShrinkStage stage, bool included) {
+    if ((_stageIncluded[stage] ?? true) == included) return;
+    _stageIncluded[stage] = included;
+    if (!included) {
+      _staged.removeStage(stage);
+      _stageOutcomes.remove(stage);
+    }
+    notifyListeners();
+  }
+
+  /// Sets the orphan-stage side toggles.
+  void setShrinkOrphanRaws(bool value) {
+    _shrinkOrphanRaws = value;
+    notifyListeners();
+  }
+
+  /// Sets the orphan-stage image-side toggle.
+  void setShrinkOrphanImages(bool value) {
+    _shrinkOrphanImages = value;
+    notifyListeners();
+  }
+
+  /// Sets which side the redundant-pairs stage drops.
+  void setShrinkPairDrop(PairDropSide side) {
+    _shrinkPairDrop = side;
+    notifyListeners();
+  }
+
+  /// Sets the low-quality threshold (clamped 0..1).
+  void setShrinkQualityThreshold(double value) {
+    _shrinkQualityThreshold = value.clamp(0.0, 1.0);
+    notifyListeners();
+  }
+
+  /// Selects or deselects an already-staged [path] (used in per-stage review and
+  /// the final summary).
+  void setShrinkSelected(String path, bool selected) {
+    _staged.setSelected(path, selected);
+    notifyListeners();
+  }
+
+  /// On-disk size of [path] in bytes, or 0 when it can't be read.
+  int _sizeOf(String path) {
+    try {
+      return File(path).lengthSync();
+    } on Object {
+      return 0;
+    }
+  }
+
+  bool _gpsOf(String path) => _meta[path]?.hasGps ?? false;
+
+  /// Runs the duplicates stage: hashes every included photo (showing hash
+  /// progress), groups them, and folds the non-kept members into the set.
+  Future<void> runShrinkDuplicates() async {
+    final scan = _scan;
+    if (scan == null) return;
+    final photos = _included(scan.photos);
+    _shrinkBusy = true;
+    _findingDuplicates = true;
+    _duplicatesCancelled = false;
+    _hashProgress = HashProgress(total: photos.length);
+    _errorMessage = null;
+    _setRunState(
+      LibraryAction.shrink,
+      ActionRunState.active(progress: photos.isEmpty ? null : 0),
+    );
+    notifyListeners();
+    try {
+      final groups = await _engine.findDuplicates(
+        photos,
+        threshold: similarityToThreshold(_similarity),
+        onProgress: (done, total) {
+          if (_duplicatesCancelled) return;
+          _hashProgress = HashProgress(done: done, total: total);
+          _setRunState(
+            LibraryAction.shrink,
+            ActionRunState.active(progress: _hashProgress.fraction),
+          );
+        },
+      );
+      if (_duplicatesCancelled) return;
+      final pairs = pairsFromGroups(groups, pipeline: _keepPipeline);
+      final candidates = duplicateCandidates(pairs, gpsOf: _gpsOf);
+      _stageOutcomes[ShrinkStage.duplicates] = _staged.addStage(
+        ShrinkStage.duplicates,
+        candidates,
+      );
+      _log('Shrink: duplicates flagged ${candidates.length} file(s)');
+    } on Object catch (e) {
+      if (!_duplicatesCancelled) {
+        _errorMessage = '$e';
+        _log('Shrink duplicates failed: $e', level: LogLevel.error);
+      }
+    } finally {
+      _shrinkBusy = false;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      _setRunState(LibraryAction.shrink, ActionRunState.idle);
+      notifyListeners();
+    }
+  }
+
+  /// Runs the orphans stage: classifies the library (cheap, pure) and folds the
+  /// chosen orphan side(s) into the set.
+  void runShrinkOrphans() {
+    final scan = _scan;
+    if (scan == null) return;
+    final pairing = classifyPairing(_included(scan.photos));
+    final candidates = orphanCandidates(
+      pairing,
+      includeOrphanRaws: _shrinkOrphanRaws,
+      includeOrphanImages: _shrinkOrphanImages,
+      sizeOf: _sizeOf,
+      gpsOf: _gpsOf,
+    );
+    _stageOutcomes[ShrinkStage.orphans] = _staged.addStage(
+      ShrinkStage.orphans,
+      candidates,
+    );
+    _log('Shrink: orphans flagged ${candidates.length} file(s)');
+    notifyListeners();
+  }
+
+  /// Runs the redundant-pairs stage: classifies the library and folds the chosen
+  /// side of every RAW+photo pair into the set.
+  void runShrinkPairs() {
+    final scan = _scan;
+    if (scan == null) return;
+    final pairing = classifyPairing(_included(scan.photos));
+    final candidates = redundantPairCandidates(
+      pairing,
+      side: _shrinkPairDrop,
+      sizeOf: _sizeOf,
+      gpsOf: _gpsOf,
+    );
+    _stageOutcomes[ShrinkStage.pairs] = _staged.addStage(
+      ShrinkStage.pairs,
+      candidates,
+    );
+    _log('Shrink: redundant pairs flagged ${candidates.length} file(s)');
+    notifyListeners();
+  }
+
+  /// Runs the low-quality stage: hashes every included photo (reusing the
+  /// composite quality the hasher already computes) and folds those below the
+  /// threshold into the set.
+  Future<void> runShrinkLowQuality() async {
+    final scan = _scan;
+    if (scan == null) return;
+    final photos = _included(scan.photos);
+    _shrinkBusy = true;
+    _findingDuplicates = true;
+    _duplicatesCancelled = false;
+    _hashProgress = HashProgress(total: photos.length);
+    _errorMessage = null;
+    _setRunState(
+      LibraryAction.shrink,
+      ActionRunState.active(progress: photos.isEmpty ? null : 0),
+    );
+    notifyListeners();
+    try {
+      final hashed = await _engine.hashFiles(
+        photos,
+        onProgress: (done, total) {
+          if (_duplicatesCancelled) return;
+          _hashProgress = HashProgress(done: done, total: total);
+          _setRunState(
+            LibraryAction.shrink,
+            ActionRunState.active(progress: _hashProgress.fraction),
+          );
+        },
+      );
+      if (_duplicatesCancelled) return;
+      final scores = {for (final h in hashed) h.path: h.quality.composite};
+      // The hasher already measured each file's on-disk size, so read it from
+      // the HashedFile rather than re-stat'ing the filesystem.
+      final sizes = {for (final h in hashed) h.path: h.fileSize};
+      final candidates = lowQualityCandidates(
+        scores,
+        threshold: _shrinkQualityThreshold,
+        sizeOf: (path) => sizes[path] ?? 0,
+        gpsOf: _gpsOf,
+      );
+      _stageOutcomes[ShrinkStage.lowQuality] = _staged.addStage(
+        ShrinkStage.lowQuality,
+        candidates,
+      );
+      _log('Shrink: low quality flagged ${candidates.length} file(s)');
+    } on Object catch (e) {
+      if (!_duplicatesCancelled) {
+        _errorMessage = '$e';
+        _log('Shrink low-quality failed: $e', level: LogLevel.error);
+      }
+    } finally {
+      _shrinkBusy = false;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      _setRunState(LibraryAction.shrink, ActionRunState.idle);
+      notifyListeners();
+    }
+  }
+
+  /// Trashes the wizard's selected set after the silly-word confirm gate. A
+  /// no-op when nothing is selected.
+  Future<void> runTrashShrink() {
+    final paths = _staged.selectedPaths;
+    if (paths.isEmpty) return Future.value();
+    return _consume(
+      _engine.trashPaths(paths),
+      owner: LibraryAction.shrink,
+      startMessage: 'Moving ${paths.length} file(s) to Trash…',
+      total: paths.length,
+      reviewOnDone: true,
+    );
+  }
+
+  /// Seeds the wizard's staged set directly (tests only), landing on the shrink
+  /// action panel.
+  @visibleForTesting
+  void debugSeedShrink(List<ShrinkCandidate> staged) {
+    _screen = AppScreen.action;
+    _action = LibraryAction.shrink;
+    _staged = StagedSet();
+    for (final stage in ShrinkStage.values) {
+      final byStage = [
+        for (final c in staged)
+          if (reasonsForStage(stage).contains(c.reason)) c,
+      ];
+      if (byStage.isEmpty) continue;
+      _stageOutcomes[stage] = _staged.addStage(stage, byStage);
+    }
+    notifyListeners();
+  }
+
+  /// Forces the wizard into a busy hashing state with the given progress (tests
+  /// only), so the hashing-bar UI can be asserted without spawning isolates.
+  @visibleForTesting
+  void debugSetShrinkBusy({required int total, int done = 0}) {
+    _shrinkBusy = true;
+    _findingDuplicates = true;
+    _hashProgress = HashProgress(done: done, total: total);
+    notifyListeners();
   }
 
   void _resetRun() {

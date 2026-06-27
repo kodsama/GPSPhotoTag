@@ -80,6 +80,15 @@ enum LibraryAction {
     icon: Icons.filter_none,
     titleKey: 'action_duplicates_title',
     descKey: 'action_duplicates_desc',
+  ),
+
+  /// A guided wizard that shrinks the library by trashing duplicate, orphan,
+  /// redundant, and low-quality photos in opt-in stages.
+  shrink(
+    id: 'shrink',
+    icon: Icons.compress,
+    titleKey: 'action_shrink_title',
+    descKey: 'action_shrink_desc',
   );
 
   const LibraryAction({
@@ -135,6 +144,13 @@ enum LibraryAction {
               params: {'count': scan.photoCount},
             )
           : const ActionReadiness.blocked('readiness_need_two'),
+    LibraryAction.shrink =>
+      scan.photoCount > 0
+          ? ActionReadiness.ready(
+              'readiness_photos',
+              params: {'count': scan.photoCount},
+            )
+          : const ActionReadiness.blocked('readiness_explore_none'),
   };
 
   static ActionReadiness _tagReadiness(FolderScanResult scan) {

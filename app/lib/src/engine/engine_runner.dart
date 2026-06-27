@@ -62,4 +62,16 @@ abstract interface class EngineRunner {
     required int threshold,
     void Function(int done, int total)? onProgress,
   });
+
+  /// Perceptually hashes [paths] across worker isolates, returning every
+  /// [HashedFile] (each carrying its on-disk size, dimensions, and an
+  /// [ImageQuality] composite score). Backs both the duplicate grouping and the
+  /// shrink wizard's low-quality stage, so neither has to re-decode the library.
+  ///
+  /// [onProgress] (when given) reports the running `done` count against the
+  /// fixed `total` (= `paths.length`) as files finish hashing.
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    void Function(int done, int total)? onProgress,
+  });
 }

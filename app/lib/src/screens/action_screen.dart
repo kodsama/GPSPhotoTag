@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../actions/duplicates_action.dart';
 import '../actions/prune_action.dart';
+import '../actions/shrink_action.dart';
 import '../actions/tag_action.dart';
 import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
@@ -65,6 +66,7 @@ class ActionScreen extends StatelessWidget {
     LibraryAction.tag => const TagAction(),
     LibraryAction.pruneRaw => const PruneAction(),
     LibraryAction.duplicates => DuplicatesAction(),
+    LibraryAction.shrink => ShrinkAction(),
     // Explore is a full screen (AppScreen.explore), never an action panel.
     LibraryAction.explore => const SizedBox.shrink(),
   };

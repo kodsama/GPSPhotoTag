@@ -4,7 +4,6 @@
   "app_tagline_period": "Give every photo its moment.",
   "app_version": "2.0.0",
   "about_legalese": "Give every photo its moment.\nAuthor: Kodsama\nGPL-3.0-or-later",
-
   "menu_tooltip": "Menu",
   "menu_appearance_light": "Appearance: Light",
   "menu_appearance_dark": "Appearance: Dark",
@@ -13,13 +12,11 @@
   "menu_about": "About",
   "activity_log_tooltip": "Activity log",
   "badge_overflow": "99+",
-
   "welcome_value_prop": "Place your photos on the map from the GPS tracks and location history you already have.",
   "welcome_choose_library": "Choose photo library",
   "welcome_or": "or",
   "welcome_drop_hint": "Drop folders or photos here",
   "welcome_drop_explainer": "Point it at any folder, or combine several. Photos, GPX/KML tracks, and Google Timeline exports anywhere inside — in any layout — are all found.",
-
   "scanning_title": "Scanning your library…",
   "scan_tile_files": "Files",
   "scan_tile_folders": "Folders",
@@ -27,16 +24,13 @@
   "scan_tile_tracks": "GPS tracks",
   "scan_tile_timeline": "Timeline",
   "scan_tile_unsupported": "Unsupported",
-
   "workspace_actions": "Actions",
-
   "library_default_name": "Library",
   "library_locations": "{count} locations",
   "library_add_folder": "Add folder",
   "library_change": "Change library",
   "library_remove_root": "Remove from library",
   "library_stat_line": "{dirs} folders · {photos} photos · {gpx} GPX · {kml} KML · {google} Timeline",
-
   "content_title": "Library contents",
   "content_supported": "Supported — will be used",
   "content_not_used": "Found but not used",
@@ -52,7 +46,6 @@
   "content_chip_gpx": "GPX",
   "content_chip_kml": "KML",
   "content_chip_timeline": "Timeline",
-
   "action_tag_title": "Tag with GPS",
   "action_tag_desc": "Write location into your photos from the tracks & history found.",
   "action_explore_title": "Explore on map",
@@ -61,7 +54,6 @@
   "action_prune_desc": "Trash RAW files or photos that have no matching partner.",
   "action_duplicates_title": "Find duplicates",
   "action_duplicates_desc": "Spot visually-similar photos and trash the extras.",
-
   "readiness_tag_ready_one": "Ready — 1 source",
   "readiness_tag_ready_many": "Ready — {count} sources",
   "readiness_tag_none": "No GPS sources found",
@@ -70,12 +62,9 @@
   "readiness_raw_files": "{count} RAW files",
   "readiness_raw_none": "No RAW files found",
   "readiness_need_two": "Need at least 2 photos",
-
   "card_needs_review": "Needs your review",
-
   "action_library_back": "Library",
   "action_cancel": "Cancel",
-
   "tag_preview_photos": "Preview {count} photos",
   "tag_tag_photos": "Tag {count} photos",
   "tag_copy_label": "Copy to a new folder",
@@ -98,9 +87,7 @@
   "tag_choose_destination": "Choose destination folder",
   "tag_change": "Change",
   "tag_pick_folder": "Pick a folder to continue.",
-
   "done_back_to_library": "Done — back to library",
-
   "prune_no_library": "No library scanned.",
   "prune_review_intro": "Nothing is removed until you review the list below and confirm. {description}",
   "prune_summary": "{orphans} orphan RAWs · {paired} RAWs with a JPG · {photos} photos without a RAW",
@@ -124,7 +111,6 @@
   "prune_kind_paired": "Paired",
   "prune_kind_no_raw": "No RAW",
   "prune_kind_has_raw": "Has RAW",
-
   "dup_intro": "Drag toward Loose to also catch lightly-edited near-duplicates. Nothing is removed until you review and confirm.",
   "dup_find": "Find duplicates",
   "dup_similarity": "Similarity",
@@ -155,19 +141,15 @@
   "dup_size_bytes": "{count} B",
   "dup_size_kb": "{count} KB",
   "dup_size_mb": "{count} MB",
-
   "sim_identical": "Identical copies",
   "sim_resaved": "Re-saved or resized",
   "sim_minor": "Minor edits (crop, exposure)",
   "sim_same_scene": "Same scene, a different shot",
   "sim_loose": "Loosely similar scenes",
-
   "hashing_progress": "Hashing {done} / {total}",
-
   "run_progress": "{done}/{total}",
   "run_recent_results": "Recent results",
   "summary_total": "total",
-
   "explore_back": "Library",
   "explore_capture_failed": "Couldn't capture the map view.",
   "explore_saved_to": "Saved to {path}",
@@ -186,7 +168,6 @@
   "explore_loading": "loading coordinates {loaded}/{total}",
   "explore_empty_title": "No geotagged photos to show.",
   "explore_empty_desc": "Tag your photos with GPS first, then explore them here.",
-
   "file_close": "Close",
   "file_no_matching": "No matching files.",
   "file_select_all": "Select all",
@@ -197,20 +178,16 @@
   "file_dimensions": "{width}×{height}",
   "file_points": "{count} pts",
   "file_date_span": "{start}–{end}",
-
   "preview_fullscreen": "View fullscreen",
   "preview_close": "Close",
   "preview_prev": "Previous",
   "preview_next": "Next",
   "preview_dimensions": "{width} × {height}",
-
   "warning_dismiss": "Dismiss",
   "warning_exiftool": "ExifTool couldn't start, so RAW-embed, HEIC, and Fuji/Canon RAW timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.",
   "exit_running": "A process is still running — cancel it before quitting.",
-
   "activity_log_title": "Activity log",
   "activity_no_activity": "No activity yet.",
-
   "licenses_title": "Licenses",
   "licenses_app_name": "Stunda",
   "licenses_app_license": "Licensed under GPL-3.0-or-later",
@@ -226,7 +203,6 @@
   "lic_role_http": "Map tiles & geocoding",
   "lic_role_archive": "Takeout zip",
   "lic_role_files": "File picking, links, app storage",
-
   "settings_title": "Settings",
   "settings_appearance": "Appearance",
   "settings_light": "Light",
@@ -257,7 +233,6 @@
   "settings_mcp_starting_tip": "Starting MCP server…",
   "settings_language": "Language",
   "settings_language_system": "System default",
-
   "lang_system": "System default",
   "lang_en": "English",
   "lang_fr": "Français",
@@ -268,7 +243,6 @@
   "lang_pt": "Português",
   "lang_es": "Español",
   "lang_da": "Dansk",
-
   "tt_settings": "Open settings, licenses, and appearance",
   "tt_activity_log": "Show the activity log of recent runs",
   "tt_welcome_choose_library": "Pick a folder of photos to open as your library",
@@ -297,5 +271,37 @@
   "tt_settings_intensity": "How strongly the background is veiled",
   "tt_file_open_preview": "Open a preview of this photo",
   "tt_file_select_all": "Select every file in this group",
-  "tt_file_select_none": "Clear the selection"
+  "tt_file_select_none": "Clear the selection",
+  "action_shrink_title": "Shrink picture library",
+  "action_shrink_desc": "Reclaim space by trashing duplicate, orphan, redundant, and low-quality photos.",
+  "shrink_intro": "Walk through the stages below. Each stage you include adds files to one cumulative trash list — a file flagged earlier is never counted twice. Review and deselect freely; nothing is deleted until you confirm.",
+  "shrink_stage_duplicates": "1. Duplicates",
+  "shrink_stage_orphans": "2. Orphans",
+  "shrink_stage_pairs": "3. RAW + photo pairs",
+  "shrink_stage_low_quality": "4. Low quality",
+  "shrink_stage_include": "Include this stage",
+  "shrink_run_stage": "Run this stage",
+  "shrink_duplicates_hint": "Finds visually-similar photos and flags every copy except the one worth keeping.",
+  "shrink_orphan_raws": "Orphan RAW files (no matching JPG/HEIC)",
+  "shrink_orphan_images": "Orphan images (no matching RAW)",
+  "shrink_pairs_hint": "Where both a RAW and a photo exist, keep one side.",
+  "shrink_keep_photo": "Keep the photo",
+  "shrink_keep_raw": "Keep the RAW",
+  "shrink_quality_threshold": "Flag photos scoring below {percent}% quality.",
+  "shrink_stage_flagged": "Flagged {count} file(s) · {size} freed",
+  "shrink_running_total": "Running total: {count} file(s) · {size}",
+  "shrink_grand_total": "Staged for deletion: {count} file(s) · {size}",
+  "shrink_nothing_staged": "No files staged yet. Run a stage above to begin.",
+  "shrink_summary_title": "Review everything staged for deletion",
+  "shrink_trash_button": "Move {count} file(s) to Trash",
+  "shrink_has_gps": "GPS",
+  "shrink_no_gps": "No GPS",
+  "shrink_confirm_title": "Move {count} file(s) to Trash?",
+  "shrink_confirm_body": "This moves the selected files to your system Trash. You can restore them from there.",
+  "shrink_reason_duplicate": "duplicate",
+  "shrink_reason_orphan_raw": "orphan RAW",
+  "shrink_reason_orphan_image": "orphan image",
+  "shrink_reason_redundant_raw": "redundant RAW",
+  "shrink_reason_redundant_jpg": "redundant JPG",
+  "shrink_reason_low_quality": "low quality"
 }

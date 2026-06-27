@@ -190,6 +190,18 @@ class IsolateRunner implements EngineRunner {
     required int threshold,
     void Function(int done, int total)? onProgress,
   }) async {
+    final all = await hashFiles(paths, onProgress: onProgress);
+    return groupDuplicates(all, threshold: threshold);
+  }
+
+  /// Fans [paths] out round-robin across CPU-bounded workers (each with its own
+  /// bundled exiftool for RAW/HEIC previews) and concatenates their hashed files
+  /// in worker order for deterministic downstream grouping.
+  @override
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    void Function(int done, int total)? onProgress,
+  }) async {
     if (paths.isEmpty) return const [];
     final total = paths.length;
     final cores = Platform.numberOfProcessors;
@@ -240,8 +252,7 @@ class IsolateRunner implements EngineRunner {
 
     await Future.wait(futures);
     // Concatenate worker outputs in worker order for deterministic grouping.
-    final all = <HashedFile>[for (var w = 0; w < workers; w++) ...?results[w]];
-    return groupDuplicates(all, threshold: threshold);
+    return <HashedFile>[for (var w = 0; w < workers; w++) ...?results[w]];
   }
 
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
