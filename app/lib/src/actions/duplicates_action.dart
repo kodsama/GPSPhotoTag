@@ -9,6 +9,7 @@ import '../state/controller_scope.dart';
 import '../state/duplicates_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/run_view.dart';
+import 'example_scene.dart';
 
 /// The Find-Duplicates flow.
 ///
@@ -129,6 +130,11 @@ class _SimilaritySlider extends StatelessWidget {
             ),
             Text('Loose', style: text.bodySmall),
           ],
+        ),
+        const SizedBox(height: 8),
+        ExampleScenePair(
+          variance: sceneVariance(controller.similarity),
+          caption: similarityExampleLabel(controller.similarity),
         ),
       ],
     );

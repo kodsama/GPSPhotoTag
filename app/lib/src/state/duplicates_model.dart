@@ -18,6 +18,29 @@ const int similaritySteps = 10;
 /// bits apart. Out-of-range inputs are clamped.
 int similarityToThreshold(int slider) => slider.clamp(0, similaritySteps);
 
+/// Normalises a similarity slider value (0..[similaritySteps]) to a 0..1
+/// "scene variance" the example-pair painter uses to perturb its right tile.
+///
+/// 0 at Exact (pixel-identical preview), 1 at Loose, and strictly increasing in
+/// between. Out-of-range inputs are clamped. Pure so the painter stays
+/// deterministic and the mapping is unit-testable.
+double sceneVariance(int slider) =>
+    slider.clamp(0, similaritySteps) / similaritySteps;
+
+/// A short, human descriptor of what the current similarity [slider] level
+/// catches, shown as the example-pair caption.
+///
+/// Buckets the slider into four bands: Exact (0) → identical copies; low → light
+/// re-encodes; mid → small edits; high/Loose → the same scene shot differently.
+/// Out-of-range inputs are clamped. Pure so the bucket boundaries are testable.
+String similarityExampleLabel(int slider) {
+  final value = slider.clamp(0, similaritySteps);
+  if (value == 0) return 'Identical copies';
+  if (value <= 3) return 'Re-saved or resized';
+  if (value <= 7) return 'Minor edits (crop, exposure)';
+  return 'Same scene, a different shot';
+}
+
 /// One reviewable duplicate pair: the [kept] file and the [other] candidate.
 ///
 /// A group of N members renders N−1 pairs (the best vs each other member). The

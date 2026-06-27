@@ -45,6 +45,52 @@ void main() {
     });
   });
 
+  group('sceneVariance', () {
+    test('is 0 at Exact and 1 at Loose', () {
+      expect(sceneVariance(0), 0);
+      expect(sceneVariance(similaritySteps), 1);
+    });
+
+    test('is monotonic across the range', () {
+      expect(sceneVariance(2), lessThan(sceneVariance(5)));
+      expect(sceneVariance(5), lessThan(sceneVariance(9)));
+    });
+
+    test('clamps out-of-range inputs to 0..1', () {
+      expect(sceneVariance(-5), 0);
+      expect(sceneVariance(999), 1);
+    });
+  });
+
+  group('similarityExampleLabel', () {
+    test('Exact (0) reads as identical copies', () {
+      expect(similarityExampleLabel(0), 'Identical copies');
+    });
+
+    test('the low band reads as a re-save/resize', () {
+      expect(similarityExampleLabel(1), 'Re-saved or resized');
+      expect(similarityExampleLabel(3), 'Re-saved or resized');
+    });
+
+    test('the mid band reads as minor edits', () {
+      expect(similarityExampleLabel(4), 'Minor edits (crop, exposure)');
+      expect(similarityExampleLabel(7), 'Minor edits (crop, exposure)');
+    });
+
+    test('the high band reads as a different shot of the same scene', () {
+      expect(similarityExampleLabel(8), 'Same scene, a different shot');
+      expect(
+        similarityExampleLabel(similaritySteps),
+        'Same scene, a different shot',
+      );
+    });
+
+    test('clamps out-of-range inputs to the end buckets', () {
+      expect(similarityExampleLabel(-1), 'Identical copies');
+      expect(similarityExampleLabel(999), 'Same scene, a different shot');
+    });
+  });
+
   group('pairsFromGroups', () {
     test('yields N-1 pairs per group, best on the left', () {
       final group = DuplicateGroup(

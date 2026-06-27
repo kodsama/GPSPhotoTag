@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/actions/duplicates_action.dart';
+import 'package:stunda/src/actions/example_scene.dart';
 import 'package:stunda/src/explore/photo_detail_panel.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
@@ -71,6 +72,26 @@ void main() {
     expect(c.similarity, greaterThan(0));
   });
 
+  testWidgets(
+    'shows the example pair and updates its caption with similarity',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+      await tester.pumpWidget(_host(c));
+
+      // The example pair renders under the slider at the Exact default.
+      expect(find.byType(ExampleScenePair), findsOneWidget);
+      expect(find.text('Identical copies'), findsOneWidget);
+      expect(find.text('≈'), findsOneWidget);
+
+      // Driving the controller to Loose updates the caption live.
+      c.setSimilarity(similaritySteps);
+      await tester.pump();
+      expect(find.text('Same scene, a different shot'), findsOneWidget);
+      expect(find.text('Identical copies'), findsNothing);
+    },
+  );
+
   testWidgets('renders best on the left and the duplicate on the right', (
     tester,
   ) async {
@@ -136,7 +157,9 @@ void main() {
       // Seed the word pick to the first silly word.
       await tester.pumpWidget(_host(c, random: _FixedRandom(0)));
 
-      await tester.tap(find.text('Remove 1 duplicate(s) on the right'));
+      final remove = find.text('Remove 1 duplicate(s) on the right');
+      await tester.ensureVisible(remove);
+      await tester.tap(remove);
       await tester.pumpAndSettle();
 
       // The Trash button is disabled until the word matches.
@@ -247,7 +270,9 @@ void main() {
       ]);
     await tester.pumpWidget(_host(c, random: _FixedRandom(0)));
 
-    await tester.tap(find.text('Remove 1 duplicate(s) on the right'));
+    final remove = find.text('Remove 1 duplicate(s) on the right');
+    await tester.ensureVisible(remove);
+    await tester.tap(remove);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
     await tester.pumpAndSettle();
