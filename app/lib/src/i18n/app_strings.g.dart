@@ -342,7 +342,18 @@ const Map<String, String> kEnglishStrings = {
   'shrink_low_quality_hint':
       'Find photos scoring below a quality threshold you choose.',
   'shrink_low_quality_intro':
-      'Set a quality threshold, find the photos below it, then tick the ones to add.',
+      'Set how strict to be, find the photos that score below it, then tick the ones to add.',
+  'shrink_quality_explainer':
+      'Quality blends sharpness, contrast, and color. This flags photos that score below your threshold — likely blurry or flat.',
+  'shrink_quality_title': 'Quality threshold',
+  'lowq_lenient': 'Lenient',
+  'lowq_strict_end': 'Strict',
+  'lowq_threshold_value': 'Lenient ↔ Strict · {percent}%',
+  'lowq_kept': 'Kept',
+  'lowq_flagged': 'Flagged',
+  'lowq_only_blurry': 'Flags only clearly blurry or flat photos.',
+  'lowq_soso': 'Flags so-so shots too, not just the worst.',
+  'lowq_strict': 'Strict — flags even slightly soft or flat photos.',
   'shrink_low_quality_find': 'Find low-quality photos',
   'shrink_low_quality_none': 'No photos scored below the threshold.',
   'shrink_low_quality_count': '{count} photo(s) below {percent}% quality',
@@ -350,7 +361,6 @@ const Map<String, String> kEnglishStrings = {
   'shrink_pairs_selected': '{selected} of {candidates} selected',
   'shrink_keep_photo': 'Keep the photo',
   'shrink_keep_raw': 'Keep the RAW',
-  'shrink_quality_threshold': 'Flag photos scoring below {percent}% quality.',
   'shrink_running_total': 'Running total: {count} file(s) · {size} to free',
   'shrink_grand_total': 'Staged: {count} file(s) · {size} to be freed',
   'shrink_nothing_staged':

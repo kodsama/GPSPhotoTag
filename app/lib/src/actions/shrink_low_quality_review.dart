@@ -6,9 +6,15 @@ import '../explore/photo_detail_panel.dart';
 import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
-import '../state/duplicates_model.dart' show HashProgress;
+import '../state/duplicates_model.dart'
+    show
+        HashProgress,
+        qualityDegradation,
+        qualityExampleKey,
+        qualityPickedLabel;
 import '../theme/app_theme.dart';
 import 'duplicates_action.dart' show formatBytes;
+import 'example_scene.dart' show QualityExamplePair;
 import 'shrink_action.dart' show ShrinkAddButton;
 
 /// The low-quality review (shrink stage 4).
@@ -18,6 +24,13 @@ import 'shrink_action.dart' show ShrinkAddButton;
 /// ticks the ones to add to the shrink list. Pure selection — nothing is trashed
 /// here; the chosen files fold into the staged set on
 /// [AppController.addActiveStageToShrinkList].
+///
+/// The surface has three unambiguous modes so the threshold control and the
+/// hashing progress bar never stack into one confusing control:
+///   * configuring (idle, not yet reviewed) — the explainer + threshold slider
+///     + kept-vs-flagged example + Find button;
+///   * hashing (busy) — ONLY the "Hashing N / M" progress bar;
+///   * results (reviewed, not busy) — the below-threshold candidate list.
 class ShrinkLowQualityReview extends StatelessWidget {
   /// Creates the low-quality review surface.
   const ShrinkLowQualityReview({super.key});
@@ -32,30 +45,13 @@ class ShrinkLowQualityReview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(context.tr('shrink_low_quality_intro'), style: text.bodyMedium),
-        const SizedBox(height: 12),
-        Text(
-          context.tr('shrink_quality_threshold', {'percent': pct}),
-          style: text.bodySmall,
-        ),
-        Slider(
-          value: controller.shrinkQualityThreshold,
-          divisions: 20,
-          label: '$pct%',
-          onChanged: controller.shrinkBusy
-              ? null
-              : controller.setShrinkQualityThreshold,
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
+        // Mode 1 — hashing: show ONLY the progress bar (no slider/example), so
+        // the threshold control can never be confused with the progress bar.
         if (controller.shrinkBusy)
           _HashingBar(progress: controller.hashProgress)
-        else
-          FilledButton.icon(
-            onPressed: controller.runShrinkLowQualityHash,
-            icon: const Icon(Icons.search),
-            label: Text(context.tr('shrink_low_quality_find')),
-          ),
-        if (controller.shrinkLowQReviewed && !controller.shrinkBusy) ...[
-          const SizedBox(height: 16),
+        // Mode 3 — results: the below-threshold candidate list.
+        else if (controller.shrinkLowQReviewed) ...[
           if (candidates.isEmpty)
             Text(context.tr('shrink_low_quality_none'), style: text.titleMedium)
           else ...[
@@ -76,9 +72,83 @@ class ShrinkLowQualityReview extends StatelessWidget {
             for (final h in candidates)
               _LowQRow(controller: controller, file: h),
           ],
+        ]
+        // Mode 2 — configuring: explainer + threshold slider + example + Find.
+        else ...[
+          Text(context.tr('shrink_quality_explainer'), style: text.bodySmall),
+          const SizedBox(height: 12),
+          _QualitySlider(controller: controller),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: controller.runShrinkLowQualityHash,
+            icon: const Icon(Icons.search),
+            label: Text(context.tr('shrink_low_quality_find')),
+          ),
         ],
         const SizedBox(height: 20),
         ShrinkAddButton(count: controller.shrinkLowQSelectedCount),
+      ],
+    );
+  }
+}
+
+/// The Lenient ↔ Strict quality-threshold slider, with an always-visible
+/// picked-threshold label and a kept-vs-flagged example keyed to the threshold.
+///
+/// Mirrors the duplicates similarity slider: the picked label
+/// ([qualityPickedLabel]) sits beside the title, and the example
+/// ([QualityExamplePair]) degrades its flagged tile by [qualityDegradation] with
+/// a caption ([qualityExampleKey]) describing what the current threshold flags.
+class _QualitySlider extends StatelessWidget {
+  const _QualitySlider({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final threshold = controller.shrinkQualityThreshold;
+    final caption = context.tr(qualityExampleKey(threshold));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(context.tr('shrink_quality_title'), style: text.titleSmall),
+            const Spacer(),
+            // The currently-picked threshold, always visible (not just the drag
+            // tooltip): "Lenient ↔ Strict · NN%".
+            Text(
+              qualityPickedLabel(threshold, context.tr),
+              style: text.labelLarge?.copyWith(
+                color: scheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Text(context.tr('lowq_lenient'), style: text.bodySmall),
+            Expanded(
+              child: Slider(
+                value: threshold,
+                divisions: 20,
+                label: '${(threshold * 100).round()}%',
+                onChanged: controller.setShrinkQualityThreshold,
+              ),
+            ),
+            Text(context.tr('lowq_strict_end'), style: text.bodySmall),
+          ],
+        ),
+        const SizedBox(height: 8),
+        QualityExamplePair(
+          degradation: qualityDegradation(threshold),
+          keptLabel: context.tr('lowq_kept'),
+          flaggedLabel: context.tr('lowq_flagged'),
+          caption: caption,
+        ),
       ],
     );
   }

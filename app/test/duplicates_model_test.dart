@@ -98,6 +98,65 @@ void main() {
     });
   });
 
+  group('qualityDegradation', () {
+    test('decreases as the threshold gets stricter', () {
+      // A stricter (higher) threshold flags milder cases, so the illustrative
+      // flagged sample should look LESS degraded.
+      expect(qualityDegradation(0.0), 1.0);
+      expect(qualityDegradation(1.0), 0.0);
+      expect(qualityDegradation(0.7), lessThan(qualityDegradation(0.3)));
+    });
+
+    test('is 1 - threshold across the range', () {
+      expect(qualityDegradation(0.35), closeTo(0.65, 1e-9));
+    });
+
+    test('clamps out-of-range inputs to 0..1', () {
+      expect(qualityDegradation(-0.5), 1.0);
+      expect(qualityDegradation(1.5), 0.0);
+    });
+  });
+
+  group('qualityExampleKey', () {
+    String label(double v) => enTr(qualityExampleKey(v));
+
+    test('lenient thresholds flag only clearly blurry/flat photos', () {
+      expect(qualityExampleKey(0.0), 'lowq_only_blurry');
+      expect(qualityExampleKey(0.25), 'lowq_only_blurry');
+      expect(label(0.1), 'Flags only clearly blurry or flat photos.');
+    });
+
+    test('mid thresholds also flag so-so shots', () {
+      expect(qualityExampleKey(0.26), 'lowq_soso');
+      expect(qualityExampleKey(0.55), 'lowq_soso');
+      expect(label(0.4), 'Flags so-so shots too, not just the worst.');
+    });
+
+    test('strict thresholds flag even slightly soft photos', () {
+      expect(qualityExampleKey(0.56), 'lowq_strict');
+      expect(qualityExampleKey(1.0), 'lowq_strict');
+      expect(label(0.8), 'Strict — flags even slightly soft or flat photos.');
+    });
+
+    test('clamps out-of-range inputs to the end buckets', () {
+      expect(qualityExampleKey(-1), 'lowq_only_blurry');
+      expect(qualityExampleKey(2), 'lowq_strict');
+    });
+  });
+
+  group('qualityPickedLabel', () {
+    test('formats the threshold as a whole percent', () {
+      expect(qualityPickedLabel(0.35, enTr), 'Lenient ↔ Strict · 35%');
+      expect(qualityPickedLabel(0.0, enTr), 'Lenient ↔ Strict · 0%');
+      expect(qualityPickedLabel(1.0, enTr), 'Lenient ↔ Strict · 100%');
+    });
+
+    test('clamps out-of-range thresholds before formatting', () {
+      expect(qualityPickedLabel(-0.2, enTr), 'Lenient ↔ Strict · 0%');
+      expect(qualityPickedLabel(1.4, enTr), 'Lenient ↔ Strict · 100%');
+    });
+  });
+
   group('pairsFromGroups', () {
     test('yields N-1 pairs per group, best on the left', () {
       final group = DuplicateGroup(

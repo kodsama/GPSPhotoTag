@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/actions/duplicates_action.dart';
+import 'package:stunda/src/actions/example_scene.dart' show QualityExamplePair;
 import 'package:stunda/src/actions/prune_action.dart';
 import 'package:stunda/src/actions/shrink_action.dart';
 import 'package:stunda/src/actions/shrink_low_quality_review.dart';
@@ -387,6 +388,70 @@ void main() {
       ..debugSetShrinkBusy(total: 4, done: 1);
     await tester.pumpWidget(_host(c));
     expect(find.textContaining('Hashing 1 / 4'), findsOneWidget);
+  });
+
+  testWidgets('the low-quality configuring view explains quality + example', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+      ..openAction(LibraryAction.shrink)
+      ..openShrinkStage(ShrinkStage.lowQuality);
+    await tester.pumpWidget(_host(c));
+    // The plain-language explanation of what "quality" means.
+    expect(
+      find.textContaining('blends sharpness, contrast, and color'),
+      findsOneWidget,
+    );
+    // The kept-vs-flagged example renders, with both tile labels.
+    expect(find.byType(QualityExamplePair), findsOneWidget);
+    expect(find.text('Kept'), findsOneWidget);
+    expect(find.text('Flagged'), findsOneWidget);
+    // No hashing bar while configuring (the slider and bar never coexist).
+    expect(find.textContaining('Hashing'), findsNothing);
+  });
+
+  testWidgets('moving the threshold updates the picked label + caption', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+      ..openAction(LibraryAction.shrink)
+      ..openShrinkStage(ShrinkStage.lowQuality)
+      ..setShrinkQualityThreshold(0.1);
+    await tester.pumpWidget(_host(c));
+    // Lenient: picked label shows 10% and the caption is the lenient bucket.
+    expect(find.text('Lenient ↔ Strict · 10%'), findsOneWidget);
+    expect(
+      find.text('Flags only clearly blurry or flat photos.'),
+      findsOneWidget,
+    );
+
+    // Move to a strict threshold; both the picked label and caption update.
+    c.setShrinkQualityThreshold(0.8);
+    await tester.pump();
+    expect(find.text('Lenient ↔ Strict · 80%'), findsOneWidget);
+    expect(find.text('Lenient ↔ Strict · 10%'), findsNothing);
+    expect(
+      find.text('Strict — flags even slightly soft or flat photos.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the threshold slider and example are hidden while hashing', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+      ..openAction(LibraryAction.shrink)
+      ..openShrinkStage(ShrinkStage.lowQuality)
+      ..debugSetShrinkBusy(total: 4, done: 1);
+    await tester.pumpWidget(_host(c));
+    // The progress bar shows ALONE — the configuring slider/example are gone, so
+    // the two controls never stack into one confusing surface.
+    expect(find.textContaining('Hashing 1 / 4'), findsOneWidget);
+    expect(find.byType(QualityExamplePair), findsNothing);
+    expect(find.byType(Slider), findsNothing);
   });
 
   testWidgets('Back to shrink wizard returns to the hub without adding', (

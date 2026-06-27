@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:stunda_engine/stunda_engine.dart';
 
+import 'library_action.dart' show Translator;
+
 /// Pure helpers behind the Find-Duplicates review: the similarity-slider ↔
 /// Hamming-threshold mapping, expanding a group into reviewable pairs, the swap
 /// that flips which side is kept, collecting the selected removal set, and the
@@ -47,6 +49,47 @@ String similarityExampleKey(int slider) {
   if (value <= 10) return 'sim_same_scene';
   return 'sim_loose';
 }
+
+/// Pure helpers behind the Shrink "Low quality" stage: the quality-threshold ↔
+/// example-degradation mapping, the threshold → caption-bucket key, and the
+/// always-visible picked-threshold label. Kept Flutter-free so the mappings are
+/// unit-testable away from any widget. Quality here is the engine's composite
+/// score — a blend of sharpness, contrast, and colourfulness (see
+/// `ImageQuality`) — and the stage flags photos scoring below the threshold.
+
+/// Maps a 0..1 quality [threshold] to a 0..1 "degradation amount" the example
+/// painter applies to its FLAGGED tile (0 = crisp/vivid, 1 = very blurry/flat).
+///
+/// DECREASING: a stricter (higher) threshold flags even mild cases, so the
+/// illustrative flagged sample should look LESS degraded (`1 - threshold`); a
+/// lenient (low) threshold only catches clearly-bad photos, so the sample looks
+/// strongly degraded. Out-of-range inputs are clamped. Pure so the painter
+/// stays deterministic and the mapping is unit-testable.
+double qualityDegradation(double threshold) => (1 - threshold).clamp(0.0, 1.0);
+
+/// The localization KEY for a short descriptor of what the current quality
+/// [threshold] flags, shown as the example caption.
+///
+/// Buckets the 0..1 threshold into three bands: lenient (≤0.25) → only clearly
+/// blurry/flat photos; mid (≤0.55) → also so-so shots; strict (>0.55) → even
+/// slightly soft or flat photos. Out-of-range inputs are clamped. Pure so the
+/// boundaries are testable; the widget resolves the key through `context.tr`.
+String qualityExampleKey(double threshold) {
+  final value = threshold.clamp(0.0, 1.0);
+  if (value <= 0.25) return 'lowq_only_blurry';
+  if (value <= 0.55) return 'lowq_soso';
+  return 'lowq_strict';
+}
+
+/// The always-visible picked-threshold label, e.g. "Lenient ↔ Strict · 35%".
+///
+/// Mirrors the similarity slider's picked-setting label: it resolves the
+/// `lowq_threshold_value` string through [tr] with the threshold as a clamped
+/// whole percent. Pure (Flutter-free) so the formatting is unit-testable.
+String qualityPickedLabel(double threshold, Translator tr) => tr(
+  'lowq_threshold_value',
+  {'percent': (threshold.clamp(0.0, 1.0) * 100).round()},
+);
 
 /// One reviewable duplicate pair: the [kept] file and the [other] candidate.
 ///
