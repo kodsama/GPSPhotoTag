@@ -109,10 +109,26 @@ class _SimilaritySlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final selected = similarityExampleLabel(controller.similarity);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Similarity', style: text.titleSmall),
+        Row(
+          children: [
+            Text('Similarity', style: text.titleSmall),
+            const Spacer(),
+            // The currently-picked setting, always visible (not just the drag
+            // tooltip): the level's plain-language name + its step.
+            Text(
+              '$selected · ${controller.similarity}/$similaritySteps',
+              style: text.labelLarge?.copyWith(
+                color: scheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
         Row(
           children: [
             Text('Exact', style: text.bodySmall),
@@ -122,7 +138,7 @@ class _SimilaritySlider extends StatelessWidget {
                 min: 0,
                 max: similaritySteps.toDouble(),
                 divisions: similaritySteps,
-                label: controller.similarity == 0 ? 'Exact' : 'Loose',
+                label: selected,
                 onChanged: controller.findingDuplicates
                     ? null
                     : (v) => controller.setSimilarity(v.round()),
