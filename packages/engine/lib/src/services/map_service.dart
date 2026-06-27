@@ -246,7 +246,10 @@ class MapService {
     );
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final res = await _client.get(url);
+        // Bound each request so a stalled connection can't hang the whole
+        // render — a timeout falls through to backoff/retry, then to a
+        // basemap-less render.
+        final res = await _client.get(url).timeout(const Duration(seconds: 12));
         if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
           final decoded = img.decodePng(res.bodyBytes);
           if (decoded != null) return decoded;

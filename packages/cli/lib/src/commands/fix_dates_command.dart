@@ -20,7 +20,6 @@ class FixDatesCommand extends Command<int> {
       ..addOption(
         'mode',
         allowed: ['exif', 'file'],
-        mandatory: true,
         help: "'exif': file date <- EXIF; 'file': EXIF <- file date.",
       )
       ..addFlag(
@@ -53,6 +52,17 @@ class FixDatesCommand extends Command<int> {
       );
       return out.exitCode;
     }
+    final modeName = argResults!.option('mode');
+    if (modeName == null) {
+      out.add(
+        const ErrorEvent(
+          "--mode is required ('exif' or 'file')",
+          code: 'bad_input',
+        ),
+      );
+      return out.exitCode;
+    }
+    final mode = FixDatesMode.values.byName(modeName);
     const runner = SystemProcessRunner();
     final exiftool = await detectExiftool(runner);
     final registry = BackendRegistry(
@@ -60,7 +70,6 @@ class FixDatesCommand extends Command<int> {
       exiftoolAvailable: exiftool,
     );
     final dater = Dater(exif: DispatchingExifBackend(registry), runner: runner);
-    final mode = FixDatesMode.values.byName(argResults!.option('mode')!);
     return out.consume(
       dater.fixDates(photos, mode, dryRun: argResults!.flag('dry-run')),
     );
