@@ -14,6 +14,7 @@ import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/screens/workspace_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/widgets/content_panel.dart';
+import 'package:stunda/src/widgets/image_compare_viewer.dart';
 
 import 'support/fakes.dart';
 
@@ -119,7 +120,9 @@ void main() {
       expect([prev, next, expanded, closed], [1, 1, 1, 1]);
     });
 
-    testWidgets('expand opens a fullscreen InteractiveViewer', (tester) async {
+    testWidgets('expand opens the single-mode big-preview viewer', (
+      tester,
+    ) async {
       final selection = DetailSelection(
         point: MapPoint(
           latitude: 1,
@@ -138,12 +141,7 @@ void main() {
                   onPrev: () {},
                   onNext: () {},
                   onClose: () {},
-                  onExpand: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          const FullscreenImageView(path: '/library/shot.heic'),
-                    ),
-                  ),
+                  onExpand: () => openFullscreen(context, '/library/shot.heic'),
                 ),
               ),
             ),
@@ -152,22 +150,18 @@ void main() {
       );
       await tester.tap(find.byIcon(Icons.open_in_full));
       await tester.pumpAndSettle();
-      expect(find.byType(InteractiveViewer), findsOneWidget);
-      // No extractable preview (fake returns null) -> placeholder fullscreen.
-      expect(find.text('HEIC'), findsOneWidget);
-    });
-  });
-
-  group('FullscreenImageView', () {
-    testWidgets('decodable path uses an Image inside InteractiveViewer', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: FullscreenImageView(path: '/library/pic.jpg')),
+      expect(find.byType(ImageCompareViewer), findsOneWidget);
+      // No extractable preview (fake returns null) -> the viewer's placeholder
+      // is shown (the underlying panel's miniature placeholder is also present).
+      expect(
+        find.descendant(
+          of: find.byType(ImageCompareViewer),
+          matching: find.text('HEIC'),
+        ),
+        findsOneWidget,
       );
-      expect(find.byType(InteractiveViewer), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-      expect(find.text('pic.jpg'), findsOneWidget);
+      // Single mode: no compare-layout button.
+      expect(find.byIcon(Icons.splitscreen), findsNothing);
     });
   });
 
@@ -241,10 +235,10 @@ void main() {
         expect(find.text('4032 × 3024'), findsOneWidget);
         expect(find.text('2023-07-15 09:04'), findsOneWidget);
 
-        // The expand control opens the fullscreen view.
+        // The expand control opens the single-mode big-preview viewer.
         await tester.tap(find.byIcon(Icons.open_in_full));
         await tester.pumpAndSettle();
-        expect(find.byType(FullscreenImageView), findsOneWidget);
+        expect(find.byType(ImageCompareViewer), findsOneWidget);
       },
     );
 
@@ -440,30 +434,6 @@ void main() {
     });
   });
 
-  group('FullscreenImageView — RAW preview extraction', () {
-    testWidgets('extracts the full-size preview for a RAF', (tester) async {
-      final dir = Directory.systemTemp.createTempSync('raw_full');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final jpeg = p.join(dir.path, 'full.jpg');
-      File(
-        jpeg,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 16, height: 16)));
-
-      final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
-      final c = AppController(runner: fake);
-
-      await tester.pumpWidget(
-        _wrap(
-          const FullscreenImageView(path: '/library/shot.raf'),
-          controller: c,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(InteractiveViewer), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-    });
-  });
-
   group('explore markers', () {
     testWidgets('PhotoPin shows no badge for a single photo', (tester) async {
       await tester.pumpWidget(
@@ -551,36 +521,6 @@ void main() {
         expect(find.text('RAF'), findsOneWidget);
       },
     );
-  });
-
-  group('FullscreenImageView fallbacks', () {
-    testWidgets('a non-decodable path shows the typed placeholder', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: FullscreenImageView(path: '/library/doc.pdf')),
-      );
-      await tester.pump();
-      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
-      expect(find.text('PDF'), findsOneWidget);
-      expect(find.byType(Image), findsNothing);
-    });
-
-    testWidgets('a decodable but missing file falls back to the placeholder', (
-      tester,
-    ) async {
-      await tester.runAsync(() async {
-        await tester.pumpWidget(
-          const MaterialApp(
-            home: FullscreenImageView(path: '/no/such/photo.jpg'),
-          ),
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pump();
-      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
-      expect(find.text('JPG'), findsOneWidget);
-    });
   });
 
   group('showPhotoPreviewDialog', () {

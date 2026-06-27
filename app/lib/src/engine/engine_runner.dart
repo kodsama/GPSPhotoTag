@@ -43,6 +43,11 @@ abstract interface class EngineRunner {
   /// dialog's progressive per-row metadata.
   Stream<FileMeta> readImageMeta(List<String> paths);
 
+  /// Batch-reads the curated camera/exposure EXIF set for [paths] (off the UI
+  /// isolate), streaming one [CuratedExif] per path as exiftool yields each
+  /// chunk. Backs the big-preview viewer's EXIF info line.
+  Stream<CuratedExif> readCuratedExif(List<String> paths);
+
   /// Extracts an embedded JPEG preview of [path] (a RAW/HEIC file) on a worker
   /// isolate via the bundled exiftool, returning the cached JPEG path — or null
   /// when the file carries no usable embedded image. [full] picks the largest

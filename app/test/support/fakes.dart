@@ -30,12 +30,17 @@ class FakeEngineRunner implements EngineRunner {
     List<ScanEvent>? scanEvents,
     this.keepOpen = false,
     Map<String, FileMeta>? imageMeta,
+    Map<String, CuratedExif>? curatedExif,
   }) : _events = events ?? _success(),
        _scanEvents = scanEvents ?? _scanSuccess(),
-       _imageMeta = imageMeta ?? const {};
+       _imageMeta = imageMeta ?? const {},
+       _curatedExif = curatedExif ?? const {};
 
   /// Canned per-path image metadata returned by [readImageMeta].
   final Map<String, FileMeta> _imageMeta;
+
+  /// Canned per-path curated EXIF returned by [readCuratedExif].
+  final Map<String, CuratedExif> _curatedExif;
 
   final List<EngineEvent> _events;
   final List<ScanEvent> _scanEvents;
@@ -160,6 +165,18 @@ class FakeEngineRunner implements EngineRunner {
     }
   }
 
+  /// Paths passed to the last [readCuratedExif] call, for assertions.
+  List<String>? lastCuratedExifPaths;
+
+  @override
+  Stream<CuratedExif> readCuratedExif(List<String> paths) async* {
+    calls.add('readCuratedExif');
+    lastCuratedExifPaths = paths;
+    for (final path in paths) {
+      yield _curatedExif[path] ?? CuratedExif(path: path);
+    }
+  }
+
   /// Per-source extracted preview paths returned by [extractPreview]; an absent
   /// path yields null (no embedded preview).
   final Map<String, String?> previews = {};
@@ -268,6 +285,10 @@ class ThrowingEngineRunner implements EngineRunner {
   @override
   Stream<FileMeta> readImageMeta(List<String> paths) =>
       Stream<FileMeta>.error(StateError('readImageMeta blew up'));
+
+  @override
+  Stream<CuratedExif> readCuratedExif(List<String> paths) =>
+      Stream<CuratedExif>.error(StateError('readCuratedExif blew up'));
 
   @override
   Future<String?> extractPreview(String path, {bool full = false}) async =>

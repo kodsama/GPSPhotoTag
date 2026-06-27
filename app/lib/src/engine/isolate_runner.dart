@@ -160,6 +160,55 @@ class IsolateRunner implements EngineRunner {
     return controller.stream;
   }
 
+  /// Batch-reads the curated EXIF set for [paths], fanned out across worker
+  /// isolates exactly like [readImageMeta], merging each [CuratedExif] into one
+  /// stream as it is read. The stream closes when every worker is done.
+  @override
+  Stream<CuratedExif> readCuratedExif(List<String> paths) {
+    if (paths.isEmpty) return const Stream<CuratedExif>.empty();
+    final cores = Platform.numberOfProcessors;
+    final workers = paths.length <= 64
+        ? 1
+        : (cores - 2).clamp(2, 6).clamp(1, (paths.length / 64).ceil());
+
+    final controller = StreamController<CuratedExif>();
+    final isolates = <Isolate>[];
+    var active = workers;
+
+    void onWorkerDone() {
+      active--;
+      if (active <= 0 && !controller.isClosed) controller.close();
+    }
+
+    for (var w = 0; w < workers; w++) {
+      final slice = [for (var i = w; i < paths.length; i += workers) paths[i]];
+      final receive = ReceivePort();
+      receive.listen((message) {
+        if (message == null) {
+          receive.close();
+          onWorkerDone();
+        } else if (message is CuratedExif && !controller.isClosed) {
+          controller.add(message);
+        }
+      });
+      Isolate.spawn(
+        readCuratedExifEntry,
+        ReadCuratedExifRequest(
+          port: receive.sendPort,
+          paths: slice,
+          bundleDir: exiftoolBundleDir,
+        ),
+      ).then((iso) => isolates.add(iso), onError: (_, _) => onWorkerDone());
+    }
+
+    controller.onCancel = () {
+      for (final iso in isolates) {
+        iso.kill(priority: Isolate.immediate);
+      }
+    };
+    return controller.stream;
+  }
+
   /// Extracts an embedded JPEG preview of [path] on a one-shot worker isolate
   /// via the bundled exiftool, returning the cached JPEG path (or null when no
   /// embedded image is produced or the worker fails to start).
@@ -403,6 +452,19 @@ class ReadImageMetaRequest {
 }
 
 @visibleForTesting
+class ReadCuratedExifRequest {
+  const ReadCuratedExifRequest({
+    required this.port,
+    required this.paths,
+    required this.bundleDir,
+  });
+
+  final SendPort port;
+  final List<String> paths;
+  final String? bundleDir;
+}
+
+@visibleForTesting
 class HashFilesRequest {
   const HashFilesRequest({
     required this.port,
@@ -555,6 +617,20 @@ Future<void> readImageMetaEntry(ReadImageMetaRequest req) async {
     }
   } on Object {
     // Best-effort: a failed exiftool read just leaves rows un-enriched.
+  } finally {
+    req.port.send(null);
+  }
+}
+
+@visibleForTesting
+Future<void> readCuratedExifEntry(ReadCuratedExifRequest req) async {
+  try {
+    final runner = buildWorkerRunner(req.bundleDir);
+    await for (final exif in readCuratedExif(req.paths, runner: runner)) {
+      req.port.send(exif);
+    }
+  } on Object {
+    // Best-effort: a failed exiftool read just leaves the EXIF line empty.
   } finally {
     req.port.send(null);
   }

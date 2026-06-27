@@ -10,6 +10,7 @@ import '../state/controller_scope.dart';
 import '../state/duplicates_model.dart';
 import '../state/library_action.dart' show Translator;
 import '../theme/app_theme.dart';
+import '../widgets/image_compare_viewer.dart';
 import '../widgets/run_view.dart';
 import 'example_scene.dart';
 import 'shrink_action.dart' show ShrinkAddButton;
@@ -377,6 +378,12 @@ class _PairRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Tapping either image opens the kept-vs-other comparison (kept on the left,
+    // the default before/after vertical curtain).
+    void openCompare() => openImageCompare(context, [
+      hashedComparePane(pair.kept),
+      hashedComparePane(pair.other),
+    ]);
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -394,6 +401,7 @@ class _PairRow extends StatelessWidget {
                   file: pair.kept,
                   label: context.tr('dup_keep'),
                   keep: true,
+                  onTap: openCompare,
                 ),
               ),
               Column(
@@ -412,6 +420,7 @@ class _PairRow extends StatelessWidget {
                     pair.removeSelected ? 'dup_remove' : 'dup_kept',
                   ),
                   keep: !pair.removeSelected,
+                  onTap: openCompare,
                 ),
               ),
             ],
@@ -453,11 +462,15 @@ class _PairSide extends StatelessWidget {
     required this.file,
     required this.label,
     required this.keep,
+    required this.onTap,
   });
 
   final HashedFile file;
   final String label;
   final bool keep;
+
+  /// Opens the full-screen comparison for this pair.
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -480,7 +493,13 @@ class _PairSide extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        PhotoThumbnail(path: file.path, height: 120),
+        Tooltip(
+          message: context.tr('tt_dup_open_compare'),
+          child: InkWell(
+            onTap: onTap,
+            child: PhotoThumbnail(path: file.path, height: 120),
+          ),
+        ),
         const SizedBox(height: 6),
         Text(
           file.path.split(RegExp(r'[/\\]')).last,
@@ -500,6 +519,16 @@ class _PairSide extends StatelessWidget {
     );
   }
 }
+
+/// Builds a [ComparePane] for the big-preview viewer from a [HashedFile],
+/// carrying its dimensions (when known) and on-disk size for the info line.
+ComparePane hashedComparePane(HashedFile file) => ComparePane(
+  path: file.path,
+  meta: (file.width > 0 && file.height > 0)
+      ? FileMeta(path: file.path, width: file.width, height: file.height)
+      : null,
+  fileSize: file.fileSize > 0 ? file.fileSize : null,
+);
 
 /// Formats [bytes] as a compact human-readable size (KB/MB), resolving the unit
 /// suffix via [tr].

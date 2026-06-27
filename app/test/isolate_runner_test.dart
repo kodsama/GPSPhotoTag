@@ -228,6 +228,39 @@ void main() {
     expect(metas.every((m) => m.path == jpg), isTrue);
   });
 
+  test('readCuratedExif returns empty stream for no paths', () async {
+    const runner = IsolateRunner();
+    final out = await runner.readCuratedExif(const []).toList();
+    expect(out, isEmpty);
+  });
+
+  test('readCuratedExif reads each photo on a single worker', () async {
+    final jpgs = [
+      for (var i = 0; i < 3; i++)
+        await writeJpegWithDate(
+          tmp,
+          'e$i.jpg',
+          dateTimeOriginal: DateTime(2026, 1, 1, i + 1),
+        ),
+    ];
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final out = await runner.readCuratedExif(jpgs).toList();
+    expect(out.map((e) => e.path).toSet(), jpgs.toSet());
+  });
+
+  test('readCuratedExif fans out across workers for many paths', () async {
+    final jpg = await writeJpegWithDate(
+      tmp,
+      'bige.jpg',
+      dateTimeOriginal: DateTime(2026, 2, 2, 2),
+    );
+    final paths = List<String>.filled(70, jpg);
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final out = await runner.readCuratedExif(paths).toList();
+    expect(out.length, paths.length);
+    expect(out.every((e) => e.path == jpg), isTrue);
+  });
+
   test('findDuplicates returns empty for no paths', () async {
     const runner = IsolateRunner();
     expect(await runner.findDuplicates(const [], threshold: 0), isEmpty);

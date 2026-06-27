@@ -181,6 +181,30 @@ void main() {
       expect(out.stageTally.bytes, 1);
     });
 
+    test('shrinkPairPartner resolves the opposite side of a pair', () async {
+      final dir = await Directory.systemTemp.createTemp('shrink_partner');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final pairRaw = File('${dir.path}/pair.raf')..writeAsBytesSync([1]);
+      final pairJpg = File('${dir.path}/pair.jpg')..writeAsBytesSync([2]);
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: [pairRaw.path, pairJpg.path]))
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.pairs);
+
+      // Default drops the RAW → its partner is the kept photo.
+      expect(c.shrinkPairPartner(pairRaw.path), pairJpg.path);
+      // Flip the drop side → the photo's partner is the kept RAW.
+      c.setShrinkPairDrop(PairDropSide.dropPhoto);
+      expect(c.shrinkPairPartner(pairJpg.path), pairRaw.path);
+      // An unknown path has no partner.
+      expect(c.shrinkPairPartner('/library/nope.jpg'), isNull);
+    });
+
+    test('shrinkPairPartner is null before a pairing is built', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.shrinkPairPartner('/library/a.jpg'), isNull);
+    });
+
     test('toggling a pair candidate off excludes it on add', () async {
       final dir = await Directory.systemTemp.createTemp('shrink_pairs2');
       addTearDown(() => dir.deleteSync(recursive: true));

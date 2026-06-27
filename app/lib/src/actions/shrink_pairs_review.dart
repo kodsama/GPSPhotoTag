@@ -8,6 +8,7 @@ import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/shrink_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/image_compare_viewer.dart';
 import 'duplicates_action.dart' show formatBytes;
 import 'shrink_action.dart' show ShrinkAddButton;
 
@@ -118,6 +119,17 @@ class _PairCandidateRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final selected = controller.isShrinkPairSelected(file.path);
+    // Tapping the thumbnail opens the kept-vs-dropped comparison when the pair's
+    // companion is known (kept on the left, the dropped side on the right).
+    final partner = controller.shrinkPairPartner(file.path);
+    void openCompare() => openImageCompare(context, [
+      if (partner != null)
+        ComparePane(path: partner, fileSize: controller.shrinkSizeOf(partner)),
+      ComparePane(
+        path: file.path,
+        fileSize: controller.shrinkSizeOf(file.path),
+      ),
+    ]);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -127,12 +139,18 @@ class _PairCandidateRow extends StatelessWidget {
             onChanged: (v) =>
                 controller.setShrinkPairSelected(file.path, v ?? false),
           ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: PhotoThumbnail(path: file.path, height: 56),
+          Tooltip(
+            message: context.tr('tt_dup_open_compare'),
+            child: InkWell(
+              onTap: openCompare,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: PhotoThumbnail(path: file.path, height: 56),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 10),

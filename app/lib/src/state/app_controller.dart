@@ -271,6 +271,9 @@ class AppController extends ChangeNotifier {
   void changeLibrary() {
     _sub?.cancel();
     _metaSub?.cancel();
+    _curatedSub?.cancel();
+    _curatedLoading.clear();
+    _curatedExif.clear();
     _exploreSub?.cancel();
     _explorePhotos.clear();
     _exploreLoading = false;
@@ -859,6 +862,54 @@ class AppController extends ChangeNotifier {
       key,
       () => _engine.extractPreview(path, full: full),
     );
+  }
+
+  // --- Curated EXIF cache (big-preview viewer info line) -------------------
+
+  /// Memoized curated EXIF per source path, so re-opening the same photo in the
+  /// big-preview viewer never re-runs exiftool. A completed entry holds the read
+  /// record (possibly empty); an in-flight read is tracked by [_curatedLoading].
+  final Map<String, CuratedExif> _curatedExif = {};
+  final Set<String> _curatedLoading = {};
+  StreamSubscription<CuratedExif>? _curatedSub;
+
+  /// Cached curated EXIF for [path], or null if not read yet.
+  CuratedExif? curatedExif(String path) => _curatedExif[path];
+
+  /// Reads (and caches) the curated EXIF set for any of [paths] not already read
+  /// or in flight, streaming results in off the UI isolate and notifying as each
+  /// arrives so the viewer's info line fills in progressively.
+  Future<void> loadCuratedExif(List<String> paths) async {
+    final pending = [
+      for (final path in paths)
+        if (!_curatedExif.containsKey(path) && !_curatedLoading.contains(path))
+          path,
+    ];
+    if (pending.isEmpty) return;
+    _curatedLoading.addAll(pending);
+
+    await _curatedSub?.cancel();
+    final completer = Completer<void>();
+    _curatedSub = _engine
+        .readCuratedExif(pending)
+        .listen(
+          (exif) {
+            _curatedExif[exif.path] = exif;
+            _curatedLoading.remove(exif.path);
+            notifyListeners();
+          },
+          onError: (Object _) {
+            _curatedLoading.removeAll(pending);
+            notifyListeners();
+            if (!completer.isCompleted) completer.complete();
+          },
+          onDone: () {
+            _curatedLoading.removeAll(pending);
+            notifyListeners();
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+    return completer.future;
   }
 
   // --- Explore map ---------------------------------------------------------
@@ -1475,6 +1526,27 @@ class AppController extends ChangeNotifier {
     ];
   }
 
+  /// The companion file of redundant-pairs candidate [path] (the file on the
+  /// other side of its RAW+photo pair), or null when no partner is classified.
+  ///
+  /// Matches by same stem (case-insensitive basename without extension) and the
+  /// opposite pair kind, so the big-preview viewer can show kept vs dropped.
+  String? shrinkPairPartner(String path) {
+    final pairing = _shrinkPairing;
+    if (pairing == null) return null;
+    final stem = p.basenameWithoutExtension(path).toLowerCase();
+    final wantKind = _shrinkPairDrop == PairDropSide.dropRaw
+        ? PairKind.photoWithRaw
+        : PairKind.pairedRaw;
+    for (final f in pairing.files) {
+      if (f.kind == wantKind &&
+          p.basenameWithoutExtension(f.path).toLowerCase() == stem) {
+        return f.path;
+      }
+    }
+    return null;
+  }
+
   /// Whether the redundant-pairs review has [path] selected to add.
   bool isShrinkPairSelected(String path) => _shrinkPairSelected.contains(path);
 
@@ -1924,6 +1996,7 @@ class AppController extends ChangeNotifier {
     _scanSub?.cancel();
     _sub?.cancel();
     _metaSub?.cancel();
+    _curatedSub?.cancel();
     _exploreSub?.cancel();
     mcp.dispose();
     super.dispose();

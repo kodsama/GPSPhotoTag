@@ -13,6 +13,7 @@ import 'package:stunda/src/explore/explore_model.dart';
 import 'package:stunda/src/explore/heatmap.dart';
 import 'package:stunda/src/explore/map_tile_provider.dart';
 import 'package:stunda/src/explore/photo_detail_panel.dart';
+import 'package:stunda/src/widgets/image_compare_viewer.dart';
 import 'package:stunda/src/explore/tile_cache.dart';
 import 'package:stunda/src/explore/tile_provider_scope.dart';
 import 'package:stunda/src/screens/explore_map_screen.dart';
@@ -209,14 +210,16 @@ void main() {
     await tester.pump();
     expect(find.byType(PhotoDetailPanel), findsOneWidget);
 
-    // Expand -> fullscreen InteractiveViewer.
+    // Expand -> the single-mode big-preview viewer (a zoomable InteractiveViewer).
     await tester.tap(find.byIcon(Icons.open_in_full));
     await tester.pumpAndSettle();
+    expect(find.byType(ImageCompareViewer), findsOneWidget);
     expect(find.byType(InteractiveViewer), findsOneWidget);
 
-    // Back, then close the panel.
-    await tester.pageBack();
+    // Close the viewer (its close button is on top), then close the panel.
+    await tester.tap(find.byIcon(Icons.close).last);
     await tester.pumpAndSettle();
+    expect(find.byType(ImageCompareViewer), findsNothing);
     await tester.tap(find.byIcon(Icons.close));
     await tester.pump();
     expect(find.byType(PhotoDetailPanel), findsNothing);

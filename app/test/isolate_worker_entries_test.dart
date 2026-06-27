@@ -169,6 +169,25 @@ void main() {
       },
     );
 
+    test(
+      'readCuratedExifEntry sends a CuratedExif per path then a sentinel',
+      () async {
+        final jpg = await writeJpegWithDate(
+          tmp,
+          'c.jpg',
+          dateTimeOriginal: DateTime(2026, 4, 4, 4),
+        );
+        final events = await _drain(
+          (port) => readCuratedExifEntry(
+            ReadCuratedExifRequest(port: port, paths: [jpg], bundleDir: null),
+          ),
+        );
+        // One record per path (the synthetic JPEG carries no camera tags, so
+        // the record may be empty — the path is what proves the worker ran).
+        expect(events.whereType<CuratedExif>().map((m) => m.path), [jpg]);
+      },
+    );
+
     test('fixDatesEntry reports a result per file in-process', () async {
       final jpg = await writeJpegWithDate(
         tmp,

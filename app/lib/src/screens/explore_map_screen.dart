@@ -215,7 +215,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   void _openFullscreen() {
     final selection = _detail.selection;
     if (selection == null) return;
-    openFullscreen(context, selection.current.path);
+    final photo = selection.current;
+    openFullscreen(context, photo.path, meta: photo.meta);
   }
 
   /// Captures the current on-screen map view (tiles + heatmap + markers as

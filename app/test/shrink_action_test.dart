@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -9,12 +10,14 @@ import 'package:stunda/src/actions/prune_action.dart';
 import 'package:stunda/src/actions/shrink_action.dart';
 import 'package:stunda/src/actions/shrink_low_quality_review.dart';
 import 'package:stunda/src/actions/shrink_pairs_review.dart';
+import 'package:stunda/src/explore/photo_detail_panel.dart' show PhotoThumbnail;
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/state/library_action.dart';
 import 'package:stunda/src/state/duplicates_model.dart' show sillyWords;
 import 'package:stunda/src/state/shrink_model.dart';
+import 'package:stunda/src/widgets/image_compare_viewer.dart';
 import 'package:stunda/src/widgets/run_view.dart';
 
 import 'support/fakes.dart';
@@ -231,6 +234,39 @@ void main() {
     await tester.pump();
     expect(c.shrinkActiveStage, isNull);
     expect(c.shrinkStaged.map((e) => e.path), [pairJpg]);
+  });
+
+  testWidgets('tapping a pair candidate opens the kept-vs-dropped viewer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    // Real, decodable images so the 56px list thumbnail decodes (no placeholder
+    // box to overflow). Drop the photo side so the listed candidate is the .jpg.
+    final dir = Directory.systemTemp.createTempSync('shrink_pair_compare');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final pairJpg = await writeJpegWithDate(dir, 'pair.jpg');
+    final pairRaf = await writeJpegWithDate(dir, 'pair.raf');
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: [pairRaf, pairJpg]))
+      ..openAction(LibraryAction.shrink);
+    c.openShrinkStage(ShrinkStage.pairs);
+    c.setShrinkPairDrop(PairDropSide.dropPhoto);
+    await tester.pumpWidget(_host(c));
+    // The dropped .jpg's partner is the kept .raf.
+    expect(c.shrinkPairPartner(pairJpg), pairRaf);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.byType(PhotoThumbnail).first, warnIfMissed: false);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // Opens in compare mode (two panes → the mode/compare-layout button shows).
+    expect(find.byType(ImageCompareViewer), findsOneWidget);
+    expect(find.byIcon(Icons.splitscreen), findsOneWidget);
   });
 
   testWidgets('the pairs review shows an empty state with no pairs', (

@@ -834,6 +834,53 @@ void main() {
     });
   });
 
+  group('curated EXIF cache', () {
+    test('loadCuratedExif streams records into the cache', () async {
+      const exif = CuratedExif(path: '/a.jpg', make: 'Canon', iso: '400');
+      final c = AppController(
+        runner: FakeEngineRunner(curatedExif: const {'/a.jpg': exif}),
+      );
+      expect(c.curatedExif('/a.jpg'), isNull);
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(c.curatedExif('/a.jpg')?.make, 'Canon');
+      expect(c.curatedExif('/a.jpg')?.iso, '400');
+    });
+
+    test('loadCuratedExif skips already-cached/in-flight paths', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.loadCuratedExif(['/a.jpg']);
+      fake.lastCuratedExifPaths = null;
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(fake.lastCuratedExifPaths, isNull);
+    });
+
+    test('loadCuratedExif is a no-op for an empty pending set', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.loadCuratedExif(const []);
+      expect(fake.lastCuratedExifPaths, isNull);
+    });
+
+    test('loadCuratedExif surfaces stream errors without crashing', () async {
+      final c = AppController(runner: ThrowingEngineRunner());
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(c.curatedExif('/a.jpg'), isNull);
+    });
+
+    test('changeLibrary clears the curated EXIF cache', () async {
+      final c = AppController(
+        runner: FakeEngineRunner(
+          curatedExif: const {'/a.jpg': CuratedExif(path: '/a.jpg', iso: '1')},
+        ),
+      )..debugSetScan(fakeScan());
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(c.curatedExif('/a.jpg'), isNotNull);
+      c.changeLibrary();
+      expect(c.curatedExif('/a.jpg'), isNull);
+    });
+  });
+
   group('previewImageFor', () {
     test('returns the runner-extracted JPEG path', () async {
       final fake = FakeEngineRunner()..previews['/lib/a.raf'] = '/cache/a.jpg';

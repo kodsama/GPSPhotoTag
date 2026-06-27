@@ -8,6 +8,7 @@ import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../state/library_action.dart' show Translator;
 import '../theme/app_theme.dart';
+import '../widgets/image_compare_viewer.dart';
 import 'detail_selection.dart';
 import 'explore_model.dart';
 
@@ -33,17 +34,29 @@ Future<void> showPhotoPreviewDialog(
         path: path,
         meta: meta,
         onClose: () => Navigator.of(dialogContext).pop(),
-        onExpand: () => openFullscreen(dialogContext, path),
+        onExpand: () => openFullscreen(dialogContext, path, meta: meta),
       ),
     ),
   );
 }
 
-/// Pushes the [FullscreenImageView] for [path].
-void openFullscreen(BuildContext context, String path) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => FullscreenImageView(path: path)),
-  );
+/// Opens [path] full-screen in the single-mode [ImageCompareViewer] (the big
+/// preview: zoom/pan + reset + a one-line info strip), carrying [meta] for the
+/// info line and the on-disk file size when readable.
+void openFullscreen(BuildContext context, String path, {FileMeta? meta}) {
+  openImageCompare(context, [
+    ComparePane(path: path, meta: meta, fileSize: fileSizeOf(path)),
+  ]);
+}
+
+/// The on-disk size of [path] in bytes, or null when it can't be read. Used to
+/// fill the viewer's info line; a missing/unreadable file simply omits the size.
+int? fileSizeOf(String path) {
+  try {
+    return File(path).statSync().size;
+  } on FileSystemException {
+    return null;
+  }
 }
 
 /// The reusable photo preview: a [PhotoThumbnail], the metadata (filename,
@@ -471,43 +484,6 @@ class RoundIconButton extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       icon: Icon(icon),
-    );
-  }
-}
-
-/// A fullscreen view of [path] in an [InteractiveViewer] for pinch/scroll zoom,
-/// with a close affordance. Non-decodable files show the typed placeholder.
-class FullscreenImageView extends StatelessWidget {
-  /// Creates the fullscreen view for [path].
-  const FullscreenImageView({super.key, required this.path});
-
-  /// The image file path.
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(p.basename(path)),
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 6,
-          child: needsPreviewExtraction(path)
-              ? _ExtractedImage(path: path, full: true, height: 240)
-              : isDecodableImage(path)
-              ? Image.file(
-                  File(path),
-                  errorBuilder: (context, _, _) =>
-                      _Placeholder(label: fileTypeLabel(path), height: 240),
-                )
-              : _Placeholder(label: fileTypeLabel(path), height: 240),
-        ),
-      ),
     );
   }
 }

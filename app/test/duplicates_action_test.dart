@@ -12,6 +12,7 @@ import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/state/duplicates_model.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/widgets/image_compare_viewer.dart';
 import 'package:stunda/src/widgets/run_view.dart';
 
 import 'support/fakes.dart';
@@ -53,6 +54,26 @@ Widget _host(AppController c, {Random? random}) => ControllerScope(
 );
 
 void main() {
+  group('hashedComparePane', () {
+    test('carries dimensions and size when known', () {
+      final pane = hashedComparePane(
+        _hf('/a.jpg', width: 400, height: 300, size: 4096),
+      );
+      expect(pane.path, '/a.jpg');
+      expect(pane.meta?.width, 400);
+      expect(pane.meta?.height, 300);
+      expect(pane.fileSize, 4096);
+    });
+
+    test('omits meta/size when the hashed file lacks them', () {
+      final pane = hashedComparePane(
+        _hf('/a.jpg', width: 0, height: 0, size: 0),
+      );
+      expect(pane.meta, isNull);
+      expect(pane.fileSize, isNull);
+    });
+  });
+
   testWidgets('shows the similarity slider and run button before a run', (
     tester,
   ) async {
@@ -111,6 +132,30 @@ void main() {
     expect(find.byType(PhotoThumbnail), findsNWidgets(2));
     // The remove button counts the one selected right-side file.
     expect(find.text('Remove 1 duplicate(s) on the right'), findsOneWidget);
+  });
+
+  testWidgets('tapping a pair thumbnail opens the comparison viewer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(
+          kept: _hf('/best.jpg', width: 400, height: 300),
+          other: _hf('/dup.jpg', width: 100, height: 100),
+        ),
+      ]);
+    await tester.pumpWidget(_host(c));
+
+    await tester.tap(find.byType(PhotoThumbnail).first);
+    await tester.pumpAndSettle();
+
+    // Opens in compare mode (the mode/compare-layout button is present).
+    expect(find.byType(ImageCompareViewer), findsOneWidget);
+    expect(find.byIcon(Icons.splitscreen), findsOneWidget);
   });
 
   testWidgets('swap flips the kept side', (tester) async {
