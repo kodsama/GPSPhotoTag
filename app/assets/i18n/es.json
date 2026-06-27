@@ -257,6 +257,7 @@
   "tt_dup_similarity": "Arrastra hacia Flexible para detectar también casi-duplicados ligeramente editados",
   "tt_dup_drag_handle": "Arrastra para reordenar la prioridad",
   "tt_dup_rule_switch": "Activar o desactivar esta regla de conservación",
+  "tt_dup_keep_people": "Prefiere la foto con personas o mascotas. Usa las etiquetas de personas/mascotas que ya están en tus fotos (regiones de rostros, nombres, palabras clave).",
   "tt_dup_keep_both": "Conservar ambos archivos — no eliminar ninguno",
   "tt_dup_remove_right": "Eliminar el archivo de la derecha",
   "tt_dup_remove_button": "Mover los duplicados seleccionados a la Papelera",

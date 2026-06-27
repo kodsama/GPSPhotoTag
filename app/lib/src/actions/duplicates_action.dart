@@ -172,13 +172,38 @@ String keepRuleLabel(KeepRule rule, Translator tr) => switch (rule) {
   KeepRule.people => tr('dup_keep_people'),
 };
 
+/// The hover tooltip for a keep [rule], resolved via [tr], or null when the rule
+/// needs no extra explanation. Only the people rule has one today: it notes that
+/// the rule uses the people/pet tags already present in the photos.
+String? keepRuleTooltip(KeepRule rule, Translator tr) => switch (rule) {
+  KeepRule.people => tr('tt_dup_keep_people'),
+  _ => null,
+};
+
+/// One keep-rule's label, with a hover [Tooltip] when [keepRuleTooltip] returns
+/// one for the rule (the people rule's "uses your photo tags" note).
+class _KeepRuleLabel extends StatelessWidget {
+  const _KeepRuleLabel({required this.rule});
+
+  final KeepRule rule;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Text(keepRuleLabel(rule, context.tr));
+    final tip = keepRuleTooltip(rule, context.tr);
+    if (tip == null) return label;
+    return Tooltip(message: tip, child: label);
+  }
+}
+
 /// The compact keep-priority pipeline control: a draggable list of the keep
 /// rules (placement = priority) each with an enable [Switch], plus a one-line
 /// explainer. Reordering or toggling drives the controller's pipeline, which
 /// re-decides the kept (left) side of the review.
 ///
-/// The not-yet-implemented [KeepRule.people] rule is hidden so the user can only
-/// reorder/toggle the rules that actually decide today.
+/// Every [KeepRule] — including [KeepRule.people] — is reorderable/toggleable.
+/// The people rule's label carries a tooltip noting it uses the people/pet tags
+/// already present in the photos (see [keepRuleTooltip]).
 class _KeepPipelinePanel extends StatelessWidget {
   const _KeepPipelinePanel({required this.controller});
 
@@ -188,10 +213,7 @@ class _KeepPipelinePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final steps = [
-      for (final step in controller.keepPipeline.steps)
-        if (step.rule != KeepRule.people) step,
-    ];
+    final steps = controller.keepPipeline.steps;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -231,9 +253,7 @@ class _KeepPipelinePanel extends StatelessWidget {
                     ),
                     Text('${i + 1}.', style: text.labelLarge),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(keepRuleLabel(steps[i].rule, context.tr)),
-                    ),
+                    Expanded(child: _KeepRuleLabel(rule: steps[i].rule)),
                     Tooltip(
                       message: context.tr('tt_dup_rule_switch'),
                       child: Switch(

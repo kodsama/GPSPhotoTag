@@ -257,6 +257,7 @@
   "tt_dup_similarity": "Richtung Locker ziehen, um auch leicht bearbeitete Beinahe-Duplikate zu finden",
   "tt_dup_drag_handle": "Ziehen, um die Priorität neu zu ordnen",
   "tt_dup_rule_switch": "Diese Behalten-Regel ein- oder ausschalten",
+  "tt_dup_keep_people": "Das Foto mit Personen oder Haustieren bevorzugen. Nutzt bereits in deinen Fotos vorhandene Personen-/Haustier-Tags (Gesichtsbereiche, Namen, Schlagwörter).",
   "tt_dup_keep_both": "Beide Dateien behalten – keine entfernen",
   "tt_dup_remove_right": "Die rechte Datei entfernen",
   "tt_dup_remove_button": "Die ausgewählten Duplikate in den Papierkorb verschieben",

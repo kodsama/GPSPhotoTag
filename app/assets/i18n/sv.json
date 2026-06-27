@@ -257,6 +257,7 @@
   "tt_dup_similarity": "Dra mot Lös för att även fånga lätt redigerade nära dubbletter",
   "tt_dup_drag_handle": "Dra för att ändra prioritetsordning",
   "tt_dup_rule_switch": "Slå på eller av denna behållningsregel",
+  "tt_dup_keep_people": "Föredra fotot med personer eller husdjur. Använder person-/husdjurstaggar som redan finns i dina foton (ansiktsområden, namn, nyckelord).",
   "tt_dup_keep_both": "Behåll båda filerna — ta inte bort någon",
   "tt_dup_remove_right": "Ta bort filen till höger",
   "tt_dup_remove_button": "Flytta de valda dubbletterna till papperskorgen",

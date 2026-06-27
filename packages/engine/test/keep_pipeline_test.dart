@@ -8,6 +8,7 @@ HashedFile hf(
   int height = 100,
   int fileSize = 1000,
   double quality = 0.5,
+  double peopleScore = 0,
 }) => HashedFile(
   path: path,
   hash: 0,
@@ -22,6 +23,7 @@ HashedFile hf(
     colorfulness: quality,
     composite: quality,
   ),
+  peopleScore: peopleScore,
 );
 
 void main() {
@@ -124,19 +126,52 @@ void main() {
       expect(keeper.path, '/small.jpg');
     });
 
-    test(
-      'the not-yet-implemented people rule never decides (falls through)',
-      () {
+    group('people rule', () {
+      const peopleOnly = KeepPipeline([KeepStep(KeepRule.people)]);
+
+      test('the candidate with clearly more people is kept', () {
+        // a has a face region (1.0), b has none (0.0): a 1.0 lead > 0.34 margin.
+        final a = hf('/a.jpg', peopleScore: 1, fileSize: 100);
+        final b = hf('/b.jpg', peopleScore: 0, fileSize: 999);
+        expect(chooseKeeper([a, b], peopleOnly).path, '/a.jpg');
+      });
+
+      test('all-zero people scores tie → falls through to the tie-break', () {
         final a = hf('/a.jpg', fileSize: 100);
         final b = hf('/b.jpg', fileSize: 999);
-        final keeper = chooseKeeper([
-          a,
-          b,
-        ], const KeepPipeline([KeepStep(KeepRule.people)]));
-        // No people scoring yet → tie → final tie-break keeps the larger file.
-        expect(keeper.path, '/b.jpg');
-      },
-    );
+        // No people metadata on either → no clear winner → larger file wins.
+        expect(chooseKeeper([a, b], peopleOnly).path, '/b.jpg');
+      });
+
+      test('a near-tie in people score falls through', () {
+        // 0.5 vs 0.5 (both only keyword hints): equal → no clear winner.
+        final a = hf('/a.jpg', peopleScore: 0.5, fileSize: 100);
+        final b = hf('/b.jpg', peopleScore: 0.5, fileSize: 999);
+        expect(chooseKeeper([a, b], peopleOnly).path, '/b.jpg');
+      });
+
+      test('a keyword hint loses to an explicit face region', () {
+        // 1.0 (face) vs 0.5 (keyword) = 0.5 lead > 0.34 margin → face wins.
+        final face = hf('/face.jpg', peopleScore: 1, fileSize: 100);
+        final hint = hf('/hint.jpg', peopleScore: 0.5, fileSize: 999);
+        expect(chooseKeeper([face, hint], peopleOnly).path, '/face.jpg');
+      });
+
+      test(
+        'people breaks a resolution+quality tie in the standard pipeline',
+        () {
+          // Identical resolution and quality; only the people signal differs, so
+          // the standard pipeline's people rule decides.
+          final withPeople = hf('/people.jpg', peopleScore: 1, fileSize: 100);
+          final without = hf('/scenery.jpg', peopleScore: 0, fileSize: 999);
+          final keeper = chooseKeeper([
+            without,
+            withPeople,
+          ], KeepPipeline.standard);
+          expect(keeper.path, '/people.jpg');
+        },
+      );
+    });
 
     test('a single candidate is returned directly', () {
       final only = hf('/only.jpg');
@@ -172,17 +207,15 @@ void main() {
   });
 
   group('KeepStep / KeepPipeline serialization', () {
-    test('round-trips the standard pipeline (enabled rules first)', () {
+    test('round-trips the standard pipeline (all rules enabled, in order)', () {
       final json = KeepPipeline.standard.toJson();
       final back = KeepPipeline.fromJson(json);
-      // The two saved rules round-trip enabled, in order; the reserved (not-yet-
-      // saved) people rule is appended disabled so its toggle can still appear.
       expect(back.steps[0].rule, KeepRule.resolution);
       expect(back.steps[0].enabled, isTrue);
       expect(back.steps[1].rule, KeepRule.quality);
       expect(back.steps[1].enabled, isTrue);
-      final people = back.steps.firstWhere((s) => s.rule == KeepRule.people);
-      expect(people.enabled, isFalse);
+      expect(back.steps[2].rule, KeepRule.people);
+      expect(back.steps[2].enabled, isTrue);
     });
 
     test('round-trips a reordered, partially-disabled pipeline', () {
@@ -205,9 +238,9 @@ void main() {
     });
 
     test('fromJson on garbage yields the standard pipeline', () {
-      expect(KeepPipeline.fromJson('nope').steps.length, 2);
-      expect(KeepPipeline.fromJson(null).steps.length, 2);
-      expect(KeepPipeline.fromJson(42).steps.length, 2);
+      expect(KeepPipeline.fromJson('nope').steps.length, 3);
+      expect(KeepPipeline.fromJson(null).steps.length, 3);
+      expect(KeepPipeline.fromJson(42).steps.length, 3);
     });
 
     test('fromJson drops unknown and duplicate rules', () {
@@ -235,7 +268,7 @@ void main() {
     });
 
     test('fromJson on an empty list yields the standard pipeline', () {
-      expect(KeepPipeline.fromJson(const <Object>[]).steps.length, 2);
+      expect(KeepPipeline.fromJson(const <Object>[]).steps.length, 3);
     });
 
     test('KeepStep.fromJson rejects non-map and bad rule name', () {

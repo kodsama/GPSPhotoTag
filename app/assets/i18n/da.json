@@ -257,6 +257,7 @@
   "tt_dup_similarity": "Træk mod Løs for også at fange let redigerede næsten-dubletter",
   "tt_dup_drag_handle": "Træk for at ændre prioritetsrækkefølgen",
   "tt_dup_rule_switch": "Slå denne behold-regel til eller fra",
+  "tt_dup_keep_people": "Foretræk fotoet med personer eller kæledyr. Bruger person-/kæledyrstags, der allerede er i dine fotos (ansigtsområder, navne, nøgleord).",
   "tt_dup_keep_both": "Behold begge filer — fjern ingen",
   "tt_dup_remove_right": "Fjern filen til højre",
   "tt_dup_remove_button": "Flyt de valgte dubletter til papirkurven",

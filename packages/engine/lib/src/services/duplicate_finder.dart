@@ -9,6 +9,7 @@ import '../data/photo_formats.dart';
 import '../data/ports/process_runner.dart';
 import 'image_quality.dart';
 import 'keep_pipeline.dart';
+import 'people_signals.dart';
 import 'preview_extract.dart';
 
 /// Perceptual (difference) hashing and duplicate grouping.
@@ -120,6 +121,7 @@ class HashedFile {
     required this.basename,
     required this.isRaw,
     this.quality = ImageQuality.zero,
+    this.peopleScore = 0,
   });
 
   /// The file path.
@@ -148,10 +150,16 @@ class HashedFile {
   /// records built without pixels (most tests).
   final ImageQuality quality;
 
+  /// People/pet likelihood in 0..1 read from metadata (face regions, person
+  /// names, subject/keyword hints) via [peopleScoreFromTags]; 0 when nothing in
+  /// the metadata suggests people or pets. Drives the `people` keep-rule.
+  final double peopleScore;
+
   /// Resolution (pixel area) used to pick the best of a group.
   int get resolution => width * height;
 
-  /// JSON view of the record (dimensions, size, RAW-ness, and quality scores).
+  /// JSON view of the record (dimensions, size, RAW-ness, quality, and the
+  /// people/pet score).
   Map<String, Object> toJson() => {
     'path': path,
     'hash': hash,
@@ -161,6 +169,7 @@ class HashedFile {
     'basename': basename,
     'isRaw': isRaw,
     'quality': quality.toJson(),
+    'peopleScore': peopleScore,
   };
 }
 
@@ -313,17 +322,21 @@ List<String> buildBatchExtractArgs(
   String tag,
 ) => ['-b', '-m', '-W', '$tmpDir/%f_%t.%s', '-$tag', ...paths];
 
-/// The exiftool args that read pixel dimensions for EVERY source in [paths] in
-/// one process, mirroring [readImageMeta]'s fast batched JSON read.
+/// The exiftool args that read pixel dimensions AND the people/pet signal tags
+/// for EVERY source in [paths] in one process, mirroring [readImageMeta]'s fast
+/// batched JSON read.
 ///
 /// `-fast2` skips MakerNotes/trailer (much faster on files with big trailers);
-/// `-json -n` emit numeric width/height keyed by `SourceFile`.
+/// `-json -n` emit numeric width/height keyed by `SourceFile`. The same call
+/// also requests [kPeopleSignalTags] (face regions, person names, subject /
+/// keyword hints) so the Tier-1 `people` score costs no extra exiftool spawn.
 List<String> buildBatchDimensionArgs(List<String> paths) => [
   '-fast2',
   '-json',
   '-n',
   '-ImageWidth',
   '-ImageHeight',
+  for (final tag in kPeopleSignalTags) '-$tag',
   ...paths,
 ];
 
@@ -332,8 +345,9 @@ List<String> buildBatchDimensionArgs(List<String> paths) => [
 String _batchOutputName(String source, String tag) =>
     '${p.basenameWithoutExtension(source)}_$tag.jpg';
 
-/// Original pixel dimensions for a source, as read from the batched JSON.
-typedef _Dims = ({int width, int height});
+/// Per-source metadata read from the batched JSON: original pixel dimensions
+/// plus the Tier-1 [peopleScore].
+typedef _Meta = ({int width, int height, double peopleScore});
 
 /// Batch-hashes a whole [paths] slice into [HashedFile]s, minimising exiftool
 /// spawns: a fixed number of extractions for the entire slice (not per file).
@@ -385,13 +399,13 @@ Future<List<HashedFile>> hashFilesBatch(
       previews = _collectOutputs(noThumb, dir.path, 'PreviewImage');
     }
 
-    // One batched read of original dimensions for the whole slice.
-    final dims = await _readBatchDimensions(runner, paths);
+    // One batched read of original dimensions + people signals for the slice.
+    final meta = await _readBatchMeta(runner, paths);
 
     final results = <HashedFile>[];
     for (final path in paths) {
       final extracted = thumbs[path] ?? previews[path];
-      final hashed = _hashFromExtract(path, extracted, dims[path]);
+      final hashed = _hashFromExtract(path, extracted, meta[path]);
       if (hashed != null) results.add(hashed);
       onFileDone?.call();
     }
@@ -429,10 +443,14 @@ Map<String, String> _collectOutputs(
   return out;
 }
 
-/// Reads original pixel dimensions for [paths] in one batched exiftool JSON
-/// call, keyed by source path. Tolerant: a failed call or missing keys just
-/// leave a path absent (its [HashedFile] then falls back to the decoded size).
-Future<Map<String, _Dims>> _readBatchDimensions(
+/// Reads original pixel dimensions and the Tier-1 people score for [paths] in
+/// one batched exiftool JSON call, keyed by source path. Tolerant: a failed
+/// call or a missing entry just leaves a path absent (its [HashedFile] then
+/// falls back to the decoded size and a zero people score). Within an entry,
+/// missing width/height are recorded as 0 (the [_hashFromExtract] sentinel for
+/// "use the decoded size") so a present people score is never dropped just
+/// because dimensions were absent.
+Future<Map<String, _Meta>> _readBatchMeta(
   ProcessRunner runner,
   List<String> paths,
 ) async {
@@ -442,25 +460,27 @@ Future<Map<String, _Dims>> _readBatchDimensions(
   } on Object {
     return const {};
   }
-  final dims = <String, _Dims>{};
+  final meta = <String, _Meta>{};
   final decoded = _tryDecodeJsonList(result.stdout);
   for (final entry in decoded) {
     if (entry is! Map) continue;
     final source = entry['SourceFile'];
-    final w = _asInt(entry['ImageWidth']);
-    final h = _asInt(entry['ImageHeight']);
-    if (source is String && w != null && h != null) {
-      dims[source] = (width: w, height: h);
-    }
+    if (source is! String) continue;
+    meta[source] = (
+      width: _asInt(entry['ImageWidth']) ?? 0,
+      height: _asInt(entry['ImageHeight']) ?? 0,
+      peopleScore: peopleScoreFromTags(entry),
+    );
   }
-  return dims;
+  return meta;
 }
 
 /// Builds a [HashedFile] for [path] from its [extracted] thumbnail/preview (or,
 /// when null, by decoding the source itself — the slow fallback). Returns null
-/// when nothing decodes. Dimensions prefer the batched [dims]; pixel size of
-/// the decoded image is the fallback. Never throws.
-HashedFile? _hashFromExtract(String path, String? extracted, _Dims? dims) {
+/// when nothing decodes. Dimensions prefer the batched [meta] (a width/height of
+/// 0 means "unknown" → use the decoded image's own size); the Tier-1 people
+/// score comes from the same [meta]. Never throws.
+HashedFile? _hashFromExtract(String path, String? extracted, _Meta? meta) {
   final Uint8List bytes;
   try {
     bytes = File(extracted ?? path).readAsBytesSync();
@@ -477,16 +497,19 @@ HashedFile? _hashFromExtract(String path, String? extracted, _Dims? dims) {
     return null; // source vanished between extract and hash
   }
 
+  final w = meta?.width ?? 0;
+  final h = meta?.height ?? 0;
   return HashedFile(
     path: path,
     hash: dHash(decoded),
-    width: dims?.width ?? decoded.width,
-    height: dims?.height ?? decoded.height,
+    width: w > 0 ? w : decoded.width,
+    height: h > 0 ? h : decoded.height,
     fileSize: fileSize,
     basename: basenameKey(path),
     isRaw: PhotoFormats.isRaw(path),
     // Reuse the already-decoded thumbnail to score quality (no re-decode).
     quality: qualityScore(decoded),
+    peopleScore: meta?.peopleScore ?? 0,
   );
 }
 

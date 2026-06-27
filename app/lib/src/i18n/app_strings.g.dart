@@ -291,6 +291,8 @@ const Map<String, String> kEnglishStrings = {
       'Drag toward Loose to also catch lightly-edited near-duplicates',
   'tt_dup_drag_handle': 'Drag to reorder priority',
   'tt_dup_rule_switch': 'Turn this keep rule on or off',
+  'tt_dup_keep_people':
+      'Prefer the photo with people or pets. Uses people/pet tags already in your photos (face regions, names, keywords).',
   'tt_dup_keep_both': 'Keep both files — remove neither',
   'tt_dup_remove_right': 'Remove the file on the right',
   'tt_dup_remove_button': 'Move the selected duplicates to the Trash',

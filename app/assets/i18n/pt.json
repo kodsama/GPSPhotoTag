@@ -257,6 +257,7 @@
   "tt_dup_similarity": "Arraste para Solto para também apanhar quase-duplicados ligeiramente editados",
   "tt_dup_drag_handle": "Arraste para reordenar a prioridade",
   "tt_dup_rule_switch": "Ativar ou desativar esta regra de manutenção",
+  "tt_dup_keep_people": "Prefere a foto com pessoas ou animais. Usa as tags de pessoas/animais já presentes nas suas fotos (regiões de rostos, nomes, palavras-chave).",
   "tt_dup_keep_both": "Manter ambos os ficheiros — não remover nenhum",
   "tt_dup_remove_right": "Remover o ficheiro da direita",
   "tt_dup_remove_button": "Mover os duplicados selecionados para o Lixo",

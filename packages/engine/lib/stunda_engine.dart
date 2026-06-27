@@ -38,6 +38,8 @@ export 'src/services/image_quality.dart';
 export 'src/services/keep_pipeline.dart';
 export 'src/services/locator.dart';
 export 'src/services/map_service.dart';
+export 'src/services/people_detector.dart';
+export 'src/services/people_signals.dart';
 export 'src/services/preview_extract.dart';
 export 'src/services/pruner.dart';
 export 'src/services/raw_pairing.dart';

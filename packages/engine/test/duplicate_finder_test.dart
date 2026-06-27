@@ -43,12 +43,17 @@ class _BatchRunner implements ProcessRunner {
     this.thumbs = const {},
     this.previews = const {},
     this.dims = const {},
+    this.peopleTags = const {},
     this.dimensionStdout,
   });
 
   final Map<String, List<int>> thumbs;
   final Map<String, List<int>> previews;
   final Map<String, (int, int)> dims;
+
+  /// Extra people-signal tags to fold into the `-json` entry for a source PATH
+  /// (e.g. `{path: {'RegionName': 'Alice'}}`), simulating face/keyword metadata.
+  final Map<String, Map<String, Object?>> peopleTags;
 
   /// When set, the `-json` dimension read returns this raw stdout verbatim
   /// (used to exercise malformed JSON and non-int width/height values).
@@ -84,6 +89,7 @@ class _BatchRunner implements ProcessRunner {
             'SourceFile': src,
             'ImageWidth': dims[src]!.$1,
             'ImageHeight': dims[src]!.$2,
+            ...?peopleTags[src],
           },
       ];
       return ProcResult(0, jsonEncode(entries), '');
@@ -416,6 +422,7 @@ void main() {
       expect(json['fileSize'], 50);
       expect(json['isRaw'], false);
       expect(json['quality'], isA<Map<String, double>>());
+      expect(json['peopleScore'], 0);
     });
   });
 
@@ -521,6 +528,13 @@ void main() {
           '/a/y.jpg',
         ]),
       );
+    });
+
+    test('also requests every people-signal tag (one spawn, no extra)', () {
+      final args = buildBatchDimensionArgs(['/a/x.jpg']);
+      for (final tag in kPeopleSignalTags) {
+        expect(args, contains('-$tag'));
+      }
     });
   });
 
@@ -745,6 +759,48 @@ void main() {
       );
       expect(out.single.width, 5000);
       expect(out.single.height, 4000);
+    });
+
+    test('reads the Tier-1 people score from the batched JSON', () async {
+      final paths = writeSources(['face.raf', 'scenery.raf']);
+      final runner = _BatchRunner(
+        thumbs: {
+          'face.raf': img.encodeJpg(_stripes(20, 20)),
+          'scenery.raf': img.encodeJpg(_stripes(20, 20, phase: 4)),
+        },
+        dims: {for (final pth in paths) pth: (100, 100)},
+        peopleTags: {
+          paths[0]: {'RegionName': 'Alice'}, // a face region → 1.0
+          // scenery has no people metadata → 0.0
+        },
+      );
+      final out = await hashFilesBatch(
+        paths,
+        runner: runner,
+        tmpDir: p.join(tmp.path, 'work'),
+      );
+      final byPath = {for (final h in out) h.path: h};
+      expect(byPath[paths[0]]!.peopleScore, 1.0);
+      expect(byPath[paths[1]]!.peopleScore, 0.0);
+    });
+
+    test('records a people score even when JSON lacks dimensions', () async {
+      final paths = writeSources(['a.raf']);
+      // Provide a JSON entry with people tags but NO width/height keys.
+      final runner = _BatchRunner(
+        thumbs: {'a.raf': img.encodeJpg(_stripes(28, 28))},
+        dimensionStdout: jsonEncode([
+          {'SourceFile': paths.first, 'PersonInImage': 'Bob'},
+        ]),
+      );
+      final out = await hashFilesBatch(
+        paths,
+        runner: runner,
+        tmpDir: p.join(tmp.path, 'work'),
+      );
+      // Dimensions fall back to the decoded thumbnail; the people score survives.
+      expect(out.single.width, 28);
+      expect(out.single.peopleScore, 1.0);
     });
   });
 }

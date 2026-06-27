@@ -257,6 +257,7 @@
   "tt_dup_similarity": "拖向“宽松”以同时找出轻微编辑的近似重复项",
   "tt_dup_drag_handle": "拖动以重新排序优先级",
   "tt_dup_rule_switch": "开启或关闭此保留规则",
+  "tt_dup_keep_people": "优先保留有人物或宠物的照片。使用照片中已有的人物/宠物标签（人脸区域、姓名、关键词）。",
   "tt_dup_keep_both": "保留两个文件，都不删除",
   "tt_dup_remove_right": "删除右侧的文件",
   "tt_dup_remove_button": "将所选重复项移至回收站",

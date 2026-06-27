@@ -1,4 +1,5 @@
 import 'duplicate_finder.dart';
+import 'people_signals.dart';
 
 /// The configurable "which photo to KEEP" decision for a duplicate group.
 ///
@@ -17,10 +18,11 @@ enum KeepRule {
   /// Prefer the higher composite-quality (sharpness/contrast/colour) candidate.
   quality,
 
-  /// Prefer the candidate with more / better-framed people. NOT YET IMPLEMENTED
-  /// — reserved so the pipeline order can already include it later. A future
-  /// pass will score it; for now [chooseKeeper] treats it as a no-op (every
-  /// candidate ties, so it always falls through).
+  /// Prefer the candidate that most looks like it contains people (or pets),
+  /// using [HashedFile.peopleScore] — the Tier-1 metadata signal (face regions,
+  /// person names, subject/keyword hints). A clear winner needs a
+  /// [kPeopleClearWinnerMargin] lead; a near-tie (or all-zero scores, when no
+  /// candidate carries people metadata) falls through to the next rule.
   people,
 }
 
@@ -65,10 +67,14 @@ class KeepPipeline {
   /// Creates a pipeline from [steps] (order = priority).
   const KeepPipeline(this.steps);
 
-  /// The standard default: resolution first, then quality, both enabled.
+  /// The standard default: resolution first, then quality, then people, all
+  /// enabled. Resolution/quality usually decide; the people rule only breaks a
+  /// near-tie between them when one candidate clearly has people/pets and the
+  /// other does not.
   static const standard = KeepPipeline([
     KeepStep(KeepRule.resolution),
     KeepStep(KeepRule.quality),
+    KeepStep(KeepRule.people),
   ]);
 
   /// The ordered steps.
@@ -142,8 +148,11 @@ HashedFile? _clearWinner(List<HashedFile> candidates, KeepRule rule) {
         kQualityClearWinnerMargin,
       );
     case KeepRule.people:
-      // Not implemented yet: no scores, so every candidate ties → fall through.
-      return null;
+      return _marginWinner(
+        candidates,
+        (c) => c.peopleScore,
+        kPeopleClearWinnerMargin,
+      );
   }
 }
 

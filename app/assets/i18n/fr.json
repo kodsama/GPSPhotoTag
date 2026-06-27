@@ -257,6 +257,7 @@
   "tt_dup_similarity": "Glissez vers Souple pour aussi détecter les quasi-doublons légèrement retouchés",
   "tt_dup_drag_handle": "Glissez pour réordonner la priorité",
   "tt_dup_rule_switch": "Activer ou désactiver cette règle de conservation",
+  "tt_dup_keep_people": "Préférer la photo avec des personnes ou des animaux. Utilise les tags de personnes/animaux déjà présents dans vos photos (zones de visages, noms, mots-clés).",
   "tt_dup_keep_both": "Garder les deux fichiers — n’en supprimer aucun",
   "tt_dup_remove_right": "Supprimer le fichier de droite",
   "tt_dup_remove_button": "Mettre les doublons sélectionnés à la corbeille",

@@ -568,6 +568,7 @@ void main() {
       expect(prefs.keepPipeline.steps.map((s) => s.rule), [
         KeepRule.resolution,
         KeepRule.quality,
+        KeepRule.people,
       ]);
 
       prefs.keepPipeline = const KeepPipeline([

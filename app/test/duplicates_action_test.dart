@@ -179,7 +179,7 @@ void main() {
     },
   );
 
-  testWidgets('shows the keep-priority pipeline with both rules', (
+  testWidgets('shows the keep-priority pipeline with every rule', (
     tester,
   ) async {
     final c = AppController(runner: FakeEngineRunner())
@@ -189,9 +189,25 @@ void main() {
     expect(find.text('Keep priority'), findsOneWidget);
     expect(find.text('Resolution'), findsOneWidget);
     expect(find.text('Quality'), findsOneWidget);
-    // The reserved People rule is hidden from the control.
-    expect(find.text('People'), findsNothing);
-    expect(find.byType(Switch), findsNWidgets(2));
+    // The People rule is now reorderable/toggleable like the others.
+    expect(find.text('People'), findsOneWidget);
+    expect(find.byType(Switch), findsNWidgets(3));
+  });
+
+  testWidgets('the People rule label carries its tags-note tooltip', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    expect(
+      find.byTooltip(
+        'Prefer the photo with people or pets. Uses people/pet tags already '
+        'in your photos (face regions, names, keywords).',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('toggling a rule switch updates the controller pipeline', (
@@ -279,6 +295,12 @@ void main() {
     expect(keepRuleLabel(KeepRule.resolution, enTr), 'Resolution');
     expect(keepRuleLabel(KeepRule.quality, enTr), 'Quality');
     expect(keepRuleLabel(KeepRule.people, enTr), 'People');
+  });
+
+  testWidgets('keepRuleTooltip only the people rule has one', (tester) async {
+    expect(keepRuleTooltip(KeepRule.resolution, enTr), isNull);
+    expect(keepRuleTooltip(KeepRule.quality, enTr), isNull);
+    expect(keepRuleTooltip(KeepRule.people, enTr), isNotEmpty);
   });
 
   testWidgets('shows live progress while a trash run is in flight', (
