@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/state/duplicates_model.dart';
 
+import 'support/fakes.dart';
+
 HashedFile _hf(
   String path, {
   int width = 100,
@@ -62,34 +64,37 @@ void main() {
     });
   });
 
-  group('similarityExampleLabel', () {
+  group('similarityExampleKey', () {
+    String label(int v) => enTr(similarityExampleKey(v));
+
     test('Exact (0) reads as identical copies', () {
-      expect(similarityExampleLabel(0), 'Identical copies');
+      expect(similarityExampleKey(0), 'sim_identical');
+      expect(label(0), 'Identical copies');
     });
 
     test('the low band reads as a re-save/resize', () {
-      expect(similarityExampleLabel(1), 'Re-saved or resized');
-      expect(similarityExampleLabel(3), 'Re-saved or resized');
+      expect(label(1), 'Re-saved or resized');
+      expect(label(3), 'Re-saved or resized');
     });
 
     test('the mid band reads as minor edits', () {
-      expect(similarityExampleLabel(4), 'Minor edits (crop, exposure)');
-      expect(similarityExampleLabel(7), 'Minor edits (crop, exposure)');
+      expect(label(4), 'Minor edits (crop, exposure)');
+      expect(label(7), 'Minor edits (crop, exposure)');
     });
 
     test('the high band reads as a different shot of the same scene', () {
-      expect(similarityExampleLabel(8), 'Same scene, a different shot');
-      expect(similarityExampleLabel(10), 'Same scene, a different shot');
+      expect(label(8), 'Same scene, a different shot');
+      expect(label(10), 'Same scene, a different shot');
     });
 
     test('the loosest band reads as loosely-similar scenes', () {
-      expect(similarityExampleLabel(11), 'Loosely similar scenes');
-      expect(similarityExampleLabel(similaritySteps), 'Loosely similar scenes');
+      expect(label(11), 'Loosely similar scenes');
+      expect(label(similaritySteps), 'Loosely similar scenes');
     });
 
     test('clamps out-of-range inputs to the end buckets', () {
-      expect(similarityExampleLabel(-1), 'Identical copies');
-      expect(similarityExampleLabel(999), 'Loosely similar scenes');
+      expect(label(-1), 'Identical copies');
+      expect(label(999), 'Loosely similar scenes');
     });
   });
 
@@ -237,14 +242,18 @@ void main() {
       expect(HashProgress(done: -3, total: 4).done, 0);
     });
 
-    test('label groups thousands', () {
+    test('groups thousands for the hashing label', () {
+      String label(HashProgress p) => enTr('hashing_progress', {
+        'done': p.groupedDone,
+        'total': p.groupedTotal,
+      });
       expect(
-        HashProgress(done: 1234, total: 5000).label,
+        label(HashProgress(done: 1234, total: 5000)),
         'Hashing 1,234 / 5,000',
       );
-      expect(HashProgress(done: 7, total: 9).label, 'Hashing 7 / 9');
+      expect(label(HashProgress(done: 7, total: 9)), 'Hashing 7 / 9');
       expect(
-        HashProgress(done: 1000000, total: 1000000).label,
+        label(HashProgress(done: 1000000, total: 1000000)),
         'Hashing 1,000,000 / 1,000,000',
       );
     });

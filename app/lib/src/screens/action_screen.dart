@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../actions/duplicates_action.dart';
 import '../actions/prune_action.dart';
 import '../actions/tag_action.dart';
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../state/library_action.dart';
 
@@ -33,14 +34,14 @@ class ActionScreen extends StatelessWidget {
                 TextButton.icon(
                   onPressed: controller.backToLibrary,
                   icon: const Icon(Icons.arrow_back, size: 18),
-                  label: const Text('Library'),
+                  label: Text(context.tr('action_library_back')),
                 ),
                 const Spacer(),
                 if (controller.runStateFor(action).running)
                   TextButton.icon(
                     onPressed: () => controller.cancelAction(action),
                     icon: const Icon(Icons.close, size: 18),
-                    label: const Text('Cancel'),
+                    label: Text(context.tr('action_cancel')),
                   ),
               ],
             ),
@@ -49,7 +50,7 @@ class ActionScreen extends StatelessWidget {
               children: [
                 Icon(action.icon, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 10),
-                Text(action.title, style: text.headlineSmall),
+                Text(action.title(context.tr), style: text.headlineSmall),
               ],
             ),
             const SizedBox(height: 20),

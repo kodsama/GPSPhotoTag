@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../branding/logo_mark.dart';
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../widgets/drop_zone.dart';
 
@@ -28,14 +29,13 @@ class WelcomeScreen extends StatelessWidget {
                 const LogoMark(size: 88),
                 const SizedBox(height: 24),
                 Text(
-                  'Stunda',
+                  context.tr('app_name'),
                   style: text.displaySmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Place your photos on the map from the GPS tracks and '
-                  'location history you already have.',
+                  context.tr('welcome_value_prop'),
                   style: text.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -43,11 +43,11 @@ class WelcomeScreen extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: controller.pickLibrary,
                   icon: const Icon(Icons.folder_open),
-                  label: const Text('Choose photo library'),
+                  label: Text(context.tr('welcome_choose_library')),
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'or',
+                  context.tr('welcome_or'),
                   style: text.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -72,7 +72,7 @@ class WelcomeScreen extends StatelessWidget {
                       const SizedBox(width: 12),
                       Flexible(
                         child: Text(
-                          'Drop folders or photos here',
+                          context.tr('welcome_drop_hint'),
                           style: text.bodyMedium,
                         ),
                       ),
@@ -81,9 +81,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Point it at any folder, or combine several. Photos, GPX/KML '
-                  'tracks, and Google Timeline exports anywhere inside — in any '
-                  'layout — are all found.',
+                  context.tr('welcome_drop_explainer'),
                   style: text.bodySmall,
                   textAlign: TextAlign.center,
                 ),

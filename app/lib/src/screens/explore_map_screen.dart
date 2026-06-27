@@ -19,6 +19,7 @@ import '../explore/photo_detail_panel.dart';
 import '../explore/tile_cache.dart';
 import '../explore/tile_provider_scope.dart';
 import '../explore/timeline_filter.dart';
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
@@ -227,11 +228,10 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   Future<void> _saveView() async {
     final controller = ControllerScope.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final captureFailed = context.tr('explore_capture_failed');
     final bytes = await (widget.capturePng ?? _capturePng)();
     if (bytes == null) {
-      messenger?.showSnackBar(
-        const SnackBar(content: Text("Couldn't capture the map view.")),
-      );
+      messenger?.showSnackBar(SnackBar(content: Text(captureFailed)));
       return;
     }
     final saved = await controller.savePng(
@@ -241,18 +241,21 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     // The save can outlive this screen (the user may navigate away mid-write);
     // don't touch a disposed messenger.
     if (saved != null && mounted) {
-      messenger?.showSnackBar(SnackBar(content: Text('Saved to $saved')));
+      final msg = context.tr('explore_saved_to', {'path': saved});
+      messenger?.showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
   /// Opens the native save panel and returns the chosen path (null on cancel).
   /// The only genuinely-untestable shell of the save flow.
   Future<String?> _pickSavePath() async {
+    final png = XTypeGroup(
+      label: context.tr('explore_png_image'),
+      extensions: const ['png'],
+    );
     final location = await getSaveLocation(
-      suggestedName: 'stunda-map.png',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'PNG image', extensions: ['png']),
-      ],
+      suggestedName: context.tr('explore_save_filename'),
+      acceptedTypeGroups: [png],
     );
     return location?.path;
   }
@@ -531,7 +534,7 @@ class _ResetButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final enabled = onPressed != null;
     return Tooltip(
-      message: 'Fit to photos',
+      message: context.tr('explore_fit'),
       child: Material(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -568,7 +571,7 @@ class _SaveButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final enabled = onPressed != null;
     return Tooltip(
-      message: 'Save view as PNG',
+      message: context.tr('explore_save_png'),
       child: Material(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -606,7 +609,7 @@ class _TimelineButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final fg = active ? scheme.onPrimary : scheme.onSurface;
     return Tooltip(
-      message: 'Filter by date',
+      message: context.tr('explore_filter_by_date'),
       child: Material(
         color: active ? scheme.primary : scheme.surface,
         borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -621,7 +624,10 @@ class _TimelineButton extends StatelessWidget {
               children: [
                 Icon(Icons.schedule, size: 18, color: fg),
                 const SizedBox(width: 8),
-                Text('Timeline', style: TextStyle(color: fg)),
+                Text(
+                  context.tr('explore_timeline'),
+                  style: TextStyle(color: fg),
+                ),
               ],
             ),
           ),
@@ -640,15 +646,19 @@ class _ModeButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   static (IconData, String) _face(MapDisplayMode mode) => switch (mode) {
-    MapDisplayMode.numbers => (Icons.tag, 'Numbers'),
-    MapDisplayMode.heatmap => (Icons.local_fire_department, 'Heatmap'),
-    MapDisplayMode.both => (Icons.layers, 'Both'),
+    MapDisplayMode.numbers => (Icons.tag, 'explore_mode_numbers'),
+    MapDisplayMode.heatmap => (
+      Icons.local_fire_department,
+      'explore_mode_heatmap',
+    ),
+    MapDisplayMode.both => (Icons.layers, 'explore_mode_both'),
   };
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final (icon, label) = _face(mode);
+    final (icon, labelKey) = _face(mode);
+    final label = context.tr(labelKey);
     return Material(
       color: scheme.surface,
       borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -772,17 +782,20 @@ class TimelinePanel extends StatelessWidget {
                 children: [
                   Icon(Icons.date_range, size: 16, color: scheme.primary),
                   const SizedBox(width: 8),
-                  Text('Date range', style: text.titleSmall),
+                  Text(
+                    context.tr('explore_date_range'),
+                    style: text.titleSmall,
+                  ),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: _isNarrowed ? onReset : null,
                     icon: const Icon(Icons.restart_alt, size: 16),
-                    label: const Text('Reset range'),
+                    label: Text(context.tr('explore_reset_range')),
                   ),
                   IconButton(
                     onPressed: onClose,
                     icon: const Icon(Icons.close, size: 18),
-                    tooltip: 'Hide timeline',
+                    tooltip: context.tr('explore_hide_timeline'),
                   ),
                 ],
               ),
@@ -861,14 +874,14 @@ class _BackButton extends StatelessWidget {
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.arrow_back, size: 18),
-              SizedBox(width: 8),
-              Text('Library'),
+              const Icon(Icons.arrow_back, size: 18),
+              const SizedBox(width: 8),
+              Text(context.tr('explore_back')),
             ],
           ),
         ),
@@ -903,7 +916,7 @@ class _LoadingChip extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              'loading coordinates $loaded/$total',
+              context.tr('explore_loading', {'loaded': loaded, 'total': total}),
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(fontFeatures: AppTheme.tabular),
@@ -927,10 +940,10 @@ class _EmptyState extends StatelessWidget {
       children: [
         const Icon(Icons.location_off_outlined, size: 40),
         const SizedBox(height: 10),
-        Text('No geotagged photos to show.', style: text.titleSmall),
+        Text(context.tr('explore_empty_title'), style: text.titleSmall),
         const SizedBox(height: 4),
         Text(
-          'Tag your photos with GPS first, then explore them here.',
+          context.tr('explore_empty_desc'),
           style: text.bodySmall,
           textAlign: TextAlign.center,
         ),

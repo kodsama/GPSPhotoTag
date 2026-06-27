@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'src/engine/exiftool_bundle.dart';
+import 'src/i18n/app_localizations.dart';
 import 'src/explore/map_tile_provider.dart';
 import 'src/explore/tile_cache.dart';
 import 'src/explore/tile_provider_scope.dart';
@@ -107,15 +109,12 @@ class _StundaAppState extends State<StundaApp> {
   /// controller's pure [AppController.exitDecision].
   Future<AppExitResponse> _onExitRequested() async {
     final decision = _controller.exitDecision;
-    if (decision == AppExitResponse.cancel) {
-      _messengerKey.currentState
-        ?..clearSnackBars()
+    final messenger = _messengerKey.currentState;
+    if (decision == AppExitResponse.cancel && messenger != null) {
+      messenger
+        ..clearSnackBars()
         ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'A process is still running — cancel it before quitting.',
-            ),
-          ),
+          SnackBar(content: Text(messenger.context.tr('exit_running'))),
         );
     }
     return decision;
@@ -140,6 +139,20 @@ class _StundaAppState extends State<StundaApp> {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: _controller.themeMode,
+        locale: _controller.localeCode == null
+            ? null
+            : Locale(_controller.localeCode!),
+        supportedLocales: kSupportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        localeResolutionCallback: (deviceLocale, supported) => resolveLocale(
+          override: _controller.localeCode,
+          system: deviceLocale,
+        ),
         home: const AppShell(),
       ),
     );

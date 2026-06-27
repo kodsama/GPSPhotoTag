@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/action_run_state.dart';
 import '../state/library_action.dart';
 import '../theme/app_colors.dart';
@@ -106,10 +107,13 @@ class _ActionCardState extends State<ActionCard> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        Text(widget.action.title, style: text.titleMedium),
+                        Text(
+                          widget.action.title(context.tr),
+                          style: text.titleMedium,
+                        ),
                         const SizedBox(height: 6),
                         Text(
-                          widget.action.description,
+                          widget.action.description(context.tr),
                           style: text.bodySmall,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -198,7 +202,7 @@ class _AttentionBadgeState extends State<_AttentionBadge>
       child: ScaleTransition(
         scale: Tween<double>(begin: 0.8, end: 1.15).animate(_controller),
         child: Tooltip(
-          message: 'Needs your review',
+          message: context.tr('card_needs_review'),
           child: Container(
             width: 14,
             height: 14,
@@ -242,7 +246,7 @@ class _ReadinessChip extends StatelessWidget {
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              readiness.label,
+              readiness.label(context.tr),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,

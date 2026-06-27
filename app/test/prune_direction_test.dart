@@ -59,10 +59,13 @@ void main() {
         PruneDirection.removeOrphanImages.target,
         PairKind.photoWithoutRaw,
       );
-      expect(PruneDirection.removeOrphanRaws.label, 'Remove orphan RAWs');
-      expect(PruneDirection.removeOrphanImages.label, 'Remove orphan images');
-      expect(PruneDirection.removeOrphanRaws.description, isNotEmpty);
-      expect(PruneDirection.removeOrphanImages.description, isNotEmpty);
+      expect(PruneDirection.removeOrphanRaws.labelKey, 'prune_dir_orphan_raws');
+      expect(
+        PruneDirection.removeOrphanImages.labelKey,
+        'prune_dir_orphan_images',
+      );
+      expect(PruneDirection.removeOrphanRaws.descriptionKey, isNotEmpty);
+      expect(PruneDirection.removeOrphanImages.descriptionKey, isNotEmpty);
     });
   });
 }

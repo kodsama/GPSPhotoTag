@@ -189,7 +189,7 @@ void main() {
       await controller.checkEnvironment();
       await _pumpApp(tester, controller);
 
-      expect(controller.environmentWarning, isNull);
+      expect(controller.hasEnvironmentWarning, isFalse);
       expect(find.textContaining("ExifTool couldn't start"), findsNothing);
     });
   });

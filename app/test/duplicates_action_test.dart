@@ -270,15 +270,15 @@ void main() {
   });
 
   testWidgets('formatBytes renders B / KB / MB', (tester) async {
-    expect(formatBytes(512), '512 B');
-    expect(formatBytes(2048), '2 KB');
-    expect(formatBytes(5 * 1024 * 1024), '5.0 MB');
+    expect(formatBytes(512, enTr), '512 B');
+    expect(formatBytes(2048, enTr), '2 KB');
+    expect(formatBytes(5 * 1024 * 1024, enTr), '5.0 MB');
   });
 
   testWidgets('keepRuleLabel names every keep rule', (tester) async {
-    expect(keepRuleLabel(KeepRule.resolution), 'Resolution');
-    expect(keepRuleLabel(KeepRule.quality), 'Quality');
-    expect(keepRuleLabel(KeepRule.people), 'People');
+    expect(keepRuleLabel(KeepRule.resolution, enTr), 'Resolution');
+    expect(keepRuleLabel(KeepRule.quality, enTr), 'Quality');
+    expect(keepRuleLabel(KeepRule.people, enTr), 'People');
   });
 
   testWidgets('shows live progress while a trash run is in flight', (

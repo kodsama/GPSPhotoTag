@@ -252,19 +252,19 @@ void main() {
 
   group('mcpStatus', () {
     test('reports running with the bound port', () {
-      final s = mcpStatus(running: true, port: 8787);
+      final s = mcpStatus(enTr, running: true, port: 8787);
       expect(s.label, 'running on :8787');
       expect(s.tip, contains('8787'));
     });
 
     test('reports off when an error is present', () {
-      final s = mcpStatus(running: false, error: 'boom');
+      final s = mcpStatus(enTr, running: false, error: 'boom');
       expect(s.label, 'off');
       expect(s.tip, contains('boom'));
     });
 
     test('reports starting before either', () {
-      final s = mcpStatus(running: false);
+      final s = mcpStatus(enTr, running: false);
       expect(s.label, 'starting…');
     });
   });

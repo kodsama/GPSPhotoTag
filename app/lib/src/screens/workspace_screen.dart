@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../state/library_action.dart';
 import '../widgets/action_card.dart';
@@ -32,7 +33,7 @@ class WorkspaceScreen extends StatelessWidget {
               const SizedBox(height: 16),
               ContentPanel(scan: scan),
               const SizedBox(height: 24),
-              Text('Actions', style: text.titleMedium),
+              Text(context.tr('workspace_actions'), style: text.titleMedium),
               const SizedBox(height: 12),
               LayoutBuilder(
                 builder: (context, c) {

@@ -410,6 +410,26 @@ void main() {
     },
   );
 
+  testWidgets('a failed capture shows the capture-failed snackbar', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+      ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+
+    // capturePng returns null → the "Couldn't capture the map view." branch.
+    await _pump(tester, c, capturePng: () async => null);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byIcon(Icons.save_alt));
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.textContaining("Couldn't capture the map view."),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('the save-view button is disabled with no points', (
     tester,
   ) async {

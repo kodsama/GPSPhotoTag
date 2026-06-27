@@ -58,6 +58,7 @@ class AppController extends ChangeNotifier {
       _rawMode = prefs.defaultRawMode;
       _maxTimeDiffSeconds = prefs.defaultMaxTimeDiffSeconds;
       _keepPipeline = prefs.keepPipeline;
+      _localeCode = prefs.localeCode;
     }
   }
 
@@ -107,6 +108,24 @@ class AppController extends ChangeNotifier {
   void setDark(bool dark) =>
       setThemeMode(dark ? ThemeMode.dark : ThemeMode.light);
 
+  // --- Language (persisted) ------------------------------------------------
+
+  String? _localeCode;
+
+  /// The persisted language override (a supported locale code), or null to
+  /// follow the system locale.
+  String? get localeCode => _localeCode;
+
+  /// Sets (null = follow system) the language override and persists it; the app
+  /// rebuilds `MaterialApp` with the new locale live.
+  void setLocaleCode(String? code) {
+    if (_localeCode == code) return;
+    _localeCode = code;
+    _prefs?.localeCode = code;
+    _persistPrefs();
+    notifyListeners();
+  }
+
   // --- Tag defaults (persisted) --------------------------------------------
 
   /// The persisted default RAW mode new tag runs start from.
@@ -140,6 +159,7 @@ class AppController extends ChangeNotifier {
     if (prefs == null) return;
     prefs.themeMode = _themeMode;
     prefs.keepPipeline = _keepPipeline;
+    prefs.localeCode = _localeCode;
     prefs.save();
   }
 
@@ -259,11 +279,6 @@ class AppController extends ChangeNotifier {
 
   // --- Environment self-check ----------------------------------------------
 
-  /// User-facing message shown when exiftool couldn't start.
-  static const _exiftoolWarning =
-      "ExifTool couldn't start, so RAW-embed, HEIC, and Fuji/Canon RAW "
-      'timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.';
-
   List<ToolStatus> _toolkit = const [];
   bool _checked = false;
 
@@ -271,10 +286,11 @@ class AppController extends ChangeNotifier {
   bool get exiftoolAvailable =>
       _toolkit.any((t) => t.id == 'exiftool' && t.present);
 
-  String? _environmentWarning;
+  bool _hasEnvironmentWarning = false;
 
-  /// A non-alarming warning to surface as a banner, or null when all is well.
-  String? get environmentWarning => _environmentWarning;
+  /// Whether a non-alarming environment warning should surface as a banner. The
+  /// banner localizes the message itself (the controller has no `BuildContext`).
+  bool get hasEnvironmentWarning => _hasEnvironmentWarning;
 
   bool _warningDismissed = false;
 
@@ -295,10 +311,10 @@ class AppController extends ChangeNotifier {
     _toolkit = await _probeToolkit();
     _runner = null; // rebuild engine with fresh exiftool availability
     if (exiftoolAvailable) {
-      _environmentWarning = null;
+      _hasEnvironmentWarning = false;
       _log('Environment OK: ExifTool ready');
     } else {
-      _environmentWarning = _exiftoolWarning;
+      _hasEnvironmentWarning = true;
       _log('ExifTool unavailable', level: LogLevel.warning);
     }
     notifyListeners();
@@ -324,12 +340,13 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
-  /// A compact label for the library: the single root's basename, or
-  /// "N locations" when the library spans several roots; null when empty.
-  String? get folderName => switch (_roots.length) {
+  /// A compact label for the library: the single root's basename via [tr] for
+  /// the "{count} locations" plural, or null when empty. Takes a [Translator] so
+  /// the controller stays Flutter-free of any `BuildContext`.
+  String? folderName(Translator tr) => switch (_roots.length) {
     0 => null,
     1 => rootLabel(_roots.first),
-    final n => '$n locations',
+    final n => tr('library_locations', {'count': n}),
   };
 
   /// The completed scan result, or null until a scan finishes.

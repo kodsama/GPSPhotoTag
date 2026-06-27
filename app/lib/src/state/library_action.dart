@@ -1,27 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+/// A translator: a localization key (+ optional params) → the resolved string.
+/// The widget layer supplies `context.tr`, keeping these models Flutter-free of
+/// any `BuildContext`.
+typedef Translator =
+    String Function(String key, [Map<String, Object?>? params]);
+
 /// Whether an action can run against the current library, plus a short reason.
 ///
-/// [label] is shown in the action card's readiness chip ("Ready — 3 sources",
-/// "No GPS sources found"). When [enabled] is false the card is disabled.
+/// [labelKey]/[labelParams] resolve (via a [Translator]) to the action card's
+/// readiness chip text ("Ready — 3 sources", "No GPS sources found"). When
+/// [enabled] is false the card is disabled.
 @immutable
 class ActionReadiness {
-  /// Creates a readiness verdict.
-  const ActionReadiness({required this.enabled, required this.label});
+  /// Creates a readiness verdict from a localization [labelKey] + [labelParams].
+  const ActionReadiness({
+    required this.enabled,
+    required this.labelKey,
+    this.labelParams,
+  });
 
-  /// A ready verdict with [label].
-  const ActionReadiness.ready(String label) : this(enabled: true, label: label);
+  /// A ready verdict with [labelKey].
+  const ActionReadiness.ready(String labelKey, {Map<String, Object?>? params})
+    : this(enabled: true, labelKey: labelKey, labelParams: params);
 
-  /// A blocked verdict with [label] explaining why.
-  const ActionReadiness.blocked(String label)
-    : this(enabled: false, label: label);
+  /// A blocked verdict with [labelKey] explaining why.
+  const ActionReadiness.blocked(String labelKey, {Map<String, Object?>? params})
+    : this(enabled: false, labelKey: labelKey, labelParams: params);
 
   /// Whether the action may run.
   final bool enabled;
 
-  /// One-line readiness text for the card chip.
-  final String label;
+  /// The localization key for the readiness chip text.
+  final String labelKey;
+
+  /// Interpolation params for [labelKey], or null.
+  final Map<String, Object?>? labelParams;
+
+  /// Resolves the chip text via [tr].
+  String label(Translator tr) => tr(labelKey, labelParams);
 }
 
 /// A single thing the user can do with a scanned library.
@@ -35,18 +53,16 @@ enum LibraryAction {
   tag(
     id: 'tag',
     icon: Icons.place_outlined,
-    title: 'Tag with GPS',
-    description:
-        'Write location into your photos from the tracks & history '
-        'found.',
+    titleKey: 'action_tag_title',
+    descKey: 'action_tag_desc',
   ),
 
   /// Open a live, pannable/zoomable world map of the geotagged photos.
   explore(
     id: 'explore',
     icon: Icons.travel_explore,
-    title: 'Explore on map',
-    description: 'Browse your geotagged photos on a live, zoomable map.',
+    titleKey: 'action_explore_title',
+    descKey: 'action_explore_desc',
   ),
 
   /// Match images to RAW: trash orphan RAWs or orphan images (the review's
@@ -54,23 +70,23 @@ enum LibraryAction {
   pruneRaw(
     id: 'prune_raw',
     icon: Icons.cleaning_services_outlined,
-    title: 'Match Images to RAW',
-    description: 'Trash RAW files or photos that have no matching partner.',
+    titleKey: 'action_prune_title',
+    descKey: 'action_prune_desc',
   ),
 
   /// Find visually-similar photos (perceptual hashing) and trash duplicates.
   duplicates(
     id: 'duplicates',
     icon: Icons.filter_none,
-    title: 'Find duplicates',
-    description: 'Spot visually-similar photos and trash the extras.',
+    titleKey: 'action_duplicates_title',
+    descKey: 'action_duplicates_desc',
   );
 
   const LibraryAction({
     required this.id,
     required this.icon,
-    required this.title,
-    required this.description,
+    required this.titleKey,
+    required this.descKey,
   });
 
   /// Stable identifier (also used for analytics / routing).
@@ -79,11 +95,18 @@ enum LibraryAction {
   /// Card icon.
   final IconData icon;
 
-  /// Card title.
-  final String title;
+  /// Localization key for the card title.
+  final String titleKey;
 
-  /// One-line neutral description (says photos are *used*, never "tagged").
-  final String description;
+  /// Localization key for the one-line neutral description (says photos are
+  /// *used*, never "tagged").
+  final String descKey;
+
+  /// The localized card title via [tr].
+  String title(Translator tr) => tr(titleKey);
+
+  /// The localized card description via [tr].
+  String description(Translator tr) => tr(descKey);
 
   /// Every action, in display order. Add a new action here and it appears.
   static const List<LibraryAction> all = values;
@@ -93,25 +116,36 @@ enum LibraryAction {
     LibraryAction.tag => _tagReadiness(scan),
     LibraryAction.explore =>
       scan.photoCount > 0
-          ? ActionReadiness.ready('${scan.photoCount} photos')
-          : const ActionReadiness.blocked('No photos found'),
+          ? ActionReadiness.ready(
+              'readiness_photos',
+              params: {'count': scan.photoCount},
+            )
+          : const ActionReadiness.blocked('readiness_explore_none'),
     LibraryAction.pruneRaw =>
       _rawCount(scan) > 0
-          ? ActionReadiness.ready('${_rawCount(scan)} RAW files')
-          : const ActionReadiness.blocked('No RAW files found'),
+          ? ActionReadiness.ready(
+              'readiness_raw_files',
+              params: {'count': _rawCount(scan)},
+            )
+          : const ActionReadiness.blocked('readiness_raw_none'),
     LibraryAction.duplicates =>
       scan.photoCount > 1
-          ? ActionReadiness.ready('${scan.photoCount} photos')
-          : const ActionReadiness.blocked('Need at least 2 photos'),
+          ? ActionReadiness.ready(
+              'readiness_photos',
+              params: {'count': scan.photoCount},
+            )
+          : const ActionReadiness.blocked('readiness_need_two'),
   };
 
   static ActionReadiness _tagReadiness(FolderScanResult scan) {
     final sources = scan.trackCount + scan.googleCount;
-    return sources > 0
-        ? ActionReadiness.ready(
-            'Ready — $sources ${sources == 1 ? 'source' : 'sources'}',
-          )
-        : const ActionReadiness.blocked('No GPS sources found');
+    if (sources == 0) {
+      return const ActionReadiness.blocked('readiness_tag_none');
+    }
+    return ActionReadiness.ready(
+      sources == 1 ? 'readiness_tag_ready_one' : 'readiness_tag_ready_many',
+      params: {'count': sources},
+    );
   }
 
   /// Number of scanned photos whose extension is a RAW format.

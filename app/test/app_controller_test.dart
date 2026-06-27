@@ -49,7 +49,7 @@ void main() {
       await c.startScan('/library');
       expect(c.screen, AppScreen.workspace);
       expect(c.scan, isNotNull);
-      expect(c.folderName, 'library');
+      expect(c.folderName(enTr), 'library');
       expect(c.scanProgress, isNull);
     });
 
@@ -77,7 +77,7 @@ void main() {
       final withGpx = fakeScan(gpxFiles: const ['/library/t.gpx']);
       final r = LibraryAction.tag.readiness(withGpx);
       expect(r.enabled, isTrue);
-      expect(r.label, contains('1'));
+      expect(r.label(enTr), contains('1'));
     });
 
     test('explore needs photos', () {
@@ -603,6 +603,43 @@ void main() {
       expect(c.keepPipeline.steps.first.rule, KeepRule.quality);
     });
 
+    test(
+      'setLocaleCode persists the override, round-trips, and notifies',
+      () async {
+        final path = '${dir.path}/preferences.json';
+        final prefs = AppPrefs(file: path);
+        final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+        var notified = 0;
+        c.addListener(() => notified++);
+
+        expect(c.localeCode, isNull); // null = follow system
+        c.setLocaleCode('sv');
+        expect(c.localeCode, 'sv');
+        expect(prefs.localeCode, 'sv');
+        expect(notified, 1);
+
+        // Setting the same value again is a no-op (no extra notify).
+        c.setLocaleCode('sv');
+        expect(notified, 1);
+
+        await prefs.save();
+        final reloaded = await AppPrefs.load(dir.path);
+        expect(reloaded.localeCode, 'sv');
+
+        // Clearing it back to system default persists null.
+        c.setLocaleCode(null);
+        expect(c.localeCode, isNull);
+        expect(prefs.localeCode, isNull);
+        expect(notified, 2);
+      },
+    );
+
+    test('controller loads the persisted localeCode on construction', () {
+      final prefs = AppPrefs(localeCode: 'ja');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.localeCode, 'ja');
+    });
+
     test('setBackgroundImagePath persists and notifies', () {
       final prefs = AppPrefs();
       final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
@@ -653,10 +690,10 @@ void main() {
         final c = AppController(
           probeToolkit: () async => [_tool('exiftool', present: false)],
         );
-        expect(c.environmentWarning, isNull);
+        expect(c.hasEnvironmentWarning, isFalse);
         await c.checkEnvironment();
         expect(c.exiftoolAvailable, isFalse);
-        expect(c.environmentWarning, contains("ExifTool couldn't start"));
+        expect(c.hasEnvironmentWarning, isTrue);
         expect(c.logEntries.any((e) => e.level == LogLevel.warning), isTrue);
       },
     );
@@ -665,7 +702,7 @@ void main() {
       final c = AppController(probeToolkit: () async => [_tool('exiftool')]);
       await c.checkEnvironment();
       expect(c.exiftoolAvailable, isTrue);
-      expect(c.environmentWarning, isNull);
+      expect(c.hasEnvironmentWarning, isFalse);
     });
 
     test('is idempotent — the probe runs at most once', () async {
@@ -689,7 +726,7 @@ void main() {
       expect(c.warningDismissed, isFalse);
       c.dismissWarning();
       expect(c.warningDismissed, isTrue);
-      expect(c.environmentWarning, isNotNull);
+      expect(c.hasEnvironmentWarning, isTrue);
     });
 
     test('hasBundledExiftool reflects the injected bundle dir', () {
@@ -1028,9 +1065,9 @@ void main() {
     test('folderName reflects single vs multiple roots', () async {
       final c = AppController(runner: FakeEngineRunner());
       await c.startScan('/a');
-      expect(c.folderName, 'a');
+      expect(c.folderName(enTr), 'a');
       await c.addRootPaths(['/b']);
-      expect(c.folderName, '2 locations');
+      expect(c.folderName(enTr), '2 locations');
     });
 
     test('changeLibrary clears the roots', () async {
@@ -1038,7 +1075,7 @@ void main() {
       await c.startScan('/a');
       c.changeLibrary();
       expect(c.roots, isEmpty);
-      expect(c.folderName, isNull);
+      expect(c.folderName(enTr), isNull);
     });
 
     test('folder getter returns the first directory root', () async {

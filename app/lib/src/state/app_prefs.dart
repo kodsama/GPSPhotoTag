@@ -27,6 +27,7 @@ class AppPrefs {
     this.backgroundImagePath,
     this.backgroundVeil = 0.85,
     this.keepPipeline = KeepPipeline.standard,
+    this.localeCode,
   });
 
   /// The backing JSON file path, or null when persistence is disabled.
@@ -52,6 +53,10 @@ class AppPrefs {
   /// The duplicate-finder keep-priority pipeline (rule order + enabled flags).
   KeepPipeline keepPipeline;
 
+  /// The user's language override (a supported locale code), or null to follow
+  /// the system locale.
+  String? localeCode;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -71,6 +76,8 @@ class AppPrefs {
       if (map.containsKey('keepPipeline')) {
         prefs.keepPipeline = KeepPipeline.fromJson(map['keepPipeline']);
       }
+      final code = map['localeCode'];
+      if (code is String && code.isNotEmpty) prefs.localeCode = code;
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -90,6 +97,7 @@ class AppPrefs {
           'backgroundImagePath': backgroundImagePath,
           'backgroundVeil': backgroundVeil,
           'keepPipeline': keepPipeline.toJson(),
+          'localeCode': localeCode,
         }),
       );
     } on Object {

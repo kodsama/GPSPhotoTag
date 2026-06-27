@@ -3,8 +3,22 @@ import 'dart:io';
 
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/engine/engine_runner.dart';
+import 'package:stunda/src/i18n/app_localizations.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
+
+/// An English [Translator] for unit tests: resolves keys through the bundled
+/// compile-time English map and interpolates `{placeholders}`, exactly like the
+/// runtime fallback. Lets pure model/label functions be asserted in English.
+String enTr(String key, [Map<String, Object?>? params]) {
+  final template = kEnglishStrings[key] ?? key;
+  if (params == null || params.isEmpty) return template;
+  return template.replaceAllMapped(
+    RegExp(r'\{(\w+)\}'),
+    (m) =>
+        params.containsKey(m.group(1)) ? '${params[m.group(1)]}' : m.group(0)!,
+  );
+}
 
 /// A scripted [EngineRunner] that returns a canned [EngineEvent] stream for
 /// every operation without spawning a single isolate. Each method records that

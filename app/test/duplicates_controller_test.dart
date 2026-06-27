@@ -97,7 +97,13 @@ void main() {
       fake.lastOnProgress!(2, 3);
       expect(c.duplicatesHashed, 2);
       expect(c.hashProgress.fraction, closeTo(2 / 3, 1e-9));
-      expect(c.hashProgress.label, 'Hashing 2 / 3');
+      expect(
+        enTr('hashing_progress', {
+          'done': c.hashProgress.groupedDone,
+          'total': c.hashProgress.groupedTotal,
+        }),
+        'Hashing 2 / 3',
+      );
 
       fake.duplicatesGate!.complete();
       await run;

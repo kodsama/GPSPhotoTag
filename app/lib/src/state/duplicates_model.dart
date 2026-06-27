@@ -31,20 +31,21 @@ int similarityToThreshold(int slider) => slider.clamp(0, similaritySteps);
 double sceneVariance(int slider) =>
     slider.clamp(0, similaritySteps) / similaritySteps;
 
-/// A short, human descriptor of what the current similarity [slider] level
-/// catches, shown as the example-pair caption.
+/// The localization KEY for a short, human descriptor of what the current
+/// similarity [slider] level catches, shown as the example-pair caption.
 ///
 /// Buckets the slider into five bands: Exact (0) → identical copies; low → light
 /// re-encodes; mid → small edits; high → the same scene shot differently; and
 /// the loosest band → only loosely-similar scenes ("kind of the same"). Out-of-
-/// range inputs are clamped. Pure so the bucket boundaries are testable.
-String similarityExampleLabel(int slider) {
+/// range inputs are clamped. Pure so the bucket boundaries are testable; the
+/// widget layer resolves the key through `context.tr`.
+String similarityExampleKey(int slider) {
   final value = slider.clamp(0, similaritySteps);
-  if (value == 0) return 'Identical copies';
-  if (value <= 3) return 'Re-saved or resized';
-  if (value <= 7) return 'Minor edits (crop, exposure)';
-  if (value <= 10) return 'Same scene, a different shot';
-  return 'Loosely similar scenes';
+  if (value == 0) return 'sim_identical';
+  if (value <= 3) return 'sim_resaved';
+  if (value <= 7) return 'sim_minor';
+  if (value <= 10) return 'sim_same_scene';
+  return 'sim_loose';
 }
 
 /// One reviewable duplicate pair: the [kept] file and the [other] candidate.
@@ -143,8 +144,11 @@ class HashProgress {
   /// the bar should render indeterminate).
   double? get fraction => total == 0 ? null : done / total;
 
-  /// A human label like "Hashing 1,234 / 5,000" with grouped thousands.
-  String get label => 'Hashing ${_grouped(done)} / ${_grouped(total)}';
+  /// [done] formatted with grouped thousands (e.g. 1234 → "1,234").
+  String get groupedDone => _grouped(done);
+
+  /// [total] formatted with grouped thousands (e.g. 5000 → "5,000").
+  String get groupedTotal => _grouped(total);
 
   /// Formats [n] with comma thousands separators (e.g. 1234 → "1,234").
   static String _grouped(int n) {

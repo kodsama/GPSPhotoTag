@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../state/library_roots.dart';
 import '../theme/app_theme.dart';
@@ -21,6 +22,8 @@ class LibraryBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final roots = controller.roots;
+    final name =
+        controller.folderName(context.tr) ?? context.tr('library_default_name');
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -40,13 +43,13 @@ class LibraryBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      controller.folderName ?? 'Library',
+                      name,
                       style: text.titleMedium,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _statLine(scan),
+                      _statLine(context, scan),
                       style: text.bodySmall,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -66,12 +69,12 @@ class LibraryBar extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: controller.addFolder,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add folder'),
+                label: Text(context.tr('library_add_folder')),
               ),
               OutlinedButton.icon(
                 onPressed: controller.changeLibrary,
                 icon: const Icon(Icons.swap_horiz, size: 18),
-                label: const Text('Change library'),
+                label: Text(context.tr('library_change')),
               ),
             ],
           ),
@@ -86,7 +89,9 @@ class LibraryBar extends StatelessWidget {
                     label: Text(rootLabel(root)),
                     onDeleted: () => controller.removeLibraryRoot(root),
                     deleteIcon: const Icon(Icons.close, size: 16),
-                    deleteButtonTooltipMessage: 'Remove from library',
+                    deleteButtonTooltipMessage: context.tr(
+                      'library_remove_root',
+                    ),
                   ),
               ],
             ),
@@ -96,8 +101,12 @@ class LibraryBar extends StatelessWidget {
     );
   }
 
-  static String _statLine(FolderScanResult scan) =>
-      '${scan.dirs} folders · ${scan.photoCount} photos · '
-      '${scan.gpxCount} GPX · ${scan.kmlCount} KML · '
-      '${scan.googleCount} Timeline';
+  static String _statLine(BuildContext context, FolderScanResult scan) =>
+      context.tr('library_stat_line', {
+        'dirs': scan.dirs,
+        'photos': scan.photoCount,
+        'gpx': scan.gpxCount,
+        'kml': scan.kmlCount,
+        'google': scan.googleCount,
+      });
 }

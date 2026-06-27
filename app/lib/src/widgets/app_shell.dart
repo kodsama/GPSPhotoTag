@@ -6,6 +6,7 @@ import '../screens/explore_map_screen.dart';
 import '../screens/scanning_screen.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/workspace_screen.dart';
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/app_screen.dart';
 import '../state/controller_scope.dart';
@@ -116,9 +117,9 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Stunda', style: text.headlineSmall),
+                Text(context.tr('app_name'), style: text.headlineSmall),
                 Text(
-                  'Give every photo its moment',
+                  context.tr('app_tagline'),
                   style: text.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -143,7 +144,7 @@ class _SettingsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return PopupMenuButton<String>(
-      tooltip: 'Menu',
+      tooltip: context.tr('menu_tooltip'),
       icon: const Icon(Icons.settings),
       position: PopupMenuPosition.under,
       onSelected: (v) {
@@ -165,34 +166,38 @@ class _SettingsMenu extends StatelessWidget {
             dense: true,
             contentPadding: EdgeInsets.zero,
             leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            title: Text(isDark ? 'Appearance: Light' : 'Appearance: Dark'),
+            title: Text(
+              context.tr(
+                isDark ? 'menu_appearance_light' : 'menu_appearance_dark',
+              ),
+            ),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'settings',
           child: ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.tune),
-            title: Text('Settings…'),
+            leading: const Icon(Icons.tune),
+            title: Text(context.tr('menu_settings')),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'licenses',
           child: ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.gavel),
-            title: Text('Licenses'),
+            leading: const Icon(Icons.gavel),
+            title: Text(context.tr('menu_licenses')),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'about',
           child: ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline),
-            title: Text('About'),
+            leading: const Icon(Icons.info_outline),
+            title: Text(context.tr('menu_about')),
           ),
         ),
       ],
@@ -204,13 +209,10 @@ class _SettingsMenu extends StatelessWidget {
 void _showAbout(BuildContext context) {
   showAboutDialog(
     context: context,
-    applicationName: 'Stunda',
-    applicationVersion: '2.0.0',
+    applicationName: context.tr('app_name'),
+    applicationVersion: context.tr('app_version'),
     applicationIcon: const LogoMark(size: 48),
-    applicationLegalese:
-        'Give every photo its moment.\n'
-        'Author: Kodsama\n'
-        'GPL-3.0-or-later',
+    applicationLegalese: context.tr('about_legalese'),
   );
 }
 
@@ -229,7 +231,7 @@ class _LogButton extends StatelessWidget {
       children: [
         IconButton(
           onPressed: onPressed,
-          tooltip: 'Activity log',
+          tooltip: context.tr('activity_log_tooltip'),
           icon: const Icon(Icons.receipt_long),
         ),
         if (unread > 0)
@@ -245,7 +247,7 @@ class _LogButton extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               alignment: Alignment.center,
               child: Text(
-                unread > 99 ? '99+' : '$unread',
+                unread > 99 ? context.tr('badge_overflow') : '$unread',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 9,

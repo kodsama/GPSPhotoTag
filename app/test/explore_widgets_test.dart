@@ -631,16 +631,17 @@ void main() {
           height: 80,
           date: DateTime(2023, 1, 2, 3, 4),
         ),
+        enTr,
       );
       expect(lines, ['2023-01-02 03:04', '100 × 80', '42.50000, 18.10000']);
     });
 
     test('omits coordinates for a non-GPS photo and null meta', () {
       expect(
-        previewMetaLines('/a.jpg', const FileMeta(path: '/a.jpg')),
+        previewMetaLines('/a.jpg', const FileMeta(path: '/a.jpg'), enTr),
         isEmpty,
       );
-      expect(previewMetaLines('/a.jpg', null), isEmpty);
+      expect(previewMetaLines('/a.jpg', null, enTr), isEmpty);
     });
   });
 

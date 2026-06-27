@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
+import '../state/library_action.dart' show Translator;
 import '../theme/app_theme.dart';
 import 'detail_selection.dart';
 import 'explore_model.dart';
@@ -109,13 +111,13 @@ class PhotoPreview extends StatelessWidget {
                     ...trailing,
                     RoundIconButton(
                       icon: Icons.open_in_full,
-                      tooltip: 'View fullscreen',
+                      tooltip: context.tr('preview_fullscreen'),
                       onPressed: onExpand,
                     ),
                     if (onClose != null)
                       RoundIconButton(
                         icon: Icons.close,
-                        tooltip: 'Close',
+                        tooltip: context.tr('preview_close'),
                         onPressed: onClose!,
                       ),
                   ],
@@ -134,7 +136,7 @@ class PhotoPreview extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
-                for (final line in previewMetaLines(path, meta))
+                for (final line in previewMetaLines(path, meta, context.tr))
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
@@ -158,7 +160,7 @@ class PhotoPreview extends StatelessWidget {
 ///
 /// Coordinates are included only when the meta carries GPS. Pure, so the line
 /// formatting is unit testable.
-List<String> previewMetaLines(String path, FileMeta? meta) {
+List<String> previewMetaLines(String path, FileMeta? meta, Translator tr) {
   final lines = <String>[];
   final date = meta?.date;
   if (date != null) {
@@ -169,7 +171,9 @@ List<String> previewMetaLines(String path, FileMeta? meta) {
     );
   }
   if (meta?.width != null && meta?.height != null) {
-    lines.add('${meta!.width} × ${meta.height}');
+    lines.add(
+      tr('preview_dimensions', {'width': meta!.width, 'height': meta.height}),
+    );
   }
   final lat = meta?.latitude, lon = meta?.longitude;
   if (meta?.hasGps == true && lat != null && lon != null) {
@@ -230,7 +234,7 @@ class PhotoDetailPanel extends StatelessWidget {
           if (selection.isMulti) ...[
             RoundIconButton(
               icon: Icons.chevron_left,
-              tooltip: 'Previous',
+              tooltip: context.tr('preview_prev'),
               onPressed: onPrev,
             ),
             Container(
@@ -250,7 +254,7 @@ class PhotoDetailPanel extends StatelessWidget {
             ),
             RoundIconButton(
               icon: Icons.chevron_right,
-              tooltip: 'Next',
+              tooltip: context.tr('preview_next'),
               onPressed: onNext,
             ),
           ],

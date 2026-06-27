@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 
@@ -15,10 +16,10 @@ class WarningBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
-    final message = controller.environmentWarning;
-    if (message == null || controller.warningDismissed) {
+    if (!controller.hasEnvironmentWarning || controller.warningDismissed) {
       return const SizedBox.shrink();
     }
+    final message = context.tr('warning_exiftool');
     final text = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -40,7 +41,7 @@ class WarningBanner extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           IconButton(
-            tooltip: 'Dismiss',
+            tooltip: context.tr('warning_dismiss'),
             icon: const Icon(Icons.close, size: 18),
             color: AppColors.warning,
             visualDensity: VisualDensity.compact,

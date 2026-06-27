@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
 import '../explore/photo_detail_panel.dart';
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/duplicates_model.dart';
+import '../state/library_action.dart' show Translator;
 import '../theme/app_theme.dart';
 import '../widgets/run_view.dart';
 import 'example_scene.dart';
@@ -72,11 +74,7 @@ class _Review extends StatelessWidget {
           ErrorBanner(message: controller.errorMessage!),
           const SizedBox(height: 14),
         ],
-        Text(
-          'Drag toward Loose to also catch lightly-edited near-duplicates. '
-          'Nothing is removed until you review and confirm.',
-          style: text.bodyMedium,
-        ),
+        Text(context.tr('dup_intro'), style: text.bodyMedium),
         const SizedBox(height: 16),
         _SimilaritySlider(controller: controller),
         const SizedBox(height: 20),
@@ -87,7 +85,7 @@ class _Review extends StatelessWidget {
               ? null
               : controller.runFindDuplicates,
           icon: const Icon(Icons.search),
-          label: const Text('Find duplicates'),
+          label: Text(context.tr('dup_find')),
         ),
         if (controller.findingDuplicates) ...[
           const SizedBox(height: 20),
@@ -112,18 +110,22 @@ class _SimilaritySlider extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final selected = similarityExampleLabel(controller.similarity);
+    final selected = context.tr(similarityExampleKey(controller.similarity));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text('Similarity', style: text.titleSmall),
+            Text(context.tr('dup_similarity'), style: text.titleSmall),
             const Spacer(),
             // The currently-picked setting, always visible (not just the drag
             // tooltip): the level's plain-language name + its step.
             Text(
-              '$selected · ${controller.similarity}/$similaritySteps',
+              context.tr('dup_similarity_value', {
+                'label': selected,
+                'step': controller.similarity,
+                'total': similaritySteps,
+              }),
               style: text.labelLarge?.copyWith(
                 color: scheme.primary,
                 fontWeight: FontWeight.w600,
@@ -133,7 +135,7 @@ class _SimilaritySlider extends StatelessWidget {
         ),
         Row(
           children: [
-            Text('Exact', style: text.bodySmall),
+            Text(context.tr('dup_exact'), style: text.bodySmall),
             Expanded(
               child: Slider(
                 value: controller.similarity.toDouble(),
@@ -146,24 +148,25 @@ class _SimilaritySlider extends StatelessWidget {
                     : (v) => controller.setSimilarity(v.round()),
               ),
             ),
-            Text('Loose', style: text.bodySmall),
+            Text(context.tr('dup_loose'), style: text.bodySmall),
           ],
         ),
         const SizedBox(height: 8),
         ExampleScenePair(
           variance: sceneVariance(controller.similarity),
-          caption: similarityExampleLabel(controller.similarity),
+          caption: selected,
         ),
       ],
     );
   }
 }
 
-/// A plain-language name for a keep [rule], shown in the pipeline list.
-String keepRuleLabel(KeepRule rule) => switch (rule) {
-  KeepRule.resolution => 'Resolution',
-  KeepRule.quality => 'Quality',
-  KeepRule.people => 'People',
+/// A plain-language name for a keep [rule], resolved via [tr] for the pipeline
+/// list.
+String keepRuleLabel(KeepRule rule, Translator tr) => switch (rule) {
+  KeepRule.resolution => tr('dup_keep_resolution'),
+  KeepRule.quality => tr('dup_keep_quality'),
+  KeepRule.people => tr('dup_keep_people'),
 };
 
 /// The compact keep-priority pipeline control: a draggable list of the keep
@@ -189,13 +192,9 @@ class _KeepPipelinePanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Keep priority', style: text.titleSmall),
+        Text(context.tr('dup_keep_priority'), style: text.titleSmall),
         const SizedBox(height: 4),
-        Text(
-          'When duplicates are found, keep the winner of the first rule that '
-          'clearly decides; ties fall through. Drag to reorder.',
-          style: text.bodySmall,
-        ),
+        Text(context.tr('dup_keep_priority_explainer'), style: text.bodySmall),
         const SizedBox(height: 8),
         // The list is short (two rules) so it sizes to its content inside the
         // surrounding scroll view.
@@ -226,7 +225,9 @@ class _KeepPipelinePanel extends StatelessWidget {
                     ),
                     Text('${i + 1}.', style: text.labelLarge),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(keepRuleLabel(steps[i].rule))),
+                    Expanded(
+                      child: Text(keepRuleLabel(steps[i].rule, context.tr)),
+                    ),
                     Switch(
                       value: steps[i].enabled,
                       onChanged: (v) =>
@@ -266,7 +267,10 @@ class _HashingProgress extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          progress.label,
+          context.tr('hashing_progress', {
+            'done': progress.groupedDone,
+            'total': progress.groupedTotal,
+          }),
           style: text.bodyMedium?.copyWith(fontFeatures: AppTheme.tabular),
         ),
       ],
@@ -290,13 +294,16 @@ class _Results extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     if (pairs.isEmpty) {
-      return Text('No duplicates found.', style: text.titleMedium);
+      return Text(context.tr('dup_none_found'), style: text.titleMedium);
     }
     final n = controller.duplicateRemovalCount;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('${pairs.length} duplicate pair(s)', style: text.titleMedium),
+        Text(
+          context.tr('dup_pairs', {'count': pairs.length}),
+          style: text.titleMedium,
+        ),
         const SizedBox(height: 12),
         for (var i = 0; i < pairs.length; i++)
           Padding(
@@ -309,7 +316,7 @@ class _Results extends StatelessWidget {
               ? null
               : () => _confirm(context, controller, random),
           icon: const Icon(Icons.delete_outline),
-          label: Text('Remove $n duplicate(s) on the right'),
+          label: Text(context.tr('dup_remove_button', {'count': n})),
         ),
       ],
     );
@@ -344,12 +351,16 @@ class _PairRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _PairSide(file: pair.kept, label: 'Keep', keep: true),
+                child: _PairSide(
+                  file: pair.kept,
+                  label: context.tr('dup_keep'),
+                  keep: true,
+                ),
               ),
               Column(
                 children: [
                   IconButton(
-                    tooltip: 'Swap which side is kept',
+                    tooltip: context.tr('dup_swap_tooltip'),
                     icon: const Icon(Icons.swap_horiz),
                     onPressed: () => controller.swapDuplicatePair(index),
                   ),
@@ -358,7 +369,9 @@ class _PairRow extends StatelessWidget {
               Expanded(
                 child: _PairSide(
                   file: pair.other,
-                  label: pair.removeSelected ? 'Remove' : 'Kept',
+                  label: context.tr(
+                    pair.removeSelected ? 'dup_remove' : 'dup_kept',
+                  ),
                   keep: !pair.removeSelected,
                 ),
               ),
@@ -373,9 +386,9 @@ class _PairRow extends StatelessWidget {
               ),
               Flexible(
                 child: Text(
-                  pair.removeSelected
-                      ? 'Remove the right file'
-                      : 'Keep both (deselected)',
+                  context.tr(
+                    pair.removeSelected ? 'dup_remove_right' : 'dup_keep_both',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -430,7 +443,11 @@ class _PairSide extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall,
         ),
         Text(
-          '${file.width} × ${file.height} · ${formatBytes(file.fileSize)}',
+          context.tr('dup_pair_dimensions', {
+            'width': file.width,
+            'height': file.height,
+            'size': formatBytes(file.fileSize, context.tr),
+          }),
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
@@ -438,11 +455,16 @@ class _PairSide extends StatelessWidget {
   }
 }
 
-/// Formats [bytes] as a compact human-readable size (KB/MB). Pure.
-String formatBytes(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+/// Formats [bytes] as a compact human-readable size (KB/MB), resolving the unit
+/// suffix via [tr].
+String formatBytes(int bytes, Translator tr) {
+  if (bytes < 1024) return tr('dup_size_bytes', {'count': bytes});
+  if (bytes < 1024 * 1024) {
+    return tr('dup_size_kb', {'count': (bytes / 1024).toStringAsFixed(0)});
+  }
+  return tr('dup_size_mb', {
+    'count': (bytes / (1024 * 1024)).toStringAsFixed(1),
+  });
 }
 
 /// Shows the silly-word confirm dialog; on success trashes the selected set.
@@ -478,22 +500,22 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
   Widget build(BuildContext context) {
     final matches = sillyWordMatches(_typed, widget.word);
     return AlertDialog(
-      title: Text('Move ${widget.count} duplicate(s) to the Trash?'),
+      title: Text(context.tr('dup_confirm_title', {'count': widget.count})),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('You can restore them from the Trash.'),
+          Text(context.tr('dup_confirm_body')),
           const SizedBox(height: 12),
           Text.rich(
             TextSpan(
-              text: 'To confirm, type ',
+              text: context.tr('dup_confirm_type_prefix'),
               children: [
                 TextSpan(
                   text: widget.word,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ' below:'),
+                TextSpan(text: context.tr('dup_confirm_type_suffix')),
               ],
             ),
           ),
@@ -508,11 +530,11 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.tr('dup_cancel')),
         ),
         FilledButton(
           onPressed: matches ? () => Navigator.of(context).pop(true) : null,
-          child: const Text('Move to Trash'),
+          child: Text(context.tr('dup_move_to_trash')),
         ),
       ],
     );
@@ -535,7 +557,7 @@ class _Done extends StatelessWidget {
         FilledButton.icon(
           onPressed: controller.backToLibrary,
           icon: const Icon(Icons.check),
-          label: const Text('Done — back to library'),
+          label: Text(context.tr('done_back_to_library')),
         ),
       ],
     );

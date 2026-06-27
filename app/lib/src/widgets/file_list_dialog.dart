@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
 import '../explore/photo_detail_panel.dart';
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_theme.dart';
@@ -107,7 +108,7 @@ class _FileListDialogState extends State<FileListDialog> {
                 children: [
                   Expanded(child: Text(widget.title, style: text.titleMedium)),
                   IconButton(
-                    tooltip: 'Close',
+                    tooltip: context.tr('file_close'),
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -125,7 +126,7 @@ class _FileListDialogState extends State<FileListDialog> {
                 child: visible.isEmpty
                     ? Center(
                         child: Text(
-                          'No matching files.',
+                          context.tr('file_no_matching'),
                           style: text.bodySmall,
                         ),
                       )
@@ -184,29 +185,32 @@ class _Header extends StatelessWidget {
             if (supported) ...[
               TextButton(
                 onPressed: () => controller.setGroupIncluded(paths, true),
-                child: const Text('Select all'),
+                child: Text(context.tr('file_select_all')),
               ),
               TextButton(
                 onPressed: () => controller.setGroupIncluded(paths, false),
-                child: const Text('Select none'),
+                child: Text(context.tr('file_select_none')),
               ),
               const Spacer(),
             ] else
               const Spacer(),
             if (reading)
               Text(
-                'reading $loaded/${paths.length}',
+                context.tr('file_reading', {
+                  'loaded': loaded,
+                  'total': paths.length,
+                }),
                 style: text.bodySmall?.copyWith(fontFeatures: AppTheme.tabular),
               ),
           ],
         ),
         const SizedBox(height: 8),
         TextField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            prefixIcon: Icon(Icons.search, size: 18),
-            hintText: 'Filter by filename…',
-            border: OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.search, size: 18),
+            hintText: context.tr('file_filter_hint'),
+            border: const OutlineInputBorder(),
           ),
           onChanged: onFilter,
         ),
@@ -282,7 +286,7 @@ class _FileRow extends StatelessWidget {
             if ((meta?.hasGps ?? false) && !gps) ...[
               const SizedBox(width: 6),
               IconButton(
-                tooltip: 'Explore on map',
+                tooltip: context.tr('file_explore_on_map'),
                 icon: Icon(Icons.place, size: 16, color: scheme.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -326,7 +330,7 @@ class _MetaText extends StatelessWidget {
       );
     }
 
-    final summary = _summarize(meta!);
+    final summary = _summarize(context, meta!);
     if (summary.isEmpty) return const SizedBox.shrink();
     return Text(
       summary,
@@ -337,18 +341,28 @@ class _MetaText extends StatelessWidget {
     );
   }
 
-  static String _summarize(FileMeta meta) {
+  static String _summarize(BuildContext context, FileMeta meta) {
     final parts = <String>[];
     if (meta.width != null && meta.height != null) {
-      parts.add('${meta.width}×${meta.height}');
+      parts.add(
+        context.tr('file_dimensions', {
+          'width': meta.width,
+          'height': meta.height,
+        }),
+      );
     }
     if (meta.date != null) parts.add(_fmtDate(meta.date!));
     if (meta.pointCount != null) {
-      parts.add('${meta.pointCount} pts');
+      parts.add(context.tr('file_points', {'count': meta.pointCount}));
     }
     final start = meta.spanStart, end = meta.spanEnd;
     if (start != null && end != null) {
-      parts.add('${_fmtDate(start)}–${_fmtDate(end)}');
+      parts.add(
+        context.tr('file_date_span', {
+          'start': _fmtDate(start),
+          'end': _fmtDate(end),
+        }),
+      );
     }
     return parts.join(' · ');
   }

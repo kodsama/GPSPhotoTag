@@ -10,32 +10,32 @@ enum PruneDirection {
   /// Trash RAW files that have no matching photo ([PairKind.orphanRaw]).
   removeOrphanRaws(
     target: PairKind.orphanRaw,
-    label: 'Remove orphan RAWs',
-    description: 'Trash RAW files that have no matching photo.',
+    labelKey: 'prune_dir_orphan_raws',
+    descriptionKey: 'prune_dir_orphan_raws_desc',
   ),
 
   /// Trash non-RAW photos (JPG/HEIC/…) that have no matching RAW
   /// ([PairKind.photoWithoutRaw]).
   removeOrphanImages(
     target: PairKind.photoWithoutRaw,
-    label: 'Remove orphan images',
-    description: 'Trash photos (JPG/HEIC/…) that have no matching RAW.',
+    labelKey: 'prune_dir_orphan_images',
+    descriptionKey: 'prune_dir_orphan_images_desc',
   );
 
   const PruneDirection({
     required this.target,
-    required this.label,
-    required this.description,
+    required this.labelKey,
+    required this.descriptionKey,
   });
 
   /// The [PairKind] this direction selects and trashes.
   final PairKind target;
 
-  /// Short label for the direction toggle segment.
-  final String label;
+  /// Localization key for the direction toggle segment label.
+  final String labelKey;
 
-  /// One-line description of what this direction trashes.
-  final String description;
+  /// Localization key for what this direction trashes.
+  final String descriptionKey;
 }
 
 /// The trashable paths for [pairing] under [direction], in scan order.
