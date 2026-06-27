@@ -19,6 +19,10 @@ coverage.xml
 venv/
 env/
 
+# AI assistant / coding-agent artifacts (never commit these)
+.zed/
+.mcp.json
+
 # Editor / IDE / tool config
 .vscode/
 .idea/
