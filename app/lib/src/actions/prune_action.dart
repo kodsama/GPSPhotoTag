@@ -7,6 +7,7 @@ import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/prune_direction.dart';
 import '../widgets/run_view.dart';
+import 'shrink_action.dart' show ShrinkAddButton;
 
 /// The Match-Images-to-RAW flow.
 ///
@@ -349,6 +350,9 @@ class _ConfirmButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = controller.selectedCount;
+    // In a deferred shrink session the chosen orphans are added to the shrink
+    // list and we return; standalone they move to Trash behind a confirm.
+    if (controller.inShrinkSession) return ShrinkAddButton(count: n);
     return Tooltip(
       message: context.tr('tt_prune_move_selected'),
       child: FilledButton.icon(

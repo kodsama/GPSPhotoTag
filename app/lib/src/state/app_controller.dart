@@ -1391,16 +1391,44 @@ class AppController extends ChangeNotifier {
   /// running total), keyed by stage. Drives the per-stage review panels.
   final Map<ShrinkStage, ShrinkStageOutcome> _stageOutcomes = {};
 
-  // Orphans stage: which side(s) to flag.
-  bool _shrinkOrphanRaws = true;
-  bool _shrinkOrphanImages = false;
   // Redundant-pairs stage: which side to drop.
   PairDropSide _shrinkPairDrop = PairDropSide.dropRaw;
   // Low-quality stage threshold (0..1 composite quality).
   double _shrinkQualityThreshold = 0.35;
   bool _shrinkBusy = false;
 
-  /// The currently-staged candidates across every run stage (cumulative).
+  /// The stage whose REAL review page is currently open inside the wizard, or
+  /// null when the user is on the wizard hub (the step list + final review).
+  ///
+  /// When non-null the action panel renders that stage's real review surface in
+  /// "shrink session" mode: its terminal action becomes "Add to shrink list"
+  /// (folding the chosen files into [_staged]) and returns to the hub instead of
+  /// trashing on the spot.
+  ShrinkStage? _shrinkActiveStage;
+
+  // The redundant-pairs review's working selection (paths the user will add),
+  // and the low-quality review's working selection. Populated when the
+  // respective stage page opens; folded into [_staged] on "Add to shrink list".
+  final Set<String> _shrinkPairSelected = {};
+  final Set<String> _shrinkLowQSelected = {};
+
+  // The classified pairing backing the redundant-pairs review page.
+  RawPairing? _shrinkPairing;
+  // The low-quality review's hashed candidates below threshold (path → size),
+  // and the GPS/size info needed to build candidates on add.
+  List<HashedFile> _shrinkLowQHashed = const [];
+  bool _shrinkLowQReviewed = false;
+
+  /// The stage whose real review page is open inside the wizard, or null on the
+  /// wizard hub.
+  ShrinkStage? get shrinkActiveStage => _shrinkActiveStage;
+
+  /// Whether a stage's real review page is open in deferred shrink-session mode
+  /// (the terminal button adds to the staged set and returns, never trashes).
+  bool get inShrinkSession =>
+      _action == LibraryAction.shrink && _shrinkActiveStage != null;
+
+  /// The currently-staged candidates across every reviewed stage (cumulative).
   List<ShrinkCandidate> get shrinkStaged => _staged.all;
 
   /// The grand total over the currently-selected staged files.
@@ -1412,12 +1440,6 @@ class AppController extends ChangeNotifier {
 
   /// The outcome of [stage] if it has been run, else null.
   ShrinkStageOutcome? shrinkOutcome(ShrinkStage stage) => _stageOutcomes[stage];
-
-  /// Whether the orphan-RAW side is flagged in the orphans stage.
-  bool get shrinkOrphanRaws => _shrinkOrphanRaws;
-
-  /// Whether the orphan-image side is flagged in the orphans stage.
-  bool get shrinkOrphanImages => _shrinkOrphanImages;
 
   /// Which side the redundant-pairs stage drops.
   PairDropSide get shrinkPairDrop => _shrinkPairDrop;
@@ -1437,10 +1459,210 @@ class AppController extends ChangeNotifier {
   /// Number of files the wizard will trash.
   int get shrinkSelectedCount => _staged.selectedPaths.length;
 
+  // --- Redundant-pairs review (stage 3, deferred) --------------------------
+
+  /// The redundant-pairs review's drop-side candidates, in scan order: the side
+  /// of every RAW+photo pair the current [shrinkPairDrop] would drop.
+  List<PairedFile> get shrinkPairCandidates {
+    final pairing = _shrinkPairing;
+    if (pairing == null) return const [];
+    final wantKind = _shrinkPairDrop == PairDropSide.dropRaw
+        ? PairKind.pairedRaw
+        : PairKind.photoWithRaw;
+    return [
+      for (final f in pairing.files)
+        if (f.kind == wantKind) f,
+    ];
+  }
+
+  /// Whether the redundant-pairs review has [path] selected to add.
+  bool isShrinkPairSelected(String path) => _shrinkPairSelected.contains(path);
+
+  /// Number of redundant-pairs files currently selected to add.
+  int get shrinkPairSelectedCount => _shrinkPairSelected.length;
+
+  /// Selects/deselects a single redundant-pairs candidate.
+  void setShrinkPairSelected(String path, bool selected) {
+    if (selected) {
+      _shrinkPairSelected.add(path);
+    } else {
+      _shrinkPairSelected.remove(path);
+    }
+    notifyListeners();
+  }
+
+  /// Selects ([all] true) or clears every redundant-pairs candidate.
+  void selectAllShrinkPairs(bool all) {
+    _shrinkPairSelected.clear();
+    if (all) {
+      _shrinkPairSelected.addAll(shrinkPairCandidates.map((f) => f.path));
+    }
+    notifyListeners();
+  }
+
+  // --- Low-quality review (stage 4, deferred) ------------------------------
+
+  /// Whether the low-quality review has hashed the library at least once.
+  bool get shrinkLowQReviewed => _shrinkLowQReviewed;
+
+  /// The hashed files scoring strictly below the current quality threshold, in
+  /// hash order — the low-quality review's selectable candidates.
+  List<HashedFile> get shrinkLowQCandidates => [
+    for (final h in _shrinkLowQHashed)
+      if (h.quality.composite < _shrinkQualityThreshold) h,
+  ];
+
+  /// Whether the low-quality review has [path] selected to add.
+  bool isShrinkLowQSelected(String path) => _shrinkLowQSelected.contains(path);
+
+  /// Number of low-quality files currently selected to add.
+  int get shrinkLowQSelectedCount => _shrinkLowQSelected.length;
+
+  /// Selects/deselects a single low-quality candidate.
+  void setShrinkLowQSelected(String path, bool selected) {
+    if (selected) {
+      _shrinkLowQSelected.add(path);
+    } else {
+      _shrinkLowQSelected.remove(path);
+    }
+    notifyListeners();
+  }
+
+  /// Selects ([all] true) or clears every low-quality candidate.
+  void selectAllShrinkLowQ(bool all) {
+    _shrinkLowQSelected.clear();
+    if (all) {
+      _shrinkLowQSelected.addAll(shrinkLowQCandidates.map((h) => h.path));
+    }
+    notifyListeners();
+  }
+
+  // --- Shrink-session navigation -------------------------------------------
+
+  /// Opens [stage]'s REAL review page inside the wizard in deferred shrink-
+  /// session mode. The page's terminal button becomes "Add to shrink list" and
+  /// returns here; nothing is trashed until the final confirm.
+  ///
+  /// Each stage primes the review surface it reuses: duplicates clears any prior
+  /// pairs (the page hashes on demand), orphans classifies the library for the
+  /// prune review, redundant-pairs classifies and pre-selects the drop side, and
+  /// low quality resets its hashed candidates for an on-demand hash.
+  void openShrinkStage(ShrinkStage stage) {
+    _shrinkActiveStage = stage;
+    _errorMessage = null;
+    switch (stage) {
+      case ShrinkStage.duplicates:
+        _duplicatePairs = null;
+        _findingDuplicates = false;
+        _hashProgress = HashProgress();
+      case ShrinkStage.orphans:
+        _preparePruneReview();
+      case ShrinkStage.pairs:
+        final scan = _scan;
+        _shrinkPairing = scan == null
+            ? null
+            : classifyPairing(_included(scan.photos));
+        _shrinkPairSelected
+          ..clear()
+          ..addAll(shrinkPairCandidates.map((f) => f.path));
+      case ShrinkStage.lowQuality:
+        _shrinkLowQHashed = const [];
+        _shrinkLowQReviewed = false;
+        _shrinkLowQSelected.clear();
+        _findingDuplicates = false;
+        _hashProgress = HashProgress();
+    }
+    notifyListeners();
+  }
+
+  /// Returns to the wizard hub WITHOUT adding anything (the review's Back/Cancel
+  /// affordance).
+  void returnToShrinkWizard() {
+    _shrinkActiveStage = null;
+    notifyListeners();
+  }
+
+  /// Folds the active stage's chosen files into the cumulative staged set and
+  /// returns to the wizard hub. Cross-stage dedup (first reason wins) is handled
+  /// by [StagedSet.addStage]; the stage's contribution outcome is recorded for
+  /// the hub's running total.
+  void addActiveStageToShrinkList() {
+    final stage = _shrinkActiveStage;
+    if (stage == null) return;
+    final candidates = _candidatesForActiveStage(stage);
+    _stageOutcomes[stage] = _staged.addStage(stage, candidates);
+    _stageIncluded[stage] = true;
+    _log('Shrink: ${stage.name} added ${candidates.length} file(s) to list');
+    _shrinkActiveStage = null;
+    notifyListeners();
+  }
+
+  /// Builds the candidates the active [stage]'s current page selection implies.
+  List<ShrinkCandidate> _candidatesForActiveStage(ShrinkStage stage) {
+    switch (stage) {
+      case ShrinkStage.duplicates:
+        final pairs = _duplicatePairs;
+        if (pairs == null) return const [];
+        return duplicateCandidates(pairs, gpsOf: _gpsOf);
+      case ShrinkStage.orphans:
+        final pairing = _pairing;
+        if (pairing == null) return const [];
+        // Flag both orphan kinds, then keep only the paths the prune review left
+        // selected (its direction toggle + checkboxes decide the chosen side).
+        final all = orphanCandidates(
+          pairing,
+          includeOrphanRaws: true,
+          includeOrphanImages: true,
+          sizeOf: _sizeOf,
+          gpsOf: _gpsOf,
+        );
+        return [
+          for (final c in all)
+            if (_selected.contains(c.path)) c,
+        ];
+      case ShrinkStage.pairs:
+        final pairing = _shrinkPairing;
+        if (pairing == null) return const [];
+        final all = redundantPairCandidates(
+          pairing,
+          side: _shrinkPairDrop,
+          sizeOf: _sizeOf,
+          gpsOf: _gpsOf,
+        );
+        return [
+          for (final c in all)
+            if (_shrinkPairSelected.contains(c.path)) c,
+        ];
+      case ShrinkStage.lowQuality:
+        final scores = {
+          for (final h in shrinkLowQCandidates) h.path: h.quality.composite,
+        };
+        final sizes = {
+          for (final h in shrinkLowQCandidates) h.path: h.fileSize,
+        };
+        final all = lowQualityCandidates(
+          scores,
+          threshold: _shrinkQualityThreshold,
+          sizeOf: (path) => sizes[path] ?? 0,
+          gpsOf: _gpsOf,
+        );
+        return [
+          for (final c in all)
+            if (_shrinkLowQSelected.contains(c.path)) c,
+        ];
+    }
+  }
+
   /// Resets the wizard to a fresh, empty cumulative set (called when opened).
   void _prepareShrink() {
     _staged = StagedSet();
     _stageOutcomes.clear();
+    _shrinkActiveStage = null;
+    _shrinkPairing = null;
+    _shrinkPairSelected.clear();
+    _shrinkLowQHashed = const [];
+    _shrinkLowQReviewed = false;
+    _shrinkLowQSelected.clear();
     for (final s in ShrinkStage.values) {
       _stageIncluded[s] = true;
     }
@@ -1458,21 +1680,16 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sets the orphan-stage side toggles.
-  void setShrinkOrphanRaws(bool value) {
-    _shrinkOrphanRaws = value;
-    notifyListeners();
-  }
-
-  /// Sets the orphan-stage image-side toggle.
-  void setShrinkOrphanImages(bool value) {
-    _shrinkOrphanImages = value;
-    notifyListeners();
-  }
-
-  /// Sets which side the redundant-pairs stage drops.
+  /// Sets which side the redundant-pairs stage drops, re-priming the review's
+  /// candidate list and selection when the pairs page is open.
   void setShrinkPairDrop(PairDropSide side) {
+    if (_shrinkPairDrop == side) return;
     _shrinkPairDrop = side;
+    if (_shrinkActiveStage == ShrinkStage.pairs) {
+      _shrinkPairSelected
+        ..clear()
+        ..addAll(shrinkPairCandidates.map((f) => f.path));
+    }
     notifyListeners();
   }
 
@@ -1489,8 +1706,9 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// On-disk size of [path] in bytes, or 0 when it can't be read.
-  int _sizeOf(String path) {
+  /// On-disk size of [path] in bytes, or 0 when it can't be read. Exposed for
+  /// the shrink review pages, which show each candidate's size.
+  int shrinkSizeOf(String path) {
     try {
       return File(path).lengthSync();
     } on Object {
@@ -1498,104 +1716,15 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  int _sizeOf(String path) => shrinkSizeOf(path);
+
   bool _gpsOf(String path) => _meta[path]?.hasGps ?? false;
 
-  /// Runs the duplicates stage: hashes every included photo (showing hash
-  /// progress), groups them, and folds the non-kept members into the set.
-  Future<void> runShrinkDuplicates() async {
-    final scan = _scan;
-    if (scan == null) return;
-    final photos = _included(scan.photos);
-    _shrinkBusy = true;
-    _findingDuplicates = true;
-    _duplicatesCancelled = false;
-    _hashProgress = HashProgress(total: photos.length);
-    _errorMessage = null;
-    _setRunState(
-      LibraryAction.shrink,
-      ActionRunState.active(progress: photos.isEmpty ? null : 0),
-    );
-    notifyListeners();
-    try {
-      final groups = await _engine.findDuplicates(
-        photos,
-        threshold: similarityToThreshold(_similarity),
-        onProgress: (done, total) {
-          if (_duplicatesCancelled) return;
-          _hashProgress = HashProgress(done: done, total: total);
-          _setRunState(
-            LibraryAction.shrink,
-            ActionRunState.active(progress: _hashProgress.fraction),
-          );
-        },
-      );
-      if (_duplicatesCancelled) return;
-      final pairs = pairsFromGroups(groups, pipeline: _keepPipeline);
-      final candidates = duplicateCandidates(pairs, gpsOf: _gpsOf);
-      _stageOutcomes[ShrinkStage.duplicates] = _staged.addStage(
-        ShrinkStage.duplicates,
-        candidates,
-      );
-      _log('Shrink: duplicates flagged ${candidates.length} file(s)');
-    } on Object catch (e) {
-      if (!_duplicatesCancelled) {
-        _errorMessage = '$e';
-        _log('Shrink duplicates failed: $e', level: LogLevel.error);
-      }
-    } finally {
-      _shrinkBusy = false;
-      _findingDuplicates = false;
-      _hashProgress = HashProgress();
-      _setRunState(LibraryAction.shrink, ActionRunState.idle);
-      notifyListeners();
-    }
-  }
-
-  /// Runs the orphans stage: classifies the library (cheap, pure) and folds the
-  /// chosen orphan side(s) into the set.
-  void runShrinkOrphans() {
-    final scan = _scan;
-    if (scan == null) return;
-    final pairing = classifyPairing(_included(scan.photos));
-    final candidates = orphanCandidates(
-      pairing,
-      includeOrphanRaws: _shrinkOrphanRaws,
-      includeOrphanImages: _shrinkOrphanImages,
-      sizeOf: _sizeOf,
-      gpsOf: _gpsOf,
-    );
-    _stageOutcomes[ShrinkStage.orphans] = _staged.addStage(
-      ShrinkStage.orphans,
-      candidates,
-    );
-    _log('Shrink: orphans flagged ${candidates.length} file(s)');
-    notifyListeners();
-  }
-
-  /// Runs the redundant-pairs stage: classifies the library and folds the chosen
-  /// side of every RAW+photo pair into the set.
-  void runShrinkPairs() {
-    final scan = _scan;
-    if (scan == null) return;
-    final pairing = classifyPairing(_included(scan.photos));
-    final candidates = redundantPairCandidates(
-      pairing,
-      side: _shrinkPairDrop,
-      sizeOf: _sizeOf,
-      gpsOf: _gpsOf,
-    );
-    _stageOutcomes[ShrinkStage.pairs] = _staged.addStage(
-      ShrinkStage.pairs,
-      candidates,
-    );
-    _log('Shrink: redundant pairs flagged ${candidates.length} file(s)');
-    notifyListeners();
-  }
-
-  /// Runs the low-quality stage: hashes every included photo (reusing the
-  /// composite quality the hasher already computes) and folds those below the
-  /// threshold into the set.
-  Future<void> runShrinkLowQuality() async {
+  /// Hashes every included photo for the low-quality review (stage 4), reusing
+  /// the composite quality the hasher already computes. Populates the review's
+  /// below-threshold candidates and pre-selects them all; the user reviews and
+  /// then adds the selection to the staged set. Nothing is staged here.
+  Future<void> runShrinkLowQualityHash() async {
     final scan = _scan;
     if (scan == null) return;
     final photos = _included(scan.photos);
@@ -1622,21 +1751,12 @@ class AppController extends ChangeNotifier {
         },
       );
       if (_duplicatesCancelled) return;
-      final scores = {for (final h in hashed) h.path: h.quality.composite};
-      // The hasher already measured each file's on-disk size, so read it from
-      // the HashedFile rather than re-stat'ing the filesystem.
-      final sizes = {for (final h in hashed) h.path: h.fileSize};
-      final candidates = lowQualityCandidates(
-        scores,
-        threshold: _shrinkQualityThreshold,
-        sizeOf: (path) => sizes[path] ?? 0,
-        gpsOf: _gpsOf,
-      );
-      _stageOutcomes[ShrinkStage.lowQuality] = _staged.addStage(
-        ShrinkStage.lowQuality,
-        candidates,
-      );
-      _log('Shrink: low quality flagged ${candidates.length} file(s)');
+      _shrinkLowQHashed = hashed;
+      _shrinkLowQReviewed = true;
+      _shrinkLowQSelected
+        ..clear()
+        ..addAll(shrinkLowQCandidates.map((h) => h.path));
+      _log('Shrink: low-quality review found ${shrinkLowQCandidates.length}');
     } on Object catch (e) {
       if (!_duplicatesCancelled) {
         _errorMessage = '$e';

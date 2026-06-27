@@ -12,6 +12,7 @@ import '../state/library_action.dart' show Translator;
 import '../theme/app_theme.dart';
 import '../widgets/run_view.dart';
 import 'example_scene.dart';
+import 'shrink_action.dart' show ShrinkAddButton;
 
 /// The Find-Duplicates flow.
 ///
@@ -340,16 +341,22 @@ class _Results extends StatelessWidget {
             child: _PairRow(controller: controller, index: i, pair: pairs[i]),
           ),
         const SizedBox(height: 8),
-        Tooltip(
-          message: context.tr('tt_dup_remove_button'),
-          child: FilledButton.icon(
-            onPressed: n == 0
-                ? null
-                : () => _confirm(context, controller, random),
-            icon: const Icon(Icons.delete_outline),
-            label: Text(context.tr('dup_remove_button', {'count': n})),
+        // In a deferred shrink session the terminal action adds the still-
+        // selected duplicates to the shrink list and returns; standalone it
+        // trashes them behind the silly-word confirm.
+        if (controller.inShrinkSession)
+          ShrinkAddButton(count: n)
+        else
+          Tooltip(
+            message: context.tr('tt_dup_remove_button'),
+            child: FilledButton.icon(
+              onPressed: n == 0
+                  ? null
+                  : () => _confirm(context, controller, random),
+              icon: const Icon(Icons.delete_outline),
+              label: Text(context.tr('dup_remove_button', {'count': n})),
+            ),
           ),
-        ),
       ],
     );
   }
