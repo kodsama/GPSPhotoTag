@@ -1470,6 +1470,13 @@ class AppController extends ChangeNotifier {
   List<HashedFile> _shrinkLowQHashed = const [];
   bool _shrinkLowQReviewed = false;
 
+  /// Per-stage snapshot of the working review state (found results + the user's
+  /// selections), so leaving a stage and re-opening it within one shrink session
+  /// restores it instantly — no re-classify, no re-hash, no lost ticks. A stage
+  /// is cached on every leave ([returnToShrinkWizard]/[addActiveStageToShrinkList])
+  /// and restored on re-open; [clearShrinkStage] and a fresh wizard drop it.
+  final Map<ShrinkStage, _ShrinkStageCache> _stageCache = {};
+
   /// The stage whose real review page is open inside the wizard, or null on the
   /// wizard hub.
   ShrinkStage? get shrinkActiveStage => _shrinkActiveStage;
@@ -1478,6 +1485,27 @@ class AppController extends ChangeNotifier {
   /// (the terminal button adds to the staged set and returns, never trashes).
   bool get inShrinkSession =>
       _action == LibraryAction.shrink && _shrinkActiveStage != null;
+
+  /// Where the action panel's top back/close affordance should go right now.
+  ///
+  /// Inside a shrink session a stage page was reached FROM the wizard, so its
+  /// back returns to the wizard hub ([ShrinkBackTarget.shrinkWizard]); opened
+  /// standalone from the library it returns to the library hub
+  /// ([ShrinkBackTarget.library]). Pure so the routing is unit-testable.
+  ShrinkBackTarget get backTarget => inShrinkSession
+      ? ShrinkBackTarget.shrinkWizard
+      : ShrinkBackTarget.library;
+
+  /// Routes the top back/close affordance to the correct target for the current
+  /// context: the shrink wizard mid-session, otherwise the library hub.
+  void goBackFromAction() {
+    switch (backTarget) {
+      case ShrinkBackTarget.shrinkWizard:
+        returnToShrinkWizard();
+      case ShrinkBackTarget.library:
+        backToLibrary();
+    }
+  }
 
   /// The currently-staged candidates across every reviewed stage (cumulative).
   List<ShrinkCandidate> get shrinkStaged => _staged.all;
@@ -1615,13 +1643,21 @@ class AppController extends ChangeNotifier {
   /// session mode. The page's terminal button becomes "Add to shrink list" and
   /// returns here; nothing is trashed until the final confirm.
   ///
-  /// Each stage primes the review surface it reuses: duplicates clears any prior
-  /// pairs (the page hashes on demand), orphans classifies the library for the
-  /// prune review, redundant-pairs classifies and pre-selects the drop side, and
-  /// low quality resets its hashed candidates for an on-demand hash.
+  /// Re-opening a stage already visited this session RESTORES its cached review
+  /// state (found results + the user's selections) instead of re-priming — no
+  /// re-classify, no re-hash. Only the first visit primes the surface fresh:
+  /// duplicates clears any prior pairs (the page hashes on demand), orphans
+  /// classifies the library for the prune review, redundant-pairs classifies and
+  /// pre-selects the drop side, and low quality resets for an on-demand hash.
   void openShrinkStage(ShrinkStage stage) {
     _shrinkActiveStage = stage;
     _errorMessage = null;
+    final cached = _stageCache[stage];
+    if (cached != null) {
+      _restoreStageCache(stage, cached);
+      notifyListeners();
+      return;
+    }
     switch (stage) {
       case ShrinkStage.duplicates:
         _duplicatePairs = null;
@@ -1647,9 +1683,76 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Returns to the wizard hub WITHOUT adding anything (the review's Back/Cancel
-  /// affordance).
+  /// Snapshots the active [stage]'s working review state into the per-stage cache
+  /// so a later re-open restores it without re-running. Called on every leave.
+  void _cacheActiveStage(ShrinkStage stage) {
+    _stageCache[stage] = switch (stage) {
+      ShrinkStage.duplicates => _ShrinkStageCache(
+        duplicatePairs: _duplicatePairs == null
+            ? null
+            : List<DuplicatePair>.of(_duplicatePairs!),
+      ),
+      ShrinkStage.orphans => _ShrinkStageCache(
+        pairing: _pairing,
+        selected: Set<String>.of(_selected),
+        direction: _direction,
+        visibleKinds: Set<PairKind>.of(_visibleKinds),
+        pruneFilter: _pruneFilter,
+      ),
+      ShrinkStage.pairs => _ShrinkStageCache(
+        shrinkPairing: _shrinkPairing,
+        shrinkPairSelected: Set<String>.of(_shrinkPairSelected),
+        shrinkPairDrop: _shrinkPairDrop,
+      ),
+      ShrinkStage.lowQuality => _ShrinkStageCache(
+        shrinkLowQHashed: _shrinkLowQHashed,
+        shrinkLowQSelected: Set<String>.of(_shrinkLowQSelected),
+        shrinkLowQReviewed: _shrinkLowQReviewed,
+        shrinkQualityThreshold: _shrinkQualityThreshold,
+      ),
+    };
+  }
+
+  /// Restores [stage]'s working review state from a [cached] snapshot.
+  void _restoreStageCache(ShrinkStage stage, _ShrinkStageCache cached) {
+    _findingDuplicates = false;
+    _hashProgress = HashProgress();
+    switch (stage) {
+      case ShrinkStage.duplicates:
+        _duplicatePairs = cached.duplicatePairs == null
+            ? null
+            : List<DuplicatePair>.of(cached.duplicatePairs!);
+      case ShrinkStage.orphans:
+        _pairing = cached.pairing;
+        _direction = cached.direction ?? PruneDirection.removeOrphanRaws;
+        _pruneFilter = cached.pruneFilter ?? '';
+        _visibleKinds
+          ..clear()
+          ..addAll(cached.visibleKinds ?? {_direction.target});
+        _selected
+          ..clear()
+          ..addAll(cached.selected ?? const {});
+      case ShrinkStage.pairs:
+        _shrinkPairing = cached.shrinkPairing;
+        _shrinkPairDrop = cached.shrinkPairDrop ?? PairDropSide.dropRaw;
+        _shrinkPairSelected
+          ..clear()
+          ..addAll(cached.shrinkPairSelected ?? const {});
+      case ShrinkStage.lowQuality:
+        _shrinkLowQHashed = cached.shrinkLowQHashed ?? const [];
+        _shrinkLowQReviewed = cached.shrinkLowQReviewed ?? false;
+        _shrinkQualityThreshold = cached.shrinkQualityThreshold ?? 0.35;
+        _shrinkLowQSelected
+          ..clear()
+          ..addAll(cached.shrinkLowQSelected ?? const {});
+    }
+  }
+
+  /// Returns to the wizard hub WITHOUT adding anything, caching the stage's
+  /// working state first so re-opening it restores the results and selections.
   void returnToShrinkWizard() {
+    final stage = _shrinkActiveStage;
+    if (stage != null) _cacheActiveStage(stage);
     _shrinkActiveStage = null;
     notifyListeners();
   }
@@ -1657,15 +1760,28 @@ class AppController extends ChangeNotifier {
   /// Folds the active stage's chosen files into the cumulative staged set and
   /// returns to the wizard hub. Cross-stage dedup (first reason wins) is handled
   /// by [StagedSet.addStage]; the stage's contribution outcome is recorded for
-  /// the hub's running total.
+  /// the hub's running total. The stage's working state is cached so re-opening
+  /// it restores the prior results and selections.
   void addActiveStageToShrinkList() {
     final stage = _shrinkActiveStage;
     if (stage == null) return;
     final candidates = _candidatesForActiveStage(stage);
     _stageOutcomes[stage] = _staged.addStage(stage, candidates);
     _stageIncluded[stage] = true;
+    _cacheActiveStage(stage);
     _log('Shrink: ${stage.name} added ${candidates.length} file(s) to list');
     _shrinkActiveStage = null;
+    notifyListeners();
+  }
+
+  /// Clears ONE stage's contribution: drops every file it added to the
+  /// cumulative [StagedSet], forgets its recorded outcome, and resets its cached
+  /// review state so re-opening it primes fresh. Other stages are untouched and
+  /// the running total updates accordingly.
+  void clearShrinkStage(ShrinkStage stage) {
+    _staged.removeStage(stage);
+    _stageOutcomes.remove(stage);
+    _stageCache.remove(stage);
     notifyListeners();
   }
 
@@ -1729,6 +1845,7 @@ class AppController extends ChangeNotifier {
   void _prepareShrink() {
     _staged = StagedSet();
     _stageOutcomes.clear();
+    _stageCache.clear();
     _shrinkActiveStage = null;
     _shrinkPairing = null;
     _shrinkPairSelected.clear();
@@ -2079,4 +2196,47 @@ class AppController extends ChangeNotifier {
     _exploreFocusPath = focusPath;
     notifyListeners();
   }
+}
+
+/// A snapshot of one shrink stage's working review state (found results + the
+/// user's selections), cached so leaving a stage and re-opening it within one
+/// session restores it without re-classifying or re-hashing. Only the fields
+/// relevant to the cached stage are set; the rest stay null.
+class _ShrinkStageCache {
+  _ShrinkStageCache({
+    this.duplicatePairs,
+    this.pairing,
+    this.selected,
+    this.direction,
+    this.visibleKinds,
+    this.pruneFilter,
+    this.shrinkPairing,
+    this.shrinkPairSelected,
+    this.shrinkPairDrop,
+    this.shrinkLowQHashed,
+    this.shrinkLowQSelected,
+    this.shrinkLowQReviewed,
+    this.shrinkQualityThreshold,
+  });
+
+  // Duplicates stage.
+  final List<DuplicatePair>? duplicatePairs;
+
+  // Orphans (prune review) stage.
+  final RawPairing? pairing;
+  final Set<String>? selected;
+  final PruneDirection? direction;
+  final Set<PairKind>? visibleKinds;
+  final String? pruneFilter;
+
+  // Redundant-pairs stage.
+  final RawPairing? shrinkPairing;
+  final Set<String>? shrinkPairSelected;
+  final PairDropSide? shrinkPairDrop;
+
+  // Low-quality stage.
+  final List<HashedFile>? shrinkLowQHashed;
+  final Set<String>? shrinkLowQSelected;
+  final bool? shrinkLowQReviewed;
+  final double? shrinkQualityThreshold;
 }

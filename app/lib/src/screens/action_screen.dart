@@ -31,11 +31,20 @@ class ActionScreen extends StatelessWidget {
             Row(
               children: [
                 // Navigating back NEVER cancels the run — it keeps going in the
-                // background and the workspace card shows its progress.
+                // background and the workspace card shows its progress. Mid
+                // shrink session a stage page was reached from the wizard, so
+                // back returns there; standalone it returns to the library. This
+                // is the single back affordance in either context.
                 TextButton.icon(
-                  onPressed: controller.backToLibrary,
+                  onPressed: controller.goBackFromAction,
                   icon: const Icon(Icons.arrow_back, size: 18),
-                  label: Text(context.tr('action_library_back')),
+                  label: Text(
+                    context.tr(
+                      controller.inShrinkSession
+                          ? 'shrink_review_back'
+                          : 'action_library_back',
+                    ),
+                  ),
                 ),
                 const Spacer(),
                 if (controller.runStateFor(action).running)

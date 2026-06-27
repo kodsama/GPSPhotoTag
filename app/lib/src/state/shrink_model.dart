@@ -13,6 +13,17 @@ import 'library_action.dart' show Translator;
 /// low-quality threshold filter are all unit-testable away from isolates and the
 /// filesystem.
 
+/// Where the action panel's back/close affordance leads, depending on how the
+/// stage page was reached: from the shrink wizard (returns to it) or standalone
+/// from the library (returns to the library hub).
+enum ShrinkBackTarget {
+  /// Back returns to the shrink wizard hub (mid-session).
+  shrinkWizard,
+
+  /// Back returns to the main library hub (standalone).
+  library,
+}
+
 /// The opt-in stages of the shrink wizard, in order.
 enum ShrinkStage {
   /// Visually-similar photos (perceptual hashing); non-kept members.

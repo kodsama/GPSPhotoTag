@@ -76,15 +76,12 @@ class _StageReview extends StatelessWidget {
       ShrinkStage.pairs => const ShrinkPairsReview(),
       ShrinkStage.lowQuality => const ShrinkLowQualityReview(),
     };
+    // The single back affordance lives on the action screen's top bar (it reads
+    // [AppController.inShrinkSession] and returns to the wizard). The stage page
+    // shows only its title + body, so there is exactly one, unambiguous back.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextButton.icon(
-          onPressed: controller.returnToShrinkWizard,
-          icon: const Icon(Icons.arrow_back, size: 18),
-          label: Text(context.tr('shrink_review_back')),
-        ),
-        const SizedBox(height: 8),
         Text(
           context.tr(shrinkStageTitleKey(stage)),
           style: Theme.of(context).textTheme.titleMedium,
@@ -207,16 +204,33 @@ class _StageCard extends StatelessWidget {
                 style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               )
             else
-              Text(
-                context.tr('shrink_stage_added', {
-                  'count': outcome.stageTally.count,
-                  'size': formatBytes(outcome.stageTally.bytes, context.tr),
-                }),
-                style: text.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: scheme.primary,
-                  fontFeatures: AppTheme.tabular,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      context.tr('shrink_stage_added', {
+                        'count': outcome.stageTally.count,
+                        'size': formatBytes(
+                          outcome.stageTally.bytes,
+                          context.tr,
+                        ),
+                      }),
+                      style: text.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.primary,
+                        fontFeatures: AppTheme.tabular,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Clears ONLY this stage's contribution + cached selections;
+                  // other stages and the running total adjust independently.
+                  TextButton.icon(
+                    onPressed: () => controller.clearShrinkStage(stage),
+                    icon: const Icon(Icons.clear, size: 16),
+                    label: Text(context.tr('shrink_stage_clear')),
+                  ),
+                ],
               ),
           ] else
             Text(
@@ -309,12 +323,19 @@ class _CandidateRow extends StatelessWidget {
             onChanged: (v) =>
                 controller.setShrinkSelected(candidate.path, v ?? false),
           ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: SizedBox(
-              width: 64,
-              height: 64,
-              child: PhotoThumbnail(path: candidate.path, height: 64),
+          // Tapping the miniature opens the big-preview viewer (single mode).
+          Tooltip(
+            message: context.tr('tt_dup_open_compare'),
+            child: InkWell(
+              onTap: () => openFullscreen(context, candidate.path),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: PhotoThumbnail(path: candidate.path, height: 64),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 10),

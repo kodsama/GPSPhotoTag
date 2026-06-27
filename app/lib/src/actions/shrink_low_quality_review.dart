@@ -145,12 +145,19 @@ class _LowQRow extends StatelessWidget {
             onChanged: (v) =>
                 controller.setShrinkLowQSelected(file.path, v ?? false),
           ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: PhotoThumbnail(path: file.path, height: 56),
+          // Tapping the miniature opens the big-preview viewer (single mode).
+          Tooltip(
+            message: context.tr('tt_dup_open_compare'),
+            child: InkWell(
+              onTap: () => openFullscreen(context, file.path),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: PhotoThumbnail(path: file.path, height: 56),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 10),

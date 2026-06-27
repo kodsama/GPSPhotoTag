@@ -293,6 +293,7 @@
   "shrink_stage_skipped": "スキップ済み",
   "shrink_stage_not_reviewed": "未確認です。開いてファイルを選んでください。",
   "shrink_stage_added": "{count} 件追加 · 解放予定 {size}",
+  "shrink_stage_clear": "クリア",
   "shrink_duplicates_hint": "見た目が似た写真を見つけ、残す1枚以外のコピーをすべて追加します。",
   "shrink_orphans_hint": "JPG/HEIC のペアがない RAW、または RAW がない画像を見つけます。",
   "shrink_pairs_hint": "RAW と写真の両方がある場合、冗長な方を追加します。",

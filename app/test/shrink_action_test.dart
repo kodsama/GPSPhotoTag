@@ -11,6 +11,7 @@ import 'package:stunda/src/actions/shrink_action.dart';
 import 'package:stunda/src/actions/shrink_low_quality_review.dart';
 import 'package:stunda/src/actions/shrink_pairs_review.dart';
 import 'package:stunda/src/explore/photo_detail_panel.dart' show PhotoThumbnail;
+import 'package:stunda/src/screens/action_screen.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
@@ -40,6 +41,15 @@ Widget _host(AppController c, {Random? random}) => ControllerScope(
     home: Scaffold(
       body: SingleChildScrollView(child: ShrinkAction(random: random)),
     ),
+  ),
+);
+
+/// Hosts the full [ActionScreen] (top back bar + body), matching production, so
+/// the context-aware back affordance is exercised.
+Widget _actionHost(AppController c) => ControllerScope(
+  controller: c,
+  child: MaterialApp(
+    home: Scaffold(body: SingleChildScrollView(child: const ActionScreen())),
   ),
 );
 
@@ -122,7 +132,7 @@ void main() {
           AppController(runner: FakeEngineRunner()..duplicateGroups = const [])
             ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
             ..openAction(LibraryAction.shrink);
-      await tester.pumpWidget(_host(c));
+      await tester.pumpWidget(_actionHost(c));
 
       await tester.ensureVisible(find.text('Open & review').first);
       await tester.tap(find.text('Open & review').first);
@@ -130,7 +140,10 @@ void main() {
 
       expect(c.shrinkActiveStage, ShrinkStage.duplicates);
       expect(find.byType(DuplicatesAction), findsOneWidget);
+      // The single back affordance is the action screen's top bar, relabelled to
+      // return to the wizard in-session.
       expect(find.text('Back to shrink wizard'), findsOneWidget);
+      expect(find.text('Library'), findsNothing);
     },
   );
 
@@ -321,6 +334,35 @@ void main() {
     expect(c.shrinkStaged.map((e) => e.path), ['/library/blur.jpg']);
   });
 
+  testWidgets('tapping a low-quality thumbnail opens the big-preview viewer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final dir = Directory.systemTemp.createTempSync('shrink_lowq_view');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final blur = await writeJpegWithDate(dir, 'blur.jpg');
+    final fake = FakeEngineRunner()..hashedFiles = [_hf(blur, quality: 0.1)];
+    final c = AppController(runner: fake)
+      ..debugSetScan(fakeScan(photos: [blur]))
+      ..openAction(LibraryAction.shrink);
+    c.openShrinkStage(ShrinkStage.lowQuality);
+    await c.runShrinkLowQualityHash();
+    await tester.pumpWidget(_host(c));
+    expect(find.byType(ShrinkLowQualityReview), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await tester.ensureVisible(find.byType(PhotoThumbnail).first);
+      await tester.tap(find.byType(PhotoThumbnail).first, warnIfMissed: false);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(ImageCompareViewer), findsOneWidget);
+    expect(find.byIcon(Icons.splitscreen), findsNothing);
+  });
+
   testWidgets('the low-quality review shows an empty state above threshold', (
     tester,
   ) async {
@@ -354,7 +396,7 @@ void main() {
       ..debugSetScan(fakeScan(photos: const ['/library/solo.jpg']))
       ..openAction(LibraryAction.shrink);
     c.openShrinkStage(ShrinkStage.pairs);
-    await tester.pumpWidget(_host(c));
+    await tester.pumpWidget(_actionHost(c));
     await tester.ensureVisible(find.text('Back to shrink wizard'));
     await tester.tap(find.text('Back to shrink wizard'));
     await tester.pump();
@@ -514,5 +556,105 @@ void main() {
   test('shrinkReasonLabel resolves a reason to its English label', () {
     expect(shrinkReasonLabel(ShrinkReason.duplicate, enTr), 'duplicate');
     expect(shrinkReasonLabel(ShrinkReason.lowQuality, enTr), 'low quality');
+  });
+
+  testWidgets('a reviewed stage shows a Clear control on its hub card', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSeedShrink(_twoStaged);
+    await tester.pumpWidget(_host(c));
+    expect(find.text('Clear'), findsNWidgets(2));
+  });
+
+  testWidgets('Clear on one stage leaves the other stage untouched', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSeedShrink(_twoStaged);
+    await tester.pumpWidget(_host(c));
+    expect(c.shrinkTotal.count, 2);
+
+    // The orphan stage's Clear is the second card's control.
+    final clearInOrphanCard = find.descendant(
+      of: find.ancestor(
+        of: find.text('2. Orphans'),
+        matching: find.byType(Container),
+      ),
+      matching: find.widgetWithText(TextButton, 'Clear'),
+    );
+    await tester.ensureVisible(clearInOrphanCard.first);
+    await tester.tap(clearInOrphanCard.first);
+    await tester.pump();
+
+    // Only the orphan stage cleared; the duplicate stage's file remains.
+    expect(c.shrinkStaged.map((e) => e.path), ['/library/dup.jpg']);
+    expect(c.shrinkOutcome(ShrinkStage.orphans), isNull);
+    expect(c.shrinkOutcome(ShrinkStage.duplicates), isNotNull);
+    expect(find.text('Staged: 1 file(s) · 2.0 MB to be freed'), findsOneWidget);
+  });
+
+  testWidgets('a stage selection persists across a wizard round-trip', (
+    tester,
+  ) async {
+    final fake = FakeEngineRunner()
+      ..duplicateGroups = [
+        DuplicateGroup(
+          best: _hf('/library/a.jpg', size: 3000, quality: 1),
+          duplicates: [_hf('/library/b.jpg', size: 1500, quality: 1)],
+        ),
+      ];
+    final c = AppController(runner: fake)
+      ..debugSetScan(
+        fakeScan(photos: const ['/library/a.jpg', '/library/b.jpg']),
+      )
+      ..openAction(LibraryAction.shrink);
+    c.openShrinkStage(ShrinkStage.duplicates);
+    await c.runFindDuplicates();
+    // Deselect the pair, then go back to the wizard.
+    c.setDuplicateRemoval(0, false);
+    c.returnToShrinkWizard();
+    await tester.pumpWidget(_host(c));
+
+    // Re-open the duplicates stage from the hub; the deselection survives.
+    await tester.ensureVisible(find.text('Open & review').first);
+    await tester.tap(find.text('Open & review').first);
+    await tester.pump();
+    expect(c.duplicatePairs!.single.removeSelected, isFalse);
+    // The page shows "Keep both" (deselected) state, not "Remove".
+    expect(find.byType(DuplicatesAction), findsOneWidget);
+  });
+
+  testWidgets('tapping a summary thumbnail opens the big-preview viewer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final dir = Directory.systemTemp.createTempSync('shrink_summary_view');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final jpg = await writeJpegWithDate(dir, 'staged.jpg');
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSeedShrink([
+        ShrinkCandidate(
+          path: jpg,
+          reason: ShrinkReason.duplicate,
+          sizeBytes: 1234,
+          hasGps: false,
+        ),
+      ]);
+    await tester.pumpWidget(_host(c));
+
+    await tester.runAsync(() async {
+      await tester.ensureVisible(find.byType(PhotoThumbnail).first);
+      await tester.tap(find.byType(PhotoThumbnail).first, warnIfMissed: false);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // Single-mode big preview (one pane → no compare-mode button).
+    expect(find.byType(ImageCompareViewer), findsOneWidget);
+    expect(find.byIcon(Icons.splitscreen), findsNothing);
   });
 }

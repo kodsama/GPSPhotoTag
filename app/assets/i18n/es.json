@@ -293,6 +293,7 @@
   "shrink_stage_skipped": "Omitida",
   "shrink_stage_not_reviewed": "Aún sin revisar: ábrela para elegir archivos.",
   "shrink_stage_added": "Añadidos {count} archivo(s) · {size} por liberar",
+  "shrink_stage_clear": "Borrar",
   "shrink_duplicates_hint": "Encuentra fotos visualmente similares y añade cada copia salvo la que vale la pena conservar.",
   "shrink_orphans_hint": "Encuentra archivos RAW sin compañero JPG/HEIC, o imágenes sin RAW.",
   "shrink_pairs_hint": "Donde existen tanto un RAW como una foto, añade el lado redundante.",

@@ -466,4 +466,220 @@ void main() {
     final c = AppController(runner: FakeEngineRunner());
     expect(c.shrinkSizeOf('/no/such/file.jpg'), 0);
   });
+
+  group('back-target resolution', () {
+    test('a standalone action routes back to the library', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+        ..openAction(LibraryAction.duplicates);
+      expect(c.backTarget, ShrinkBackTarget.library);
+      c.goBackFromAction();
+      expect(c.screen, AppScreen.workspace);
+      expect(c.action, isNull);
+    });
+
+    test('a wizard stage page routes back to the shrink wizard', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.duplicates);
+      expect(c.backTarget, ShrinkBackTarget.shrinkWizard);
+      c.goBackFromAction();
+      // Back lands on the wizard hub, NOT the library.
+      expect(c.screen, AppScreen.action);
+      expect(c.action, LibraryAction.shrink);
+      expect(c.shrinkActiveStage, isNull);
+      expect(c.inShrinkSession, isFalse);
+      expect(c.backTarget, ShrinkBackTarget.library);
+    });
+  });
+
+  group('per-stage state cache survives navigation', () {
+    test('re-opening duplicates restores pairs without re-running', () async {
+      final fake = FakeEngineRunner()
+        ..duplicateGroups = [
+          DuplicateGroup(
+            best: _hf('/library/a.jpg', size: 3000),
+            duplicates: [_hf('/library/b.jpg', size: 1500)],
+          ),
+        ];
+      final c = AppController(runner: fake)
+        ..debugSetScan(
+          fakeScan(photos: const ['/library/a.jpg', '/library/b.jpg']),
+        )
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.duplicates);
+      await c.runFindDuplicates();
+      expect(c.duplicatePairs, isNotNull);
+      expect(c.duplicatePairs!.length, 1);
+      // Deselect the only pair, then leave to the wizard.
+      c.setDuplicateRemoval(0, false);
+      c.returnToShrinkWizard();
+
+      final callsBefore = fake.calls.where((e) => e == 'findDuplicates').length;
+      // Re-open: the found pairs AND the deselection are restored — no re-hash.
+      c.openShrinkStage(ShrinkStage.duplicates);
+      expect(c.duplicatePairs, isNotNull);
+      expect(c.duplicatePairs!.length, 1);
+      expect(c.duplicatePairs!.single.removeSelected, isFalse);
+      expect(
+        fake.calls.where((e) => e == 'findDuplicates').length,
+        callsBefore,
+      );
+    });
+
+    test(
+      're-opening low-quality restores hashed results without re-hashing',
+      () async {
+        final fake = FakeEngineRunner()
+          ..hashedFiles = [_hf('/library/blur.jpg', size: 2222, quality: 0.1)];
+        final c = AppController(runner: fake)
+          ..debugSetScan(fakeScan(photos: const ['/library/blur.jpg']))
+          ..openAction(LibraryAction.shrink);
+        c.openShrinkStage(ShrinkStage.lowQuality);
+        await c.runShrinkLowQualityHash();
+        expect(c.shrinkLowQReviewed, isTrue);
+        c.setShrinkLowQSelected('/library/blur.jpg', false);
+        c.returnToShrinkWizard();
+
+        final hashCalls = fake.calls.where((e) => e == 'hashFiles').length;
+        c.openShrinkStage(ShrinkStage.lowQuality);
+        // Reviewed flag, the candidate, and the deselection all survive.
+        expect(c.shrinkLowQReviewed, isTrue);
+        expect(c.shrinkLowQCandidates.map((h) => h.path), [
+          '/library/blur.jpg',
+        ]);
+        expect(c.isShrinkLowQSelected('/library/blur.jpg'), isFalse);
+        expect(fake.calls.where((e) => e == 'hashFiles').length, hashCalls);
+      },
+    );
+
+    test('re-opening orphans restores the direction and selection', () async {
+      final dir = await Directory.systemTemp.createTemp('shrink_cache_orph');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final onlyRaw = File('${dir.path}/only.raf')..writeAsBytesSync([1, 2, 3]);
+      final solo = File('${dir.path}/solo.jpg')..writeAsBytesSync([9]);
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: [onlyRaw.path, solo.path]))
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.orphans);
+      c.setPruneDirection(PruneDirection.removeOrphanImages);
+      c.toggleSelected(solo.path, false);
+      c.returnToShrinkWizard();
+
+      c.openShrinkStage(ShrinkStage.orphans);
+      expect(c.pruneDirection, PruneDirection.removeOrphanImages);
+      expect(c.selectedPaths, isEmpty);
+    });
+
+    test('re-opening pairs restores the drop side and selection', () async {
+      final dir = await Directory.systemTemp.createTemp('shrink_cache_pairs');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final pairRaw = File('${dir.path}/pair.raf')..writeAsBytesSync([1, 2]);
+      final pairJpg = File('${dir.path}/pair.jpg')..writeAsBytesSync([3]);
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: [pairRaw.path, pairJpg.path]))
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.pairs);
+      c.setShrinkPairDrop(PairDropSide.dropPhoto);
+      c.setShrinkPairSelected(pairJpg.path, false);
+      c.returnToShrinkWizard();
+
+      c.openShrinkStage(ShrinkStage.pairs);
+      expect(c.shrinkPairDrop, PairDropSide.dropPhoto);
+      expect(c.shrinkPairCandidates.map((f) => f.path), [pairJpg.path]);
+      expect(c.isShrinkPairSelected(pairJpg.path), isFalse);
+    });
+
+    test(
+      'adding a stage then re-opening still shows the prior selection',
+      () async {
+        final fake = FakeEngineRunner()
+          ..duplicateGroups = [
+            DuplicateGroup(
+              best: _hf('/library/a.jpg', size: 3000),
+              duplicates: [
+                _hf('/library/b.jpg', size: 1500),
+                _hf('/library/c.jpg', size: 1200),
+              ],
+            ),
+          ];
+        final c = AppController(runner: fake)
+          ..debugSetScan(
+            fakeScan(
+              photos: const [
+                '/library/a.jpg',
+                '/library/b.jpg',
+                '/library/c.jpg',
+              ],
+            ),
+          )
+          ..openAction(LibraryAction.shrink);
+        c.openShrinkStage(ShrinkStage.duplicates);
+        await c.runFindDuplicates();
+        // Deselect one of the two pairs, then commit to the shrink list.
+        c.setDuplicateRemoval(1, false);
+        c.addActiveStageToShrinkList();
+        expect(c.shrinkActiveStage, isNull);
+
+        // Re-open after adding: the pairs and the deselection are restored.
+        c.openShrinkStage(ShrinkStage.duplicates);
+        expect(c.duplicatePairs!.length, 2);
+        expect(c.duplicatePairs![1].removeSelected, isFalse);
+      },
+    );
+  });
+
+  group('per-stage Clear', () {
+    test('clears only that stage from the staged set and total', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSeedShrink(const [
+          ShrinkCandidate(
+            path: '/a.jpg',
+            reason: ShrinkReason.duplicate,
+            sizeBytes: 100,
+            hasGps: false,
+          ),
+          ShrinkCandidate(
+            path: '/o.raf',
+            reason: ShrinkReason.orphanRaw,
+            sizeBytes: 50,
+            hasGps: false,
+          ),
+        ]);
+      expect(c.shrinkTotal.count, 2);
+      expect(c.shrinkOutcome(ShrinkStage.duplicates), isNotNull);
+
+      c.clearShrinkStage(ShrinkStage.orphans);
+      // Only the orphan stage's file leaves; the duplicate stays.
+      expect(c.shrinkStaged.map((e) => e.path), ['/a.jpg']);
+      expect(c.shrinkOutcome(ShrinkStage.orphans), isNull);
+      expect(c.shrinkOutcome(ShrinkStage.duplicates), isNotNull);
+      expect(c.shrinkTotal.count, 1);
+      expect(c.shrinkTotal.bytes, 100);
+    });
+
+    test(
+      'Clear resets the cleared stage cache so re-open primes fresh',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('shrink_clear_cache');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final onlyRaw = File('${dir.path}/only.raf')
+          ..writeAsBytesSync([1, 2, 3]);
+        final c = AppController(runner: FakeEngineRunner())
+          ..debugSetScan(fakeScan(photos: [onlyRaw.path]))
+          ..openAction(LibraryAction.shrink);
+        c.openShrinkStage(ShrinkStage.orphans);
+        // Deselect everything, then add (an empty contribution) so a cache exists.
+        c.toggleSelected(onlyRaw.path, false);
+        c.addActiveStageToShrinkList();
+        expect(c.selectedPaths, isEmpty);
+
+        c.clearShrinkStage(ShrinkStage.orphans);
+        // Re-opening primes fresh: the orphan RAW is selected again by default.
+        c.openShrinkStage(ShrinkStage.orphans);
+        expect(c.selectedPaths, contains(onlyRaw.path));
+      },
+    );
+  });
 }

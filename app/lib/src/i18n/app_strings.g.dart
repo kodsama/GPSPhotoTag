@@ -330,6 +330,7 @@ const Map<String, String> kEnglishStrings = {
   'shrink_stage_skipped': 'Skipped',
   'shrink_stage_not_reviewed': 'Not reviewed yet — open to choose files.',
   'shrink_stage_added': 'Added {count} file(s) · {size} to free',
+  'shrink_stage_clear': 'Clear',
   'shrink_duplicates_hint':
       'Find visually-similar photos and add every copy except the one worth keeping.',
   'shrink_orphans_hint':

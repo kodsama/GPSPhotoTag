@@ -293,6 +293,7 @@
   "shrink_stage_skipped": "Sprunget over",
   "shrink_stage_not_reviewed": "Endnu ikke gennemset — åbn for at vælge filer.",
   "shrink_stage_added": "Tilføjet {count} fil(er) · {size} at frigøre",
+  "shrink_stage_clear": "Ryd",
   "shrink_duplicates_hint": "Find visuelt ens fotos og tilføj alle kopier undtagen den ene, der er værd at beholde.",
   "shrink_orphans_hint": "Find RAW-filer uden JPG/HEIC-makker, eller billeder uden RAW.",
   "shrink_pairs_hint": "Hvor både en RAW og et foto findes, tilføj den overflødige side.",

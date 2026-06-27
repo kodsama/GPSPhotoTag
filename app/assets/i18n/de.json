@@ -293,6 +293,7 @@
   "shrink_stage_skipped": "Übersprungen",
   "shrink_stage_not_reviewed": "Noch nicht geprüft — zum Auswählen öffnen.",
   "shrink_stage_added": "{count} Datei(en) hinzugefügt · {size} freizugeben",
+  "shrink_stage_clear": "Leeren",
   "shrink_duplicates_hint": "Visuell ähnliche Fotos finden und jede Kopie außer der besten hinzufügen.",
   "shrink_orphans_hint": "RAW-Dateien ohne JPG/HEIC-Partner oder Bilder ohne RAW finden.",
   "shrink_pairs_hint": "Wo sowohl RAW als auch Foto existieren, die überflüssige Seite hinzufügen.",
