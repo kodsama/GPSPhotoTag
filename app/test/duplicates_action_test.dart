@@ -87,7 +87,7 @@ void main() {
       // Driving the controller to Loose updates the caption live.
       c.setSimilarity(similaritySteps);
       await tester.pump();
-      expect(find.text('Same scene, a different shot'), findsOneWidget);
+      expect(find.text('Loosely similar scenes'), findsOneWidget);
       expect(find.text('Identical copies'), findsNothing);
     },
   );
@@ -120,6 +120,7 @@ void main() {
       ]);
     await tester.pumpWidget(_host(c));
 
+    await tester.ensureVisible(find.byIcon(Icons.swap_horiz));
     await tester.tap(find.byIcon(Icons.swap_horiz));
     await tester.pump();
 
@@ -134,6 +135,7 @@ void main() {
       ]);
     await tester.pumpWidget(_host(c));
 
+    await tester.ensureVisible(find.byType(Checkbox));
     await tester.tap(find.byType(Checkbox));
     await tester.pump();
 
@@ -177,6 +179,89 @@ void main() {
     },
   );
 
+  testWidgets('shows the keep-priority pipeline with both rules', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    expect(find.text('Keep priority'), findsOneWidget);
+    expect(find.text('Resolution'), findsOneWidget);
+    expect(find.text('Quality'), findsOneWidget);
+    // The reserved People rule is hidden from the control.
+    expect(find.text('People'), findsNothing);
+    expect(find.byType(Switch), findsNWidgets(2));
+  });
+
+  testWidgets('toggling a rule switch updates the controller pipeline', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    // The first switch is Resolution (top of the default order).
+    final resolutionSwitch = find.byType(Switch).first;
+    await tester.ensureVisible(resolutionSwitch);
+    await tester.tap(resolutionSwitch);
+    await tester.pump();
+
+    final resolution = c.keepPipeline.steps.firstWhere(
+      (s) => s.rule == KeepRule.resolution,
+    );
+    expect(resolution.enabled, isFalse);
+  });
+
+  testWidgets('the kept side reflects a controller pipeline change', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(
+          kept: HashedFile(
+            path: '/big.jpg',
+            hash: 0,
+            width: 300,
+            height: 300,
+            fileSize: 10,
+            basename: 'big',
+            isRaw: false,
+            quality: const ImageQuality(
+              sharpness: 0.1,
+              contrast: 0.1,
+              colorfulness: 0.1,
+              composite: 0.1,
+            ),
+          ),
+          other: HashedFile(
+            path: '/crisp.jpg',
+            hash: 0,
+            width: 100,
+            height: 100,
+            fileSize: 10,
+            basename: 'crisp',
+            isRaw: false,
+            quality: const ImageQuality(
+              sharpness: 0.9,
+              contrast: 0.9,
+              colorfulness: 0.9,
+              composite: 0.9,
+            ),
+          ),
+        ),
+      ]);
+    await tester.pumpWidget(_host(c));
+    // Initially resolution keeps the big file.
+    expect(find.text('big.jpg'), findsOneWidget);
+
+    // Disable resolution via the controller → quality keeps the crisp file, and
+    // the review's kept side updates.
+    c.setKeepRuleEnabled(KeepRule.resolution, false);
+    await tester.pump();
+    expect(c.duplicatePairs!.single.kept.path, '/crisp.jpg');
+  });
+
   testWidgets('an empty result shows the no-duplicates note', (tester) async {
     final c = AppController(runner: FakeEngineRunner())
       ..debugSetDuplicatePairs(const []);
@@ -188,6 +273,12 @@ void main() {
     expect(formatBytes(512), '512 B');
     expect(formatBytes(2048), '2 KB');
     expect(formatBytes(5 * 1024 * 1024), '5.0 MB');
+  });
+
+  testWidgets('keepRuleLabel names every keep rule', (tester) async {
+    expect(keepRuleLabel(KeepRule.resolution), 'Resolution');
+    expect(keepRuleLabel(KeepRule.quality), 'Quality');
+    expect(keepRuleLabel(KeepRule.people), 'People');
   });
 
   testWidgets('shows live progress while a trash run is in flight', (

@@ -563,6 +563,46 @@ void main() {
       expect(prefs.backgroundVeil, 1.0);
     });
 
+    test('keep pipeline defaults to standard and round-trips', () async {
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.keepPipeline.steps.map((s) => s.rule), [
+        KeepRule.resolution,
+        KeepRule.quality,
+      ]);
+
+      prefs.keepPipeline = const KeepPipeline([
+        KeepStep(KeepRule.quality),
+        KeepStep(KeepRule.resolution, enabled: false),
+      ]);
+      await prefs.save();
+
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.keepPipeline.steps[0].rule, KeepRule.quality);
+      expect(reloaded.keepPipeline.steps[0].enabled, isTrue);
+      expect(reloaded.keepPipeline.steps[1].rule, KeepRule.resolution);
+      expect(reloaded.keepPipeline.steps[1].enabled, isFalse);
+    });
+
+    test('controller persists pipeline reorder/toggle to the store', () {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      c.reorderKeepRule(1, 0); // quality to the front
+      expect(prefs.keepPipeline.steps.first.rule, KeepRule.quality);
+      c.setKeepRuleEnabled(KeepRule.resolution, false);
+      final resolution = prefs.keepPipeline.steps.firstWhere(
+        (s) => s.rule == KeepRule.resolution,
+      );
+      expect(resolution.enabled, isFalse);
+    });
+
+    test('controller loads the persisted pipeline on construction', () {
+      final prefs = AppPrefs(
+        keepPipeline: const KeepPipeline([KeepStep(KeepRule.quality)]),
+      );
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.keepPipeline.steps.first.rule, KeepRule.quality);
+    });
+
     test('setBackgroundImagePath persists and notifies', () {
       final prefs = AppPrefs();
       final c = AppController(runner: FakeEngineRunner(), prefs: prefs);

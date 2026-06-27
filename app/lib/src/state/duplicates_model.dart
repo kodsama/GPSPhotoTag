@@ -8,7 +8,11 @@ import 'package:stunda_engine/stunda_engine.dart';
 /// silly-word confirm gate. Kept Flutter-free so they are unit-testable.
 
 /// The number of discrete similarity steps the slider offers (0..[similaritySteps]).
-const int similaritySteps = 10;
+///
+/// Raised from 10 to 14 so the loosest settings reach a higher Hamming distance
+/// ("Similar scenes"), catching photos that are only *kind of* the same — a
+/// looser tier than the old near-duplicate maximum.
+const int similaritySteps = 14;
 
 /// Maps a similarity slider value (0 = Exact, [similaritySteps] = Loose) to a
 /// Hamming-distance threshold for [groupDuplicates].
@@ -30,15 +34,17 @@ double sceneVariance(int slider) =>
 /// A short, human descriptor of what the current similarity [slider] level
 /// catches, shown as the example-pair caption.
 ///
-/// Buckets the slider into four bands: Exact (0) → identical copies; low → light
-/// re-encodes; mid → small edits; high/Loose → the same scene shot differently.
-/// Out-of-range inputs are clamped. Pure so the bucket boundaries are testable.
+/// Buckets the slider into five bands: Exact (0) → identical copies; low → light
+/// re-encodes; mid → small edits; high → the same scene shot differently; and
+/// the loosest band → only loosely-similar scenes ("kind of the same"). Out-of-
+/// range inputs are clamped. Pure so the bucket boundaries are testable.
 String similarityExampleLabel(int slider) {
   final value = slider.clamp(0, similaritySteps);
   if (value == 0) return 'Identical copies';
   if (value <= 3) return 'Re-saved or resized';
   if (value <= 7) return 'Minor edits (crop, exposure)';
-  return 'Same scene, a different shot';
+  if (value <= 10) return 'Same scene, a different shot';
+  return 'Loosely similar scenes';
 }
 
 /// One reviewable duplicate pair: the [kept] file and the [other] candidate.
@@ -73,14 +79,28 @@ class DuplicatePair {
 
 /// Expands [groups] into the flat list of reviewable [DuplicatePair]s.
 ///
-/// Each group yields one pair per duplicate: its [DuplicateGroup.best] as the
-/// kept (left) side and each [DuplicateGroup.duplicates] member as the other
-/// (right) side, all initially selected for removal.
-List<DuplicatePair> pairsFromGroups(List<DuplicateGroup> groups) {
+/// Each group yields one pair per other member: the keeper as the kept (left)
+/// side and every remaining member as the other (right) side, all initially
+/// selected for removal.
+///
+/// The keeper defaults to [DuplicateGroup.best] (the engine's choice). Passing a
+/// [pipeline] re-decides the keeper per group with [chooseKeeper] over all the
+/// group's members, so the kept side reflects the user's keep-priority pipeline
+/// even though the engine grouped with its standard one. The per-pair Swap still
+/// lets the user override the choice afterwards.
+List<DuplicatePair> pairsFromGroups(
+  List<DuplicateGroup> groups, {
+  KeepPipeline? pipeline,
+}) {
   final pairs = <DuplicatePair>[];
   for (final group in groups) {
-    for (final dup in group.duplicates) {
-      pairs.add(DuplicatePair(kept: group.best, other: dup));
+    final members = [group.best, ...group.duplicates];
+    final keeper = pipeline == null
+        ? group.best
+        : chooseKeeper(members, pipeline);
+    for (final member in members) {
+      if (identical(member, keeper)) continue;
+      pairs.add(DuplicatePair(kept: keeper, other: member));
     }
   }
   return pairs;

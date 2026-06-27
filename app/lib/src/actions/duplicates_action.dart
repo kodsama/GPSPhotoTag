@@ -79,6 +79,8 @@ class _Review extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _SimilaritySlider(controller: controller),
+        const SizedBox(height: 20),
+        _KeepPipelinePanel(controller: controller),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: controller.findingDuplicates
@@ -151,6 +153,89 @@ class _SimilaritySlider extends StatelessWidget {
         ExampleScenePair(
           variance: sceneVariance(controller.similarity),
           caption: similarityExampleLabel(controller.similarity),
+        ),
+      ],
+    );
+  }
+}
+
+/// A plain-language name for a keep [rule], shown in the pipeline list.
+String keepRuleLabel(KeepRule rule) => switch (rule) {
+  KeepRule.resolution => 'Resolution',
+  KeepRule.quality => 'Quality',
+  KeepRule.people => 'People',
+};
+
+/// The compact keep-priority pipeline control: a draggable list of the keep
+/// rules (placement = priority) each with an enable [Switch], plus a one-line
+/// explainer. Reordering or toggling drives the controller's pipeline, which
+/// re-decides the kept (left) side of the review.
+///
+/// The not-yet-implemented [KeepRule.people] rule is hidden so the user can only
+/// reorder/toggle the rules that actually decide today.
+class _KeepPipelinePanel extends StatelessWidget {
+  const _KeepPipelinePanel({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final steps = [
+      for (final step in controller.keepPipeline.steps)
+        if (step.rule != KeepRule.people) step,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Keep priority', style: text.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          'When duplicates are found, keep the winner of the first rule that '
+          'clearly decides; ties fall through. Drag to reorder.',
+          style: text.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        // The list is short (two rules) so it sizes to its content inside the
+        // surrounding scroll view.
+        ReorderableListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          onReorderItem: controller.reorderKeepRule,
+          children: [
+            for (var i = 0; i < steps.length; i++)
+              Container(
+                key: ValueKey(steps[i].rule),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: scheme.outline),
+                ),
+                child: Row(
+                  children: [
+                    ReorderableDragStartListener(
+                      index: i,
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(Icons.drag_handle, size: 20),
+                      ),
+                    ),
+                    Text('${i + 1}.', style: text.labelLarge),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(keepRuleLabel(steps[i].rule))),
+                    Switch(
+                      value: steps[i].enabled,
+                      onChanged: (v) =>
+                          controller.setKeepRuleEnabled(steps[i].rule, v),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ],
     );

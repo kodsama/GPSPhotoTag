@@ -26,6 +26,7 @@ class AppPrefs {
     this.defaultMaxTimeDiffSeconds = 300,
     this.backgroundImagePath,
     this.backgroundVeil = 0.85,
+    this.keepPipeline = KeepPipeline.standard,
   });
 
   /// The backing JSON file path, or null when persistence is disabled.
@@ -48,6 +49,9 @@ class AppPrefs {
   /// is more subtle (more veil, fainter background). Defaults to a subtle 0.85.
   double backgroundVeil;
 
+  /// The duplicate-finder keep-priority pipeline (rule order + enabled flags).
+  KeepPipeline keepPipeline;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -64,6 +68,9 @@ class AppPrefs {
       if (bg is String && bg.isNotEmpty) prefs.backgroundImagePath = bg;
       final veil = map['backgroundVeil'];
       if (veil is num) prefs.backgroundVeil = veil.toDouble().clamp(0.0, 1.0);
+      if (map.containsKey('keepPipeline')) {
+        prefs.keepPipeline = KeepPipeline.fromJson(map['keepPipeline']);
+      }
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -82,6 +89,7 @@ class AppPrefs {
           'defaultMaxTimeDiffSeconds': defaultMaxTimeDiffSeconds,
           'backgroundImagePath': backgroundImagePath,
           'backgroundVeil': backgroundVeil,
+          'keepPipeline': keepPipeline.toJson(),
         }),
       );
     } on Object {

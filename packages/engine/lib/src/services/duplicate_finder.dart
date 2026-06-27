@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 
 import '../data/photo_formats.dart';
 import '../data/ports/process_runner.dart';
+import 'image_quality.dart';
+import 'keep_pipeline.dart';
 import 'preview_extract.dart';
 
 /// Perceptual (difference) hashing and duplicate grouping.
@@ -117,6 +119,7 @@ class HashedFile {
     required this.fileSize,
     required this.basename,
     required this.isRaw,
+    this.quality = ImageQuality.zero,
   });
 
   /// The file path.
@@ -140,8 +143,25 @@ class HashedFile {
   /// Whether this is a RAW container.
   final bool isRaw;
 
+  /// Composite + per-component quality scored from the decoded ~160 px
+  /// thumbnail (see [qualityScore]). Defaults to [ImageQuality.zero] for
+  /// records built without pixels (most tests).
+  final ImageQuality quality;
+
   /// Resolution (pixel area) used to pick the best of a group.
   int get resolution => width * height;
+
+  /// JSON view of the record (dimensions, size, RAW-ness, and quality scores).
+  Map<String, Object> toJson() => {
+    'path': path,
+    'hash': hash,
+    'width': width,
+    'height': height,
+    'fileSize': fileSize,
+    'basename': basename,
+    'isRaw': isRaw,
+    'quality': quality.toJson(),
+  };
 }
 
 /// A detected duplicate group: a single [best] file to keep and the
@@ -150,8 +170,7 @@ class DuplicateGroup {
   /// Creates a group keeping [best] over [duplicates].
   const DuplicateGroup({required this.best, required this.duplicates});
 
-  /// The highest-quality member (highest resolution, then largest file, then
-  /// path) — the one to keep.
+  /// The member to keep, chosen by the keep-rule cascade ([chooseKeeper]).
   final HashedFile best;
 
   /// The other members that match [best] within the threshold.
@@ -167,22 +186,6 @@ class DuplicateGroup {
 bool _areCompanions(HashedFile a, HashedFile b) =>
     a.basename == b.basename && a.isRaw != b.isRaw;
 
-/// Picks the "best" of [members]: highest resolution, then largest file size,
-/// then the lexicographically smallest path (deterministic tie-break).
-HashedFile _pickBest(List<HashedFile> members) {
-  var best = members.first;
-  for (final m in members.skip(1)) {
-    if (_isBetter(m, best)) best = m;
-  }
-  return best;
-}
-
-bool _isBetter(HashedFile a, HashedFile b) {
-  if (a.resolution != b.resolution) return a.resolution > b.resolution;
-  if (a.fileSize != b.fileSize) return a.fileSize > b.fileSize;
-  return a.path.compareTo(b.path) < 0;
-}
-
 /// Groups [records] whose perceptual hashes are within [threshold] Hamming
 /// distance into [DuplicateGroup]s. Pure (no I/O).
 ///
@@ -191,8 +194,9 @@ bool _isBetter(HashedFile a, HashedFile b) {
 /// - **RAW-companion exclusion**: two files sharing a basename but differing in
 ///   RAW-ness (a RAW + its JPG/HEIC sibling) are never placed in the same group,
 ///   even if their preview hashes match — they are partners, not duplicates.
-/// - Each group's [DuplicateGroup.best] is the highest-resolution member (ties
-///   broken by larger file size, then path); the rest become its duplicates.
+/// - Each group's [DuplicateGroup.best] is chosen by [chooseKeeper] running the
+///   given [pipeline] (default [KeepPipeline.standard]); the rest become its
+///   duplicates.
 /// - Singletons are dropped: a group needs at least two members.
 ///
 /// Grouping is greedy single-linkage by seed: each not-yet-grouped record seeds
@@ -201,6 +205,7 @@ bool _isBetter(HashedFile a, HashedFile b) {
 List<DuplicateGroup> groupDuplicates(
   List<HashedFile> records, {
   required int threshold,
+  KeepPipeline pipeline = KeepPipeline.standard,
 }) {
   final used = List<bool>.filled(records.length, false);
   final groups = <DuplicateGroup>[];
@@ -222,7 +227,7 @@ List<DuplicateGroup> groupDuplicates(
       used[j] = true;
     }
     if (members.length < 2) continue;
-    final best = _pickBest(members);
+    final best = chooseKeeper(members, pipeline);
     final duplicates = [
       for (final m in members)
         if (!identical(m, best)) m,
@@ -290,6 +295,8 @@ Future<HashedFile?> hashFile(
     fileSize: File(path).lengthSync(),
     basename: basenameKey(path),
     isRaw: isRaw,
+    // Quality is scored from the same decoded thumbnail used for the hash.
+    quality: qualityScore(decoded),
   );
 }
 
@@ -478,6 +485,8 @@ HashedFile? _hashFromExtract(String path, String? extracted, _Dims? dims) {
     fileSize: fileSize,
     basename: basenameKey(path),
     isRaw: PhotoFormats.isRaw(path),
+    // Reuse the already-decoded thumbnail to score quality (no re-decode).
+    quality: qualityScore(decoded),
   );
 }
 

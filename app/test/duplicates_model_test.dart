@@ -79,15 +79,17 @@ void main() {
 
     test('the high band reads as a different shot of the same scene', () {
       expect(similarityExampleLabel(8), 'Same scene, a different shot');
-      expect(
-        similarityExampleLabel(similaritySteps),
-        'Same scene, a different shot',
-      );
+      expect(similarityExampleLabel(10), 'Same scene, a different shot');
+    });
+
+    test('the loosest band reads as loosely-similar scenes', () {
+      expect(similarityExampleLabel(11), 'Loosely similar scenes');
+      expect(similarityExampleLabel(similaritySteps), 'Loosely similar scenes');
     });
 
     test('clamps out-of-range inputs to the end buckets', () {
       expect(similarityExampleLabel(-1), 'Identical copies');
-      expect(similarityExampleLabel(999), 'Same scene, a different shot');
+      expect(similarityExampleLabel(999), 'Loosely similar scenes');
     });
   });
 
@@ -106,6 +108,50 @@ void main() {
 
     test('empty groups yield no pairs', () {
       expect(pairsFromGroups(const []), isEmpty);
+    });
+
+    test('a pipeline re-decides the keeper (left side) per group', () {
+      // The engine grouped with the big file as best; a quality-first pipeline
+      // re-decides and keeps the crisp (smaller) one instead.
+      final group = DuplicateGroup(
+        best: HashedFile(
+          path: '/big.jpg',
+          hash: 0,
+          width: 300,
+          height: 300,
+          fileSize: 10,
+          basename: 'big',
+          isRaw: false,
+          quality: const ImageQuality(
+            sharpness: 0.1,
+            contrast: 0.1,
+            colorfulness: 0.1,
+            composite: 0.1,
+          ),
+        ),
+        duplicates: [
+          HashedFile(
+            path: '/crisp.jpg',
+            hash: 0,
+            width: 100,
+            height: 100,
+            fileSize: 10,
+            basename: 'crisp',
+            isRaw: false,
+            quality: const ImageQuality(
+              sharpness: 0.9,
+              contrast: 0.9,
+              colorfulness: 0.9,
+              composite: 0.9,
+            ),
+          ),
+        ],
+      );
+      final pairs = pairsFromGroups([
+        group,
+      ], pipeline: const KeepPipeline([KeepStep(KeepRule.quality)]));
+      expect(pairs.single.kept.path, '/crisp.jpg');
+      expect(pairs.single.other.path, '/big.jpg');
     });
   });
 

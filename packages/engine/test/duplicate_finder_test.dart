@@ -338,6 +338,85 @@ void main() {
     test('preserves order and handles an empty input', () {
       expect(groupDuplicates(const [], threshold: 5), isEmpty);
     });
+
+    test('best is chosen via the keep pipeline (resolution clear winner)', () {
+      // Same hash; the big file has a clear resolution win so it's kept even
+      // though the small one has higher quality.
+      final groups = groupDuplicates([
+        hf('/small.jpg', 0xAA, width: 100, height: 100),
+        hf('/big.jpg', 0xAA, width: 300, height: 300),
+      ], threshold: 0);
+      expect(groups.single.best.path, '/big.jpg');
+    });
+
+    test('a custom pipeline changes which member is kept', () {
+      // Equal resolution; quality differs. With quality enabled the crisp file
+      // wins; with only a (disabled) resolution rule it falls to the tie-break.
+      const crisp = HashedFile(
+        path: '/crisp.jpg',
+        hash: 0xAA,
+        width: 100,
+        height: 100,
+        fileSize: 100,
+        basename: 'crisp',
+        isRaw: false,
+        quality: ImageQuality(
+          sharpness: 0.9,
+          contrast: 0.9,
+          colorfulness: 0.9,
+          composite: 0.9,
+        ),
+      );
+      const dull = HashedFile(
+        path: '/dull.jpg',
+        hash: 0xAA,
+        width: 100,
+        height: 100,
+        fileSize: 999,
+        basename: 'dull',
+        isRaw: false,
+        quality: ImageQuality(
+          sharpness: 0.1,
+          contrast: 0.1,
+          colorfulness: 0.1,
+          composite: 0.1,
+        ),
+      );
+      final byQuality = groupDuplicates(
+        [dull, crisp],
+        threshold: 0,
+        pipeline: const KeepPipeline([KeepStep(KeepRule.quality)]),
+      );
+      expect(byQuality.single.best.path, '/crisp.jpg');
+
+      // No enabled rule → final tie-break keeps the larger file (dull).
+      final byTieBreak = groupDuplicates(
+        [crisp, dull],
+        threshold: 0,
+        pipeline: const KeepPipeline([
+          KeepStep(KeepRule.quality, enabled: false),
+        ]),
+      );
+      expect(byTieBreak.single.best.path, '/dull.jpg');
+    });
+  });
+
+  group('HashedFile.toJson', () {
+    test('serializes dimensions, size, RAW-ness, and quality', () {
+      final json = hf(
+        '/a.jpg',
+        0xAB,
+        width: 40,
+        height: 30,
+        fileSize: 50,
+      ).toJson();
+      expect(json['path'], '/a.jpg');
+      expect(json['width'], 40);
+      expect(json['height'], 30);
+      expect(json['fileSize'], 50);
+      expect(json['isRaw'], false);
+      expect(json['quality'], isA<Map<String, double>>());
+    });
   });
 
   group('hashFile', () {
@@ -359,6 +438,8 @@ void main() {
       expect(hashed.fileSize, greaterThan(0));
       expect(hashed.isRaw, isFalse);
       expect(hashed.basename, 'a');
+      // Quality is scored from the decoded image (striped → non-zero).
+      expect(hashed.quality.composite, greaterThan(0));
     });
 
     test('hashes a RAW via its extracted embedded preview', () async {
@@ -584,6 +665,21 @@ void main() {
         expect(ticks, 2); // one tick per input file
       },
     );
+
+    test('scores quality from the decoded thumbnail', () async {
+      final paths = writeSources(['a.raf']);
+      final runner = _BatchRunner(
+        thumbs: {'a.raf': img.encodeJpg(_stripes(32, 32))},
+        dims: {paths.first: (4000, 3000)},
+      );
+      final out = await hashFilesBatch(
+        paths,
+        runner: runner,
+        tmpDir: p.join(tmp.path, 'work'),
+      );
+      // The striped thumbnail is sharp + high-contrast → a non-zero composite.
+      expect(out.single.quality.composite, greaterThan(0));
+    });
 
     test('empty input does nothing and returns empty', () async {
       final runner = _BatchRunner();

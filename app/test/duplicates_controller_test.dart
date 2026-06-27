@@ -13,6 +13,7 @@ HashedFile _hf(
   int width = 100,
   int height = 100,
   int size = 10,
+  double quality = 0.5,
 }) => HashedFile(
   path: path,
   hash: 0,
@@ -21,6 +22,12 @@ HashedFile _hf(
   fileSize: size,
   basename: path,
   isRaw: false,
+  quality: ImageQuality(
+    sharpness: quality,
+    contrast: quality,
+    colorfulness: quality,
+    composite: quality,
+  ),
 );
 
 void main() {
@@ -152,6 +159,98 @@ void main() {
       c.setDuplicateRemoval(0, false);
       c.swapDuplicatePair(0);
       expect(c.duplicateRemovalPaths, isEmpty);
+    });
+  });
+
+  group('keep pipeline', () {
+    test('defaults to the standard pipeline', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.keepPipeline.steps.map((s) => s.rule), [
+        KeepRule.resolution,
+        KeepRule.quality,
+      ]);
+    });
+
+    test('toggling a rule disables it and notifies', () {
+      final c = AppController(runner: FakeEngineRunner());
+      var notifies = 0;
+      c.addListener(() => notifies++);
+      c.setKeepRuleEnabled(KeepRule.resolution, false);
+      final resolution = c.keepPipeline.steps.firstWhere(
+        (s) => s.rule == KeepRule.resolution,
+      );
+      expect(resolution.enabled, isFalse);
+      expect(notifies, 1);
+    });
+
+    test('reordering moves a rule to a new priority', () {
+      final c = AppController(runner: FakeEngineRunner());
+      // Move quality (index 1) to the front (index 0).
+      c.reorderKeepRule(1, 0);
+      expect(c.keepPipeline.steps.first.rule, KeepRule.quality);
+    });
+
+    test('reorder ignores an out-of-range source and a no-op move', () {
+      final c = AppController(runner: FakeEngineRunner());
+      final before = c.keepPipeline.steps.map((s) => s.rule).toList();
+      c.reorderKeepRule(99, 0); // out of range
+      c.reorderKeepRule(0, 0); // no-op
+      expect(c.keepPipeline.steps.map((s) => s.rule), before);
+    });
+
+    test('the kept (left) side follows the pipeline on a fresh run', () async {
+      // Equal resolution; the right-hand file is crisper. Resolution can't
+      // decide, so quality keeps the crisp one as the keeper.
+      final fake = FakeEngineRunner()
+        ..duplicateGroups = [
+          DuplicateGroup(
+            best: _hf('/dull.jpg', quality: 0.1, size: 50),
+            duplicates: [_hf('/crisp.jpg', quality: 0.9, size: 50)],
+          ),
+        ];
+      final c = AppController(runner: fake)
+        ..debugSetScan(fakeScan(photos: const ['/dull.jpg', '/crisp.jpg']));
+      c.openAction(LibraryAction.duplicates);
+
+      await c.runFindDuplicates();
+
+      expect(c.duplicatePairs!.single.kept.path, '/crisp.jpg');
+      expect(c.duplicateRemovalPaths, ['/dull.jpg']);
+    });
+
+    test('toggling the pipeline re-decides reviewed pairs live', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetDuplicatePairs([
+          DuplicatePair(
+            kept: _hf('/big.jpg', width: 300, height: 300, quality: 0.1),
+            other: _hf('/crisp.jpg', width: 100, height: 100, quality: 0.9),
+          ),
+        ]);
+      // Initially resolution decides → big kept. Disable resolution so quality
+      // takes over and the crisp file becomes the keeper.
+      expect(c.duplicatePairs!.single.kept.path, '/big.jpg');
+      c.setKeepRuleEnabled(KeepRule.resolution, false);
+      expect(c.duplicatePairs!.single.kept.path, '/crisp.jpg');
+    });
+
+    test('re-deciding preserves a deselected pair', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetDuplicatePairs([
+          DuplicatePair(
+            kept: _hf('/big.jpg', width: 300, height: 300, quality: 0.1),
+            other: _hf('/crisp.jpg', width: 100, height: 100, quality: 0.9),
+            removeSelected: false,
+          ),
+        ]);
+      c.setKeepRuleEnabled(KeepRule.resolution, false);
+      // The pair flips its keeper but stays deselected (keep both).
+      expect(c.duplicatePairs!.single.removeSelected, isFalse);
+    });
+
+    test('re-decide is a safe no-op before any run', () {
+      final c = AppController(runner: FakeEngineRunner());
+      c.setKeepRuleEnabled(KeepRule.quality, false);
+      expect(c.duplicatePairs, isNull);
     });
   });
 

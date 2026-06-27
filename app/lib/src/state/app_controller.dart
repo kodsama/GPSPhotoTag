@@ -57,6 +57,7 @@ class AppController extends ChangeNotifier {
       _themeMode = prefs.themeMode;
       _rawMode = prefs.defaultRawMode;
       _maxTimeDiffSeconds = prefs.defaultMaxTimeDiffSeconds;
+      _keepPipeline = prefs.keepPipeline;
     }
   }
 
@@ -138,6 +139,7 @@ class AppController extends ChangeNotifier {
     final prefs = _prefs;
     if (prefs == null) return;
     prefs.themeMode = _themeMode;
+    prefs.keepPipeline = _keepPipeline;
     prefs.save();
   }
 
@@ -1126,6 +1128,7 @@ class AppController extends ChangeNotifier {
   // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------
 
   int _similarity = 0;
+  KeepPipeline _keepPipeline = KeepPipeline.standard;
   bool _findingDuplicates = false;
   HashProgress _hashProgress = HashProgress();
   List<DuplicatePair>? _duplicatePairs;
@@ -1169,6 +1172,83 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The keep-priority pipeline (ordered rules + enabled flags) deciding which
+  /// member of a duplicate group is kept. Order = priority.
+  KeepPipeline get keepPipeline => _keepPipeline;
+
+  /// Moves the keep rule from [oldIndex] to [newIndex] (drag-to-reorder),
+  /// changing its priority, then persists + re-decides the kept side of any
+  /// reviewed pairs so the review reflects the new order live.
+  ///
+  /// Indices are the post-removal slots `ReorderableListView.onReorderItem`
+  /// reports (no manual down-shift adjustment needed).
+  void reorderKeepRule(int oldIndex, int newIndex) {
+    final steps = List<KeepStep>.of(_keepPipeline.steps);
+    if (oldIndex < 0 || oldIndex >= steps.length) return;
+    final target = newIndex.clamp(0, steps.length - 1);
+    if (target == oldIndex) return;
+    final moved = steps.removeAt(oldIndex);
+    steps.insert(target, moved);
+    _keepPipeline = KeepPipeline(steps);
+    _persistPrefs();
+    _reapplyKeepPipeline();
+    notifyListeners();
+  }
+
+  /// Enables or disables the keep [rule], persisting + re-deciding kept sides.
+  void setKeepRuleEnabled(KeepRule rule, bool enabled) {
+    final steps = [
+      for (final step in _keepPipeline.steps)
+        if (step.rule == rule) step.withEnabled(enabled) else step,
+    ];
+    _keepPipeline = KeepPipeline(steps);
+    _persistPrefs();
+    _reapplyKeepPipeline();
+    notifyListeners();
+  }
+
+  /// Re-decides the kept (left) side of every already-reviewed pair using the
+  /// current pipeline, preserving each pair's selection. Pairs the user already
+  /// swapped are regrouped by their kept path, so a live pipeline change updates
+  /// the default keeper without losing the in-progress review.
+  void _reapplyKeepPipeline() {
+    final pairs = _duplicatePairs;
+    if (pairs == null || pairs.isEmpty) return;
+    // Reconstruct each group's members from the flat pairs (every pair in a
+    // group shares the same kept file), then re-choose the keeper.
+    final byKeeper = <String, List<DuplicatePair>>{};
+    for (final pair in pairs) {
+      byKeeper.putIfAbsent(pair.kept.path, () => []).add(pair);
+    }
+    final rebuilt = <DuplicatePair>[];
+    for (final groupPairs in byKeeper.values) {
+      final members = <HashedFile>[
+        groupPairs.first.kept,
+        for (final p in groupPairs) p.other,
+      ];
+      final keeper = chooseKeeper(members, _keepPipeline);
+      for (final member in members) {
+        if (identical(member, keeper)) continue;
+        // Preserve the prior selection for the relationship this member was part
+        // of — the prior pair where it appeared on EITHER side (the keeper may
+        // have flipped, swapping which file is the "other").
+        final prior = groupPairs
+            .where(
+              (p) => identical(p.other, member) || identical(p.kept, member),
+            )
+            .firstOrNull;
+        rebuilt.add(
+          DuplicatePair(
+            kept: keeper,
+            other: member,
+            removeSelected: prior?.removeSelected ?? true,
+          ),
+        );
+      }
+    }
+    _duplicatePairs = rebuilt;
+  }
+
   /// Hashes every *included* photo off the UI isolate and folds the resulting
   /// duplicate groups into reviewable pairs at the current similarity.
   Future<void> runFindDuplicates() async {
@@ -1202,7 +1282,9 @@ class AppController extends ChangeNotifier {
       );
       // A run the user cancelled mid-flight discards its result entirely.
       if (_duplicatesCancelled) return;
-      _duplicatePairs = pairsFromGroups(groups);
+      // The keeper (left side) follows the user's keep-priority pipeline, not
+      // just the engine's default resolution-first choice.
+      _duplicatePairs = pairsFromGroups(groups, pipeline: _keepPipeline);
       _log('Found ${groups.length} duplicate group(s)');
       _findingDuplicates = false;
       _hashProgress = HashProgress();
