@@ -14,17 +14,19 @@ dependencies:
     sdk: flutter
   stunda_engine:
   stunda_mcp:
-  file_selector: ^1.0.3
+  file_selector: ^1.1.0
   desktop_drop: ^0.7.1
   # Mobile (Android/iOS) device photo-library access: enumerate, metadata,
   # thumbnails, full bytes, and delete. GPS write-back uses a custom channel.
-  photo_manager: ^3.0.0
-  url_launcher: ^6.3.0
+  photo_manager: ^3.9.0
+  url_launcher: ^6.3.2
   cupertino_icons: ^1.0.8
-  path: ^1.9.0
-  path_provider: ^2.1.4
-  http: ^1.2.0
-  flutter_map: ^8.2.2
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  http: ^1.6.0
+  # latlong2 is capped at 0.9.x by flutter_map 8.x (its newest); 0.10.x needs a
+  # flutter_map major that doesn't exist yet.
+  flutter_map: ^8.3.0
   latlong2: ^0.9.1
   flutter_map_marker_cluster: ^8.2.2
 
@@ -33,7 +35,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
-  image: ^4.3.0
+  image: ^4.9.1
   # Test-only: mock platform plugins (file picker, app dirs) in widget tests.
   file_selector_platform_interface: ^2.6.0
   path_provider_platform_interface: ^2.1.0
