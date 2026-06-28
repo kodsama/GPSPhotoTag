@@ -218,3 +218,61 @@ jobs:
             app/build/windows/x64/runner/Release/**
             app/build/linux/x64/release/bundle/**
           if-no-files-found: warn
+
+  # Mobile build matrix: prove the Flutter app compiles for Android + iOS.
+  # Android pulls the ONNX Runtime AAR + ExifInterface via Gradle; iOS pulls the
+  # onnxruntime-c CocoaPod. Both still vendor the host exiftool + ONNX assets so
+  # the app's declared `assets:` exist at build time (the engine itself uses the
+  # device photo library, not exiftool, on mobile). iOS builds unsigned.
+  build-mobile:
+    name: Build ${{ matrix.target }}
+    needs: lint-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: apk
+          - os: macos-latest
+            target: ios
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java (Android)
+        if: matrix.target == 'apk'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Print toolchain versions
+        run: flutter --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # Vendor exiftool (host flavour) + the ONNX models so the declared assets
+      # exist; fetch-*.sh also regenerates the pubspec asset list to match.
+      - name: Vendor bundled exiftool
+        run: bash tool/fetch-exiftool.sh
+
+      - name: Vendor ONNX Runtime + detector model
+        run: bash tool/fetch-onnx.sh
+
+      - name: Build Android APK
+        if: matrix.target == 'apk'
+        working-directory: app
+        run: flutter build apk --debug
+
+      - name: Build iOS (unsigned)
+        if: matrix.target == 'ios'
+        working-directory: app
+        run: flutter build ios --no-codesign --debug
