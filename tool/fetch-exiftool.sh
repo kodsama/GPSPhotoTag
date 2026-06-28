@@ -89,7 +89,13 @@ vendor_windows_exe() {
   fi
   got=""
   for u in "${urls[@]}"; do
-    if curl -fsSL "$u" -o "$zip"; then echo "downloaded $u"; got=1; break; fi
+    # Retry transient failures (the SourceForge mirror occasionally times out or
+    # 503s in CI); exiftool.org 404s for non-hosted versions and falls through.
+    if curl -fsSL --retry 4 --retry-delay 3 --connect-timeout 30 "$u" -o "$zip"; then
+      echo "downloaded $u"
+      got=1
+      break
+    fi
   done
   [ -n "$got" ] || { echo "ERROR: could not download Windows exiftool" >&2; return 1; }
   unzip -q -o "$zip" -d "$workdir"
@@ -160,7 +166,7 @@ vendor_from_download() {
   urls+=("https://github.com/exiftool/exiftool/archive/refs/heads/master.tar.gz")
   got=""
   for u in "${urls[@]}"; do
-    if curl -fsSL "$u" -o "$tar"; then echo "downloaded $u"; got=1; break; fi
+    if curl -fsSL --retry 4 --retry-delay 3 --connect-timeout 30 "$u" -o "$tar"; then echo "downloaded $u"; got=1; break; fi
   done
   [ -n "$got" ] || return 1
   tar xzf "$tar" -C "$workdir"
