@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "能识别同一场景的裁剪、旋转和重新着色。",
   "dup_metric_smart_con": "稍慢一些，并且需要内置的嵌入模型。",
   "dup_metric_smart_unavailable": "此处无法使用 嵌入模型，因此智能模式回退为快速模式。",
-  "lic_role_mobilenet_embed": "智能重复相似度（设备端嵌入）"
+  "lic_role_mobilenet_embed": "智能重复相似度（设备端嵌入）",
+  "welcome_scan_library": "扫描照片图库",
+  "welcome_permission_denied": "扫描图库需要照片访问权限。请在“设置”中授予权限后重试。",
+  "tag_mobile_tracks_title": "GPS 轨迹与位置历史",
+  "tag_mobile_tracks_help": "选择 GPX/KML 轨迹或 Google 时间线导出文件；坐标会根据每张照片的时间进行匹配并写回到图库。",
+  "tag_mobile_pick_tracks": "选择 GPS 轨迹文件",
+  "tag_mobile_clear_tracks": "清除轨迹文件",
+  "prune_mobile_unavailable": "在移动设备上暂不支持将图像与 RAW 匹配——照片图库不会将 RAW 文件作为独立项目提供。"
 }

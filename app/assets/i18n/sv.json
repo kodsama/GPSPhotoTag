@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "Förstår beskärningar, rotationer och omfärgningar av samma motiv.",
   "dup_metric_smart_con": "Lite långsammare och kräver den medföljande embedding-modellen.",
   "dup_metric_smart_unavailable": "embedding-modellen är inte tillgänglig här, så Smart faller tillbaka till Snabb.",
-  "lic_role_mobilenet_embed": "Smart dubblettlikhet (inbäddning på enheten)"
+  "lic_role_mobilenet_embed": "Smart dubblettlikhet (inbäddning på enheten)",
+  "welcome_scan_library": "Skanna fotobiblioteket",
+  "welcome_permission_denied": "Åtkomst till foton krävs för att skanna ditt bibliotek. Tillåt det i Inställningar och försök igen.",
+  "tag_mobile_tracks_title": "GPS-spår och platshistorik",
+  "tag_mobile_tracks_help": "Välj GPX/KML-spår eller Google Timeline-exporter; koordinaterna matchas mot varje fotos tid och skrivs tillbaka till ditt bibliotek.",
+  "tag_mobile_pick_tracks": "Välj GPS-spårfiler",
+  "tag_mobile_clear_tracks": "Rensa spårfiler",
+  "prune_mobile_unavailable": "Att matcha bilder mot RAW är inte tillgängligt på mobilen ännu — fotobiblioteket exponerar inte RAW-filer som separata objekt."
 }

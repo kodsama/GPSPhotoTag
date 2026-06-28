@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "Erkennt Zuschnitte, Drehungen und Umfärbungen derselben Szene.",
   "dup_metric_smart_con": "Etwas langsamer und benötigt das mitgelieferte Embedding-Modell.",
   "dup_metric_smart_unavailable": "Das Embedding-Modell ist hier nicht verfügbar, daher wechselt Smart zu Schnell.",
-  "lic_role_mobilenet_embed": "Smarte Duplikat-Ähnlichkeit (Embedding auf dem Gerät)"
+  "lic_role_mobilenet_embed": "Smarte Duplikat-Ähnlichkeit (Embedding auf dem Gerät)",
+  "welcome_scan_library": "Fotomediathek scannen",
+  "welcome_permission_denied": "Für den Scan deiner Mediathek wird Fotozugriff benötigt. Erlaube ihn in den Einstellungen und versuche es erneut.",
+  "tag_mobile_tracks_title": "GPS-Tracks & Standortverlauf",
+  "tag_mobile_tracks_help": "Wähle GPX/KML-Tracks oder Google-Timeline-Exporte; die Koordinaten werden der Aufnahmezeit jedes Fotos zugeordnet und in deine Mediathek zurückgeschrieben.",
+  "tag_mobile_pick_tracks": "GPS-Track-Dateien auswählen",
+  "tag_mobile_clear_tracks": "Track-Dateien entfernen",
+  "prune_mobile_unavailable": "Das Zuordnen von Bildern zu RAW ist auf Mobilgeräten noch nicht verfügbar — die Fotomediathek stellt RAW-Dateien nicht als separate Elemente bereit."
 }

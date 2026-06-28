@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "Entiende recortes, rotaciones y recoloreados de la misma escena.",
   "dup_metric_smart_con": "Un poco más lento y necesita el modelo de embedding incluido.",
   "dup_metric_smart_unavailable": "El modelo de embedding no está disponible aquí, así que Inteligente vuelve a Rápido.",
-  "lic_role_mobilenet_embed": "Similitud inteligente de duplicados (embedding en el dispositivo)"
+  "lic_role_mobilenet_embed": "Similitud inteligente de duplicados (embedding en el dispositivo)",
+  "welcome_scan_library": "Escanear la fototeca",
+  "welcome_permission_denied": "Se necesita acceso a las fotos para escanear tu biblioteca. Concédelo en Ajustes e inténtalo de nuevo.",
+  "tag_mobile_tracks_title": "Tracks GPS e historial de ubicación",
+  "tag_mobile_tracks_help": "Elige tracks GPX/KML o exportaciones de Google Timeline; las coordenadas se asocian a la hora de cada foto y se escriben de vuelta en tu biblioteca.",
+  "tag_mobile_pick_tracks": "Elegir archivos de track GPS",
+  "tag_mobile_clear_tracks": "Borrar archivos de track",
+  "prune_mobile_unavailable": "Asociar imágenes con RAW aún no está disponible en móvil: la fototeca no expone los archivos RAW como elementos separados."
 }

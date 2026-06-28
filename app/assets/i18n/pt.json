@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "Entende cortes, rotações e recolorações da mesma cena.",
   "dup_metric_smart_con": "Um pouco mais lento e precisa do modelo de embedding incluído.",
   "dup_metric_smart_unavailable": "O modelo de embedding não está disponível aqui, então Inteligente volta para Rápido.",
-  "lic_role_mobilenet_embed": "Similaridade inteligente de duplicatas (embedding no dispositivo)"
+  "lic_role_mobilenet_embed": "Similaridade inteligente de duplicatas (embedding no dispositivo)",
+  "welcome_scan_library": "Analisar a biblioteca de fotos",
+  "welcome_permission_denied": "É necessário acesso às fotos para analisar a sua biblioteca. Conceda-o nas Definições e tente novamente.",
+  "tag_mobile_tracks_title": "Trilhos GPS e histórico de localização",
+  "tag_mobile_tracks_help": "Escolha trilhos GPX/KML ou exportações do Google Timeline; as coordenadas são associadas à hora de cada foto e escritas de volta na sua biblioteca.",
+  "tag_mobile_pick_tracks": "Escolher ficheiros de trilho GPS",
+  "tag_mobile_clear_tracks": "Limpar ficheiros de trilho",
+  "prune_mobile_unavailable": "Associar imagens a RAW ainda não está disponível no telemóvel — a biblioteca de fotos não expõe ficheiros RAW como itens separados."
 }

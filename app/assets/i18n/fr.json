@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "Comprend recadrages, rotations et recolorations d'une même scène.",
   "dup_metric_smart_con": "Un peu plus lent, et nécessite le modèle d'embedding fourni.",
   "dup_metric_smart_unavailable": "Le modèle d'embedding n'est pas disponible ici ; Intelligent revient à Rapide.",
-  "lic_role_mobilenet_embed": "Similarité intelligente des doublons (vecteur sur l'appareil)"
+  "lic_role_mobilenet_embed": "Similarité intelligente des doublons (vecteur sur l'appareil)",
+  "welcome_scan_library": "Analyser la photothèque",
+  "welcome_permission_denied": "L'accès aux photos est nécessaire pour analyser votre photothèque. Autorisez-le dans les Réglages, puis réessayez.",
+  "tag_mobile_tracks_title": "Traces GPS et historique de position",
+  "tag_mobile_tracks_help": "Choisissez des traces GPX/KML ou des exports Google Timeline ; les coordonnées sont associées à l'heure de chaque photo et réécrites dans votre photothèque.",
+  "tag_mobile_pick_tracks": "Choisir des fichiers de trace GPS",
+  "tag_mobile_clear_tracks": "Effacer les fichiers de trace",
+  "prune_mobile_unavailable": "La mise en correspondance des images avec les RAW n'est pas encore disponible sur mobile — la photothèque n'expose pas les fichiers RAW comme éléments distincts."
 }

@@ -399,5 +399,12 @@
   "dup_metric_smart_pro": "同じシーンのトリミング、回転、色変更を理解します。",
   "dup_metric_smart_con": "やや遅く、付属の埋め込みモデルが必要です。",
   "dup_metric_smart_unavailable": "ここでは埋め込みモデルを利用できないため、スマートは高速に切り替わります。",
-  "lic_role_mobilenet_embed": "スマート重複類似度（オンデバイス埋め込み）"
+  "lic_role_mobilenet_embed": "スマート重複類似度（オンデバイス埋め込み）",
+  "welcome_scan_library": "フォトライブラリをスキャン",
+  "welcome_permission_denied": "ライブラリをスキャンするには写真へのアクセスが必要です。設定で許可してから再試行してください。",
+  "tag_mobile_tracks_title": "GPS トラックと位置履歴",
+  "tag_mobile_tracks_help": "GPX/KML トラックまたは Google タイムラインのエクスポートを選択すると、各写真の時刻に座標が照合され、ライブラリに書き戻されます。",
+  "tag_mobile_pick_tracks": "GPS トラックファイルを選択",
+  "tag_mobile_clear_tracks": "トラックファイルをクリア",
+  "prune_mobile_unavailable": "画像と RAW の対応付けはモバイルではまだ利用できません。フォトライブラリは RAW ファイルを個別の項目として公開しません。"
 }
