@@ -256,6 +256,14 @@ jobs:
       - name: Print toolchain versions
         run: flutter --version
 
+      # ONNX Runtime ships only as a CocoaPod (no Swift Package), so the iOS
+      # build must use CocoaPods integration rather than Flutter 3.44's default
+      # Swift Package Manager (mixing the two leaves the Pods sandbox out of
+      # sync). Disable SPM before resolving so plugins integrate via CocoaPods.
+      - name: Use CocoaPods integration on iOS (disable SPM)
+        if: matrix.target == 'ios'
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Resolve dependencies
         run: flutter pub get
 
