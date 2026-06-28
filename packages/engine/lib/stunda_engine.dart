@@ -19,6 +19,7 @@ export 'src/data/exif/xmp_sidecar_backend.dart';
 export 'src/data/filename_date.dart';
 export 'src/data/photo_formats.dart';
 export 'src/data/ports/exiftool_runner.dart';
+export 'src/data/ports/photo_library.dart';
 export 'src/data/ports/process_runner.dart';
 export 'src/data/ports/system_trash.dart';
 export 'src/data/ports/trash.dart';

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:image/image.dart' as img;
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:test/test.dart';
@@ -107,7 +109,26 @@ void main() {
       );
       expect(ortLibraryFileName(operatingSystem: 'linux'), 'libonnxruntime.so');
       expect(ortLibraryFileName(operatingSystem: 'windows'), 'onnxruntime.dll');
+      expect(ortLibraryFileName(operatingSystem: 'android'), 'libonnxruntime.so');
+      expect(
+        ortLibraryFileName(operatingSystem: 'ios'),
+        'onnxruntime.framework/onnxruntime',
+      );
       expect(ortLibraryFileName(operatingSystem: 'fuchsia'), isNull);
+    });
+
+    test('mobile libraries are loader-resolved, desktop are not', () {
+      expect(ortLibraryIsLoaderResolved(operatingSystem: 'android'), isTrue);
+      expect(ortLibraryIsLoaderResolved(operatingSystem: 'ios'), isTrue);
+      expect(ortLibraryIsLoaderResolved(operatingSystem: 'macos'), isFalse);
+      expect(ortLibraryIsLoaderResolved(operatingSystem: 'windows'), isFalse);
+    });
+
+    test('mobile resolves a bare loader library path, model in the dir', () {
+      final bundle = resolveOnnxBundle('/bundle', operatingSystem: 'android')!;
+      expect(bundle.libraryPath, 'libonnxruntime.so');
+      expect(bundle.libraryLoaderResolved, isTrue);
+      expect(bundle.modelPath, '/bundle/$kOnnxModelFileName');
     });
 
     test('null bundle dir resolves to null', () {
@@ -130,6 +151,17 @@ void main() {
         operatingSystem: 'macos',
       )!;
       expect(bundle.isComplete, isFalse);
+    });
+
+    test('mobile isComplete needs only the model (loader provides the lib)', () {
+      final dir = Directory.systemTemp.createTempSync('stunda_onnx_test');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final android = resolveOnnxBundle(dir.path, operatingSystem: 'android')!;
+      // No model yet → incomplete even though the lib is loader-resolved.
+      expect(android.isComplete, isFalse);
+      File(android.modelPath).writeAsBytesSync([0]);
+      // Model present + loader-resolved lib (file absent) → complete.
+      expect(android.isComplete, isTrue);
     });
   });
 

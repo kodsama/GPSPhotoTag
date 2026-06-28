@@ -337,7 +337,12 @@ class _OrtApi {
     final getApi = apiBase.value
         .cast<NativeFunction<Pointer<Pointer<Void>> Function(Uint32)>>()
         .asFunction<Pointer<Pointer<Void>> Function(int)>();
-    _api = getApi(27);
+    // Request API v26 (not the newest): ORT's C API is backward-compatible, so
+    // a newer desktop lib (1.27) still serves it, while the latest ONNX Runtime
+    // *Android* AAR (1.26) — which doesn't yet offer v27 — also works. The
+    // detector only calls 1.0-era functions, whose ordinals are stable, so the
+    // older interface request is safe on every platform.
+    _api = getApi(26);
   }
 
   late final Pointer<Pointer<Void>> _api;

@@ -6,6 +6,10 @@
 /// bundle dir to the concrete file paths and reports whether a complete pair is
 /// present, so callers can decide between [OrtPeopleDetector] and the no-op.
 ///
+/// On mobile the ONNX Runtime library is provided by the OS dynamic loader (the
+/// Android AAR's `libonnxruntime.so`, the iOS CocoaPod framework) rather than a
+/// file in the bundle dir, so only the model is a real file there.
+///
 /// Resolution is pure given an [operatingSystem] override, so the per-platform
 /// library name is unit-testable on any host.
 library;
@@ -22,10 +26,15 @@ const String kOnnxModelFileName = 'ssd_mobilenet_v1_12.onnx';
 /// MobileNetV2-12 from the ONNX Model Zoo, used by the Smart duplicate metric).
 const String kEmbeddingModelFileName = 'mobilenetv2-12.onnx';
 
-/// The ONNX Runtime shared-library file name for [operatingSystem]
-/// ([Platform.operatingSystem] by default): `libonnxruntime.dylib` on macOS,
-/// `libonnxruntime.so` on Linux, `onnxruntime.dll` on Windows. Other platforms
-/// (where a desktop ORT build is not bundled) yield null.
+/// The ONNX Runtime shared-library name for [operatingSystem]
+/// ([Platform.operatingSystem] by default).
+///
+/// Desktop returns a bundled file name resolved relative to the bundle dir:
+/// `libonnxruntime.dylib` (macOS), `libonnxruntime.so` (Linux),
+/// `onnxruntime.dll` (Windows). Mobile returns a name the dynamic loader
+/// resolves itself (see [ortLibraryIsLoaderResolved]): `libonnxruntime.so`
+/// (Android, packaged from the AAR), `onnxruntime.framework/onnxruntime` (iOS,
+/// the embedded CocoaPod framework). Unsupported platforms yield null.
 String? ortLibraryFileName({String? operatingSystem}) {
   final os = operatingSystem ?? Platform.operatingSystem;
   switch (os) {
@@ -35,27 +44,54 @@ String? ortLibraryFileName({String? operatingSystem}) {
       return 'libonnxruntime.so';
     case 'windows':
       return 'onnxruntime.dll';
+    case 'android':
+      return 'libonnxruntime.so';
+    case 'ios':
+      return 'onnxruntime.framework/onnxruntime';
     default:
       return null;
   }
 }
 
-/// The resolved on-disk paths of a detector bundle: the ORT [libraryPath] and
-/// the [modelPath]. Built by [resolveOnnxBundle]; [isComplete] is true only when
-/// both files exist.
-class OnnxBundle {
-  /// Creates a bundle descriptor from a [libraryPath] and [modelPath].
-  const OnnxBundle({required this.libraryPath, required this.modelPath});
+/// Whether [operatingSystem]'s ONNX Runtime library is resolved by the OS
+/// dynamic loader (mobile) rather than living as a file inside the bundle dir
+/// (desktop). When true the library path is a bare soname / framework path that
+/// cannot be `stat`'d, so [OnnxBundle.isComplete] only requires the model.
+bool ortLibraryIsLoaderResolved({String? operatingSystem}) {
+  final os = operatingSystem ?? Platform.operatingSystem;
+  return os == 'android' || os == 'ios';
+}
 
-  /// Absolute/relative path to the ONNX Runtime shared library.
+/// The resolved paths of a detector bundle: the ORT [libraryPath] and the
+/// [modelPath]. Built by [resolveOnnxBundle]; [isComplete] reports whether the
+/// pieces this platform needs are present.
+class OnnxBundle {
+  /// Creates a bundle descriptor. [libraryLoaderResolved] is true on mobile,
+  /// where [libraryPath] is a loader-resolved soname/framework path rather than
+  /// a file on disk.
+  const OnnxBundle({
+    required this.libraryPath,
+    required this.modelPath,
+    this.libraryLoaderResolved = false,
+  });
+
+  /// Path to the ONNX Runtime shared library (desktop) or the loader-resolved
+  /// soname/framework path (mobile, when [libraryLoaderResolved]).
   final String libraryPath;
 
-  /// Path to the SSD-MobileNet model file.
+  /// Path to the model file.
   final String modelPath;
 
-  /// Whether both the library and the model exist on disk right now.
-  bool get isComplete =>
-      File(libraryPath).existsSync() && File(modelPath).existsSync();
+  /// Whether [libraryPath] is resolved by the OS loader (mobile) instead of
+  /// being a file in the bundle dir (desktop).
+  final bool libraryLoaderResolved;
+
+  /// Whether the pieces needed on this platform are present: the model always,
+  /// plus the library file on desktop (on mobile the loader provides it).
+  bool get isComplete {
+    if (!File(modelPath).existsSync()) return false;
+    return libraryLoaderResolved || File(libraryPath).existsSync();
+  }
 }
 
 /// Resolves the detector [OnnxBundle] for [bundleDir], or null when no bundle is
@@ -86,8 +122,14 @@ OnnxBundle? _resolveBundle(
   if (bundleDir == null) return null;
   final libName = ortLibraryFileName(operatingSystem: operatingSystem);
   if (libName == null) return null;
+  final loaderResolved = ortLibraryIsLoaderResolved(
+    operatingSystem: operatingSystem,
+  );
   return OnnxBundle(
-    libraryPath: p.join(bundleDir, libName),
+    // On mobile the loader finds the library by its bare soname/framework path;
+    // on desktop it lives next to the model in the bundle dir.
+    libraryPath: loaderResolved ? libName : p.join(bundleDir, libName),
     modelPath: p.join(bundleDir, modelFileName),
+    libraryLoaderResolved: loaderResolved,
   );
 }

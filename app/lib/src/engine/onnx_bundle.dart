@@ -1,8 +1,34 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
+
+/// Prepares the ONNX bundle dir on mobile (Android/iOS), or returns null on
+/// desktop (use [locateBundledOnnx] there).
+///
+/// On mobile the two `.onnx` models ship as Flutter assets — not real files —
+/// and the ONNX Runtime native library is provided by the OS dynamic loader
+/// (the Android AAR / the iOS CocoaPod framework). This copies both models from
+/// the asset bundle into `<supportDir>/onnx/` (idempotent) and returns that dir
+/// to use as the engine's `onnxBundleDir`. The library is resolved by name at
+/// FFI load time, so only the models need to be materialised here.
+Future<String?> prepareMobileOnnxBundle(String supportDir) async {
+  if (!Platform.isAndroid && !Platform.isIOS) return null;
+  final dir = Directory(p.join(supportDir, 'onnx'));
+  if (!dir.existsSync()) dir.createSync(recursive: true);
+  for (final name in const [kOnnxModelFileName, kEmbeddingModelFileName]) {
+    final out = File(p.join(dir.path, name));
+    if (out.existsSync() && out.lengthSync() > 0) continue;
+    final data = await rootBundle.load('assets/onnx/$name');
+    await out.writeAsBytes(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      flush: true,
+    );
+  }
+  return dir.path;
+}
 
 /// Locates the bundled ONNX Runtime library + detector model inside the built
 /// desktop app, mirroring [locateBundledExiftool].

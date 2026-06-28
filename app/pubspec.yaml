@@ -15,7 +15,10 @@ dependencies:
   stunda_engine:
   stunda_mcp:
   file_selector: ^1.0.3
-  desktop_drop: ^0.6.1
+  desktop_drop: ^0.7.1
+  # Mobile (Android/iOS) device photo-library access: enumerate, metadata,
+  # thumbnails, full bytes, and delete. GPS write-back uses a custom channel.
+  photo_manager: ^3.0.0
   url_launcher: ^6.3.0
   cupertino_icons: ^1.0.8
   path: ^1.9.0

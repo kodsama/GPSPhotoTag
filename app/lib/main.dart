@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -24,6 +25,14 @@ Future<void> main() async {
   final support = await getApplicationSupportDirectory();
   final prefs = await AppPrefs.load(support.path);
 
+  // On mobile the ONNX models ship as assets and must be copied to real files;
+  // on desktop they are vendored next to the executable. The ONNX Runtime
+  // library is loader-resolved on mobile and bundle-relative on desktop.
+  final isMobile = Platform.isAndroid || Platform.isIOS;
+  final onnxBundleDir = isMobile
+      ? await prepareMobileOnnxBundle(support.path)
+      : locateBundledOnnx();
+
   // Resolve the tile cache dir ONCE here (never per tile), build the persistent
   // browse-cache + provider, and best-effort seed the low-zoom world view so
   // the first open of the map paints immediately instead of grey.
@@ -33,8 +42,8 @@ Future<void> main() async {
 
   runApp(
     StundaApp(
-      exiftoolBundleDir: locateBundledExiftool(),
-      onnxBundleDir: locateBundledOnnx(),
+      exiftoolBundleDir: isMobile ? null : locateBundledExiftool(),
+      onnxBundleDir: onnxBundleDir,
       prefs: prefs,
       tileProvider: CachingTileProvider(cache: tileCache),
     ),
