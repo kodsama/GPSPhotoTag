@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/engine/engine_runner.dart';
@@ -328,6 +329,62 @@ class ThrowingEngineRunner implements EngineRunner {
     bool embed = false,
     void Function(int done, int total)? onProgress,
   }) async => throw StateError('hashFiles blew up');
+}
+
+/// An in-memory [PhotoLibrary] for mobile controller tests: enumerates the
+/// seeded [assets], exports a fake proxy path per asset, and records the ids
+/// passed to [delete]/[writeGps] so the trash + tag wiring can be asserted
+/// without a device, a plugin, or a platform channel.
+class FakePhotoLibrary implements PhotoLibrary {
+  FakePhotoLibrary(this.assets);
+
+  /// The library contents this fake reports from [enumerate].
+  List<LibraryAsset> assets;
+
+  /// Asset ids passed to the most recent [delete] call.
+  List<String>? deletedIds;
+
+  /// (id, lat, lng) tuples passed to [writeGps], in call order.
+  final List<(String, double, double)> gpsWrites = [];
+
+  /// Ids whose [exportProxy] should throw (simulating an un-exportable asset).
+  final Set<String> exportFailures = {};
+
+  /// When set, [delete] throws this (simulating a native delete failure).
+  Object? deleteError;
+
+  /// When set, [writeGps] throws this (simulating a native GPS-write failure).
+  Object? writeGpsError;
+
+  /// The fake proxy path for an asset id (the engine-facing temp path).
+  static String proxyPathFor(String id) => '/proxies/$id.jpg';
+
+  @override
+  Future<List<LibraryAsset>> enumerate() async => assets;
+
+  @override
+  Future<String> exportProxy(String id, int maxEdge) async {
+    if (exportFailures.contains(id)) throw StateError('export failed: $id');
+    return proxyPathFor(id);
+  }
+
+  @override
+  Future<Uint8List> thumbnail(String id, int edge) async => Uint8List(0);
+
+  @override
+  Future<Uint8List> fullBytes(String id) async => Uint8List(0);
+
+  @override
+  Future<void> writeGps(String id, double latitude, double longitude) async {
+    if (writeGpsError != null) throw writeGpsError!;
+    gpsWrites.add((id, latitude, longitude));
+  }
+
+  @override
+  Future<void> delete(List<String> ids) async {
+    if (deleteError != null) throw deleteError!;
+    deletedIds = ids;
+  }
 }
 
 /// Builds a [FolderScanResult] for tests with controllable tallies.
