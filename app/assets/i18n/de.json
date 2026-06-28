@@ -184,7 +184,6 @@
   "sim_minor": "Kleine Bearbeitungen (Zuschnitt, Belichtung)",
   "sim_same_scene": "Gleiche Szene, anderer Schuss",
   "sim_loose": "Lose ähnliche Szenen",
-  "sim_vague": "Vage ähnlich / gleiche Art von Szene",
   "hashing_progress": "Hashing {done} / {total}",
   "run_progress": "{done}/{total}",
   "run_recent_results": "Letzte Ergebnisse",

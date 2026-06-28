@@ -184,7 +184,6 @@
   "sim_minor": "Ediciones menores (recorte, exposición)",
   "sim_same_scene": "Misma escena, otra toma",
   "sim_loose": "Escenas vagamente similares",
-  "sim_vague": "Vagamente similares / mismo tipo de escena",
   "hashing_progress": "Calculando hash {done} / {total}",
   "run_progress": "{done}/{total}",
   "run_recent_results": "Resultados recientes",

@@ -184,7 +184,6 @@
   "sim_minor": "Mindre redigeringar (beskärning, exponering)",
   "sim_same_scene": "Samma motiv, en annan tagning",
   "sim_loose": "Löst liknande motiv",
-  "sim_vague": "Vagt liknande / samma slags motiv",
   "hashing_progress": "Hashar {done} / {total}",
   "run_progress": "{done}/{total}",
   "run_recent_results": "Senaste resultaten",

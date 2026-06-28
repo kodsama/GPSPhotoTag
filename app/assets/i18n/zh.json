@@ -184,7 +184,6 @@
   "sim_minor": "轻微编辑（裁剪、曝光）",
   "sim_same_scene": "同一场景，不同拍摄",
   "sim_loose": "大致相似的场景",
-  "sim_vague": "大致相近／同类场景",
   "hashing_progress": "正在哈希 {done} / {total}",
   "run_progress": "{done}/{total}",
   "run_recent_results": "最近结果",

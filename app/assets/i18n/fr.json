@@ -184,7 +184,6 @@
   "sim_minor": "Retouches mineures (recadrage, exposition)",
   "sim_same_scene": "Même scène, une autre prise",
   "sim_loose": "Scènes vaguement similaires",
-  "sim_vague": "Vaguement similaires / même type de scène",
   "hashing_progress": "Hachage {done} / {total}",
   "run_progress": "{done}/{total}",
   "run_recent_results": "Résultats récents",

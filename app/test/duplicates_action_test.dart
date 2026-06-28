@@ -108,7 +108,7 @@ void main() {
       // Driving the controller to Loose updates the caption live.
       c.setSimilarity(similaritySteps);
       await tester.pump();
-      expect(find.text('Vaguely similar / same kind of scene'), findsOneWidget);
+      expect(find.text('Loosely similar scenes'), findsOneWidget);
       expect(find.text('Identical copies'), findsNothing);
     },
   );

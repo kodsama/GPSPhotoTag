@@ -235,7 +235,6 @@ const Map<String, String> kEnglishStrings = {
   'sim_minor': 'Minor edits (crop, exposure)',
   'sim_same_scene': 'Same scene, a different shot',
   'sim_loose': 'Loosely similar scenes',
-  'sim_vague': 'Vaguely similar / same kind of scene',
   'hashing_progress': 'Hashing {done} / {total}',
   'run_progress': '{done}/{total}',
   'run_recent_results': 'Recent results',

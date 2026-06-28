@@ -184,7 +184,6 @@
   "sim_minor": "軽微な編集（切り抜き、露出）",
   "sim_same_scene": "同じ場面の別ショット",
   "sim_loose": "緩やかに似た場面",
-  "sim_vague": "漠然と似た／同じ種類の場面",
   "hashing_progress": "ハッシュ計算中 {done} / {total}",
   "run_progress": "{done}/{total}",
   "run_recent_results": "最近の結果",
