@@ -246,11 +246,31 @@ class IsolateRunner implements EngineRunner {
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
     void Function(int done, int total)? onProgress,
   }) async {
-    final all = await hashFiles(paths, onProgress: onProgress);
-    return groupDuplicates(all, minSimilarity: minSimilarity);
+    // A Smart run also embeds each file (when a model is bundled). When Smart is
+    // requested but no embedder is available, grouping with the Smart metric
+    // would find nothing (every embedding is empty), so fall back to Fast.
+    final wantSmart = metric == SimilarityMetric.smart && smartAvailable;
+    final all = await hashFiles(
+      paths,
+      embed: wantSmart,
+      onProgress: onProgress,
+    );
+    return groupDuplicates(
+      all,
+      minSimilarity: minSimilarity,
+      metric: wantSmart ? SimilarityMetric.smart : SimilarityMetric.fast,
+    );
   }
+
+  /// Whether the Smart metric can run: an embedding model + ONNX Runtime are
+  /// bundled and resolve to a complete bundle. Mirrors how the worker decides to
+  /// build the embedder, so the UI's "fell back to Fast" note is accurate.
+  @override
+  bool get smartAvailable =>
+      resolveEmbeddingBundle(onnxBundleDir)?.isComplete ?? false;
 
   /// Fans [paths] out round-robin across CPU-bounded workers (each with its own
   /// bundled exiftool for RAW/HEIC previews) and concatenates their hashed files
@@ -258,6 +278,7 @@ class IsolateRunner implements EngineRunner {
   @override
   Future<List<HashedFile>> hashFiles(
     List<String> paths, {
+    bool embed = false,
     void Function(int done, int total)? onProgress,
   }) async {
     if (paths.isEmpty) return const [];
@@ -299,6 +320,7 @@ class IsolateRunner implements EngineRunner {
           paths: slice,
           bundleDir: exiftoolBundleDir,
           onnxBundleDir: onnxBundleDir,
+          embed: embed,
         ),
       ).catchError((Object _) {
         // A worker that never starts contributes no hashes; unblock the join.
@@ -472,12 +494,17 @@ class HashFilesRequest {
     required this.paths,
     required this.bundleDir,
     this.onnxBundleDir,
+    this.embed = false,
   });
 
   final SendPort port;
   final List<String> paths;
   final String? bundleDir;
   final String? onnxBundleDir;
+
+  /// Whether to also compute each file's Smart-metric embedding (only set for
+  /// a Smart duplicate run; the embedder is unavailable when no model bundled).
+  final bool embed;
 }
 
 @visibleForTesting
@@ -656,6 +683,12 @@ Future<void> hashFilesEntry(HashFilesRequest req) async {
   // sendable). It's unavailable when no model is bundled, so hashing falls back
   // to Tier-1 metadata. Closed in the finally so the native session is freed.
   final detector = OrtPeopleDetector.fromBundleDir(req.onnxBundleDir);
+  // The Smart-metric embedder, built INSIDE the worker only for a Smart run.
+  // Unavailable when no embedding model is bundled, so the Smart metric degrades
+  // to Fast. A non-embedding run uses the no-op so no native session is loaded.
+  final ImageEmbedder embedder = req.embed
+      ? OrtImageEmbedder.fromBundleDir(req.onnxBundleDir)
+      : const NoopImageEmbedder();
   try {
     final runner = buildWorkerRunner(req.bundleDir);
     final tmpDir = previewCacheDir().path;
@@ -671,6 +704,7 @@ Future<void> hashFilesEntry(HashFilesRequest req) async {
         runner: runner,
         tmpDir: tmpDir,
         detector: detector,
+        embedder: embedder,
         // One progress tick per file processed (even skips) so the aggregated
         // `done` count reaches the total when the run finishes.
         onFileDone: () => req.port.send(1),
@@ -683,6 +717,7 @@ Future<void> hashFilesEntry(HashFilesRequest req) async {
     // Best-effort: a failed worker just contributes no hashes.
   } finally {
     detector.close();
+    if (embedder is OrtImageEmbedder) embedder.close();
     req.port.send(null);
   }
 }

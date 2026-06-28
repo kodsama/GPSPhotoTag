@@ -28,7 +28,7 @@
   "help_match_b1": "Finden Sie Dateien, die ihren Partner verloren haben: Entfernen Sie verwaiste RAW-Dateien ohne passendes Foto oder — umgekehrt — Fotos ohne passendes RAW.",
   "help_match_b2": "Sie prüfen die vollständige Liste und wählen aus, was einbezogen wird, bevor etwas in den Papierkorb wandert.",
   "help_duplicates_title": "Duplikate finden",
-  "help_duplicates_b1": "Erkennt visuell ähnliche Fotos. Der Ähnlichkeitsregler reicht von Exakt bis Locker — ziehen Sie ihn Richtung Locker, um auch leicht bearbeitete Beinahe-Duplikate zu erfassen, mit einer Live-Vorschau, wie streng jede Einstellung ist.",
+  "help_duplicates_b1": "Findet visuell ähnliche Fotos. Wählen Sie oben eine Vergleichsmethode — Schnell (perzeptueller Hash + Farbe) oder Smart (Embedding-Ähnlichkeit auf dem Gerät) — und nutzen Sie dann den Ähnlichkeitsregler von Exakt bis Locker, mit einer Live-Vorschau, wie streng jede Einstellung ist.",
   "help_duplicates_b2": "Eine Behalten-Prioritätskette entscheidet, welche Kopie bleibt: Auflösung, Qualität sowie Personen & Tiere. Ordnen Sie die Regeln um und schalten Sie sie ein oder aus; die erste Regel, die klar entscheidet, gewinnt.",
   "help_duplicates_b3": "Prüfen Sie jedes Paar, tauschen Sie die behaltene Seite oder wählen Sie ab, um beide zu behalten. Nichts wird gelöscht, bis Sie bestätigen.",
   "help_compare_title": "Vergleichsansicht",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "verwaistes Bild",
   "shrink_reason_redundant_raw": "redundantes RAW",
   "shrink_reason_redundant_jpg": "redundantes JPG",
-  "shrink_reason_low_quality": "geringe Qualität"
+  "shrink_reason_low_quality": "geringe Qualität",
+  "dup_metric_title": "Vergleichsmethode",
+  "dup_metric_fast": "Schnell — perzeptueller Hash",
+  "dup_metric_fast_desc": "Vergleicht einen perzeptuellen Hash (pHash) plus Farbe. Sofort, für jede Datei.",
+  "dup_metric_fast_pro": "Ideal für nahezu identische Kopien und erneutes Speichern.",
+  "dup_metric_fast_con": "Übersieht starke Zuschnitte, Drehungen oder Umfärbungen.",
+  "dup_metric_smart": "Smart — Embedding-Ähnlichkeit",
+  "dup_metric_smart_desc": "Vergleicht ein Embedding jedes Fotos, lokal berechnet. Läuft komplett auf Ihrem Computer.",
+  "dup_metric_smart_pro": "Erkennt Zuschnitte, Drehungen und Umfärbungen derselben Szene.",
+  "dup_metric_smart_con": "Etwas langsamer und benötigt das mitgelieferte Embedding-Modell.",
+  "dup_metric_smart_unavailable": "Das Embedding-Modell ist hier nicht verfügbar, daher wechselt Smart zu Schnell.",
+  "lic_role_mobilenet_embed": "Smarte Duplikat-Ähnlichkeit (Embedding auf dem Gerät)"
 }

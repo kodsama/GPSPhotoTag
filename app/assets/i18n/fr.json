@@ -28,7 +28,7 @@
   "help_match_b1": "Trouvez les fichiers ayant perdu leur partenaire : supprimez les fichiers RAW orphelins sans photo correspondante, ou — dans l'autre sens — les photos sans RAW correspondant.",
   "help_match_b2": "Vous passez en revue la liste complète et choisissez ce qu'il faut inclure avant que quoi que ce soit ne soit mis à la corbeille.",
   "help_duplicates_title": "Trouver les doublons",
-  "help_duplicates_b1": "Repère les photos visuellement similaires. Le curseur de similarité va de Exact à Large — glissez vers Large pour aussi attraper les quasi-doublons légèrement retouchés, avec un aperçu en direct de la rigueur de chaque réglage.",
+  "help_duplicates_b1": "Repère les photos visuellement similaires. Choisissez une méthode de comparaison en haut — Rapide (empreinte perceptuelle + couleur) ou Intelligent (similarité par embedding sur l'appareil) — puis utilisez le curseur de similarité d'Exact à Large, avec un aperçu en direct de la rigueur de chaque réglage.",
   "help_duplicates_b2": "Une chaîne de priorités décide quelle copie conserver : Résolution, Qualité et Personnes & animaux. Réorganisez les règles et activez-les ou non ; la première règle qui tranche clairement l'emporte.",
   "help_duplicates_b3": "Examinez chaque paire, inversez le côté conservé, ou désélectionnez pour garder les deux. Rien n'est supprimé tant que vous ne confirmez pas.",
   "help_compare_title": "Visionneuse de comparaison",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "image orpheline",
   "shrink_reason_redundant_raw": "RAW redondant",
   "shrink_reason_redundant_jpg": "JPG redondant",
-  "shrink_reason_low_quality": "faible qualité"
+  "shrink_reason_low_quality": "faible qualité",
+  "dup_metric_title": "Méthode de comparaison",
+  "dup_metric_fast": "Rapide — empreinte perceptuelle",
+  "dup_metric_fast_desc": "Compare une empreinte perceptuelle (pHash) et la couleur. Instantané, sur chaque fichier.",
+  "dup_metric_fast_pro": "Idéal pour les copies quasi identiques et les ré-enregistrements.",
+  "dup_metric_fast_con": "Manque les recadrages, rotations ou recolorations importants.",
+  "dup_metric_smart": "Intelligent — similarité par embedding",
+  "dup_metric_smart_desc": "Compare un vecteur d'embedding de chaque photo, calculé sur l'appareil. Tout reste sur votre ordinateur.",
+  "dup_metric_smart_pro": "Comprend recadrages, rotations et recolorations d'une même scène.",
+  "dup_metric_smart_con": "Un peu plus lent, et nécessite le modèle d'embedding fourni.",
+  "dup_metric_smart_unavailable": "Le modèle d'embedding n'est pas disponible ici ; Intelligent revient à Rapide.",
+  "lic_role_mobilenet_embed": "Similarité intelligente des doublons (vecteur sur l'appareil)"
 }

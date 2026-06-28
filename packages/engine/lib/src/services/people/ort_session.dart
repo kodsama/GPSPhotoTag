@@ -44,8 +44,11 @@ const int _oReleaseValue = 96;
 const int _oReleaseTensorTypeAndShapeInfo = 99;
 const int _oReleaseSessionOptions = 100;
 
-/// The `ONNXTensorElementDataType` for uint8 (the model's image input type).
+/// The `ONNXTensorElementDataType` for uint8 (the detector's image input type).
 const int _onnxTensorElemUint8 = 2;
+
+/// The `ONNXTensorElementDataType` for float32 (the embedder's input type).
+const int _onnxTensorElemFloat = 1;
 
 /// The `OrtLoggingLevel` for warnings (env creation severity).
 const int _ortLoggingLevelWarning = 2;
@@ -218,6 +221,85 @@ class OrtSession {
         classes: classes,
         numDetections: num,
       );
+    });
+  }
+
+  /// Runs the model on one float32 NCHW image tensor in [input] (length
+  /// `3 * side * side`, channel-major: all R, then all G, then all B) and
+  /// returns the model's single output tensor as a flat float list — used by the
+  /// image embedder, whose model takes a normalized `[1,3,H,W]` float input and
+  /// emits a feature/logit vector. Throws on a native failure.
+  List<double> runEmbedding(Float32List input, {required int side}) {
+    if (_closed) throw StateError('OrtSession is closed');
+    return using((Arena arena) {
+      final memPP = arena<Pointer<Void>>();
+      _api.check(_api.createCpuMemoryInfo(0, 0, memPP));
+      final memInfo = memPP.value;
+
+      final dataPtr = arena<Float>(input.length);
+      dataPtr.asTypedList(input.length).setAll(0, input);
+
+      final shape = arena<Int64>(4);
+      shape[0] = 1;
+      shape[1] = 3;
+      shape[2] = side;
+      shape[3] = side;
+
+      final inputValPP = arena<Pointer<Void>>();
+      _api.check(
+        _api.createTensorWithData(
+          memInfo,
+          dataPtr.cast<Uint8>(),
+          input.length * 4, // float32 = 4 bytes each
+          shape,
+          4,
+          _onnxTensorElemFloat,
+          inputValPP,
+        ),
+      );
+      final inputVal = inputValPP.value;
+
+      final outCountP = arena<Size>();
+      _api.check(_api.sessionGetOutputCount(_session, outCountP));
+      final outCount = outCountP.value;
+      final outNames = <String>[
+        for (var i = 0; i < outCount; i++)
+          _api.outputName(_session, i, _allocator(arena), arena),
+      ];
+
+      final inNamesArr = arena<Pointer<Utf8>>(1);
+      inNamesArr[0] = _cstr(_inputName, arena);
+      final inValsArr = arena<Pointer<Void>>(1);
+      inValsArr[0] = inputVal;
+      final outNamesArr = arena<Pointer<Utf8>>(outCount);
+      for (var i = 0; i < outCount; i++) {
+        outNamesArr[i] = _cstr(outNames[i], arena);
+      }
+      final outValsArr = arena<Pointer<Void>>(outCount);
+      for (var i = 0; i < outCount; i++) {
+        outValsArr[i] = nullptr;
+      }
+
+      _api.check(
+        _api.run(
+          _session,
+          nullptr,
+          inNamesArr,
+          inValsArr,
+          1,
+          outNamesArr,
+          outCount,
+          outValsArr,
+        ),
+      );
+
+      final result = _api.readFloats(outValsArr[0], arena);
+      for (var i = 0; i < outCount; i++) {
+        _api.releaseValue(outValsArr[i]);
+      }
+      _api.releaseValue(inputVal);
+      _api.releaseMemoryInfo(memInfo);
+      return result;
     });
   }
 

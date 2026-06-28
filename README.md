@@ -75,10 +75,13 @@ workspace you choose an action:
   tiles are cached for offline and repeat viewing.
 - **Match Images to RAW** — remove orphan RAWs, or orphan images (both
   directions), after reviewing the list.
-- **Find duplicates** — a similarity slider (Exact ↔ Loose) with a live example,
-  and a **Keep priority** pipeline (Resolution → Quality → People & animals,
+- **Find duplicates** — pick a **matching method**: *Fast* (perceptual hash +
+  colour, instant, best for near-identical copies) or *Smart* (an on-device AI
+  embedding that understands crops, rotations and recolours). A similarity slider
+  (Exact ↔ Loose) with a live example tunes whichever method is selected, plus a
+  **Keep priority** pipeline (Resolution → Quality → People & animals,
   reorderable and toggleable). Review pairs, swap, or deselect; nothing is
-  deleted until you confirm.
+  deleted until you confirm. Smart degrades to Fast when no model is bundled.
 - **Comparison viewer** — open any image full-screen, with a vertical/horizontal
   curtain or side-by-side synced zoom, plus an info line (name, resolution,
   size, time, GPS, EXIF).
@@ -161,6 +164,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
 ## Duplicate detection & the people keep-rule
 
+Duplicates are grouped with one of two **similarity metrics**, chosen at the top
+of the Find-duplicates screen and persisted:
+
+- **Fast** — a 256-bit perceptual DCT hash (pHash) blended with a coarse HSV
+  colour signature. Instant, computed for every file; best for near-identical
+  copies and re-saves. Pure maths, fully unit-tested.
+- **Smart** — an on-device **image embedding**: a small Apache-2.0
+  **MobileNetV2** (ONNX Model Zoo, ~14 MB) runs over the same decoded thumbnail
+  through the bundled **ONNX Runtime** via `dart:ffi`, producing an L2-normalized
+  vector per image; pairs are compared by cosine similarity mapped to 0..1. This
+  is engine-wide (app worker isolates **and** headless `dart run`), and is far
+  more robust to crops, rotations and recolours. When the embedding model or
+  runtime isn't available, Smart **degrades to Fast** (surfaced in the UI).
+
 When grouping near-duplicates, Stunda picks which copy to **keep** with an
 ordered keep-rule cascade (resolution → quality → people). The `people` rule
 favours the candidate that most looks like it contains a person or pet, in two
@@ -180,7 +197,7 @@ git), exactly like exiftool:
 
 ```bash
 bash tool/fetch-exiftool.sh           # exiftool + lib into app/assets/exiftool/
-bash tool/fetch-onnx.sh               # ORT lib + SSD-MobileNet into app/assets/onnx/
+bash tool/fetch-onnx.sh               # ORT lib + SSD-MobileNet + MobileNetV2 into app/assets/onnx/
 ```
 
 ## Development
@@ -201,4 +218,5 @@ the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see
 [LICENSE](LICENSE). It comes with no warranty, to the extent permitted by law.
 
 Bundled at build time: **exiftool** (Artistic/GPL), **ONNX Runtime** (MIT), and
-the **SSD-MobileNet v1** detector model from the ONNX Model Zoo (**Apache-2.0**).
+the **SSD-MobileNet v1** detector and **MobileNetV2** embedding models from the
+ONNX Model Zoo (both **Apache-2.0**).

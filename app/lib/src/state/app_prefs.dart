@@ -31,6 +31,7 @@ class AppPrefs {
     Set<QualityParam>? lowQParams,
     this.lowQThreshold = 0.35,
     this.similarityPercent = 0,
+    this.similarityMetric = SimilarityMetric.fast,
   }) : lowQParams = lowQParams ?? QualityParam.values.toSet();
 
   /// The backing JSON file path, or null when persistence is disabled.
@@ -72,6 +73,10 @@ class AppPrefs {
   /// Snapped to a multiple of 10 by the controller on use.
   int similarityPercent;
 
+  /// The duplicate-finder metric: Fast (perceptual hash + colour) or Smart
+  /// (on-device embedding). Defaults to Fast.
+  SimilarityMetric similarityMetric;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -101,6 +106,9 @@ class AppPrefs {
       // 0..15-step value lands at the strict end and is snapped on use.
       final sim = map['similarityPercent'];
       if (sim is int) prefs.similarityPercent = sim.clamp(0, 100);
+      prefs.similarityMetric = _parseSimilarityMetric(
+        map['similarityMetric'] as String?,
+      );
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -124,6 +132,7 @@ class AppPrefs {
           'lowQParams': [for (final p in lowQParams) p.name],
           'lowQThreshold': lowQThreshold,
           'similarityPercent': similarityPercent,
+          'similarityMetric': similarityMetric.name,
         }),
       );
     } on Object {
@@ -142,6 +151,12 @@ class AppPrefs {
     'embed' => RawMode.embed,
     _ => RawMode.auto,
   };
+
+  static SimilarityMetric _parseSimilarityMetric(String? name) =>
+      switch (name) {
+        'smart' => SimilarityMetric.smart,
+        _ => SimilarityMetric.fast,
+      };
 
   /// Parses a persisted list of [QualityParam] names, ignoring any unknown
   /// entries. An empty/all-unknown list is honoured as the empty set (the user

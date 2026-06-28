@@ -54,6 +54,90 @@ class ExampleScenePair extends StatelessWidget {
   }
 }
 
+/// A small illustration for a duplicate-finder metric option, mirroring
+/// [ExampleScenePair]: two scene tiles with a relation glyph between them.
+///
+/// The Fast metric is shown as two pixel-identical tiles joined by "=" (it
+/// matches near-identical copies). The Smart metric is shown as a reference tile
+/// and the SAME scene cropped/rotated/recoloured, joined by "≈", because the embedder
+/// embedding still recognises it as the same photo. Both are drawn with the
+/// shared [CustomPainter] — no bundled image assets — so they stay light and
+/// deterministic.
+class MetricIllustration extends StatelessWidget {
+  /// Builds the illustration. [transformed] draws the right tile as a
+  /// cropped/rotated/recoloured variant (Smart); otherwise it is identical
+  /// (Fast). [glyph] is the relation symbol shown between the tiles.
+  const MetricIllustration({
+    super.key,
+    required this.transformed,
+    required this.glyph,
+    this.tileSize = 52,
+  });
+
+  /// Whether the right tile is a crop/rotate/recolour of the left (Smart) vs an
+  /// exact copy (Fast).
+  final bool transformed;
+
+  /// The relation glyph drawn between the two tiles ("=" for Fast, "≈" Smart).
+  final String glyph;
+
+  /// Edge length of each square tile in logical pixels.
+  final double tileSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _SceneTile(variance: 0, size: tileSize),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            glyph,
+            style: text.titleLarge?.copyWith(color: AppColors.inkSoft),
+          ),
+        ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox.square(
+            dimension: tileSize,
+            child: CustomPaint(
+              painter: transformed
+                  ? _SmartScenePainter()
+                  : _ScenePainter(variance: 0),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Paints the reference scene cropped, rotated, and recoloured — the kind of
+/// edit the Smart (embedding) metric still recognises as the same photo,
+/// where a pixel hash would not. Deterministic (no inputs).
+class _SmartScenePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas
+      ..save()
+      // Crop + zoom (clip already applied by ClipRRect): translate/scale so a
+      // sub-region of the scene fills the tile, then rotate slightly.
+      ..translate(size.width / 2, size.height / 2)
+      ..rotate(0.18)
+      ..scale(1.25)
+      ..translate(-size.width / 2 - size.width * 0.08, -size.height / 2);
+    // Reuse the reference scene painter, perturbed only by a colour shift (the
+    // recolour) — structure stays the same, so the embedding still matches.
+    _ScenePainter(variance: 0.35).paint(canvas, size);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SmartScenePainter oldDelegate) => false;
+}
+
 /// A single rounded scene tile drawn by [_ScenePainter] at [variance].
 class _SceneTile extends StatelessWidget {
   const _SceneTile({required this.variance, required this.size});

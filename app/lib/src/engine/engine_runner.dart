@@ -62,11 +62,23 @@ abstract interface class EngineRunner {
   /// [onProgress] (when given) is called as files finish hashing with the
   /// running `done` count against the fixed `total` (= `paths.length`), so the
   /// UI can show determinate progress instead of an indeterminate spinner.
+  ///
+  /// [metric] selects which per-pair similarity groups the files:
+  /// [SimilarityMetric.fast] (pHash + colour) or [SimilarityMetric.smart] (the
+  /// on-device embedding). Smart hashing also computes each file's embedding;
+  /// when no embedding model is bundled it produces none, so grouping degrades
+  /// to Fast (surfaced via [smartUnavailable]).
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
     void Function(int done, int total)? onProgress,
   });
+
+  /// Whether the Smart (embedding) metric can run here — true only when an
+  /// embedding model + ONNX Runtime are bundled and load. The UI uses this to
+  /// show the "fell back to Fast" note when Smart is selected but unavailable.
+  bool get smartAvailable;
 
   /// Perceptually hashes [paths] across worker isolates, returning every
   /// [HashedFile] (each carrying its on-disk size, dimensions, and an
@@ -75,8 +87,13 @@ abstract interface class EngineRunner {
   ///
   /// [onProgress] (when given) reports the running `done` count against the
   /// fixed `total` (= `paths.length`) as files finish hashing.
+  ///
+  /// [embed] additionally computes each file's Smart-metric embedding (when a
+  /// model is bundled); the low-quality shrink stage leaves it false since it
+  /// only needs the quality score.
   Future<List<HashedFile>> hashFiles(
     List<String> paths, {
+    bool embed = false,
     void Function(int done, int total)? onProgress,
   });
 }

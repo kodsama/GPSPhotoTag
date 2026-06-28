@@ -146,6 +146,7 @@ HashedFile hf(
   String path, {
   int bits = 0,
   List<double>? colorSig,
+  List<double> embedding = const [],
   int width = 100,
   int height = 100,
   int fileSize = 1000,
@@ -155,6 +156,7 @@ HashedFile hf(
   path: path,
   pHash: _pHashWithBits(bits),
   colorSig: colorSig ?? _flatColorSig(),
+  embedding: embedding,
   width: width,
   height: height,
   fileSize: fileSize,
@@ -353,6 +355,96 @@ void main() {
     });
   });
 
+  group('embeddingSimilarity', () {
+    test('identical embeddings score 1.0', () {
+      final a = hf('/a.jpg', embedding: [1, 0, 0]);
+      final b = hf('/b.jpg', embedding: [2, 0, 0]); // same direction
+      expect(embeddingSimilarity(a, b), closeTo(1, 1e-9));
+    });
+
+    test('orthogonal embeddings score 0.5 (cosine 0)', () {
+      final a = hf('/a.jpg', embedding: [1, 0]);
+      final b = hf('/b.jpg', embedding: [0, 1]);
+      expect(embeddingSimilarity(a, b), closeTo(0.5, 1e-9));
+    });
+
+    test('opposite embeddings score 0.0', () {
+      final a = hf('/a.jpg', embedding: [1, 0]);
+      final b = hf('/b.jpg', embedding: [-1, 0]);
+      expect(embeddingSimilarity(a, b), closeTo(0, 1e-9));
+    });
+
+    test('a missing embedding on either side yields 0 (never groups)', () {
+      final withVec = hf('/a.jpg', embedding: [1, 0]);
+      final without = hf('/b.jpg');
+      expect(embeddingSimilarity(withVec, without), 0);
+      expect(embeddingSimilarity(without, withVec), 0);
+    });
+  });
+
+  group('similarityFor (metric dispatch)', () {
+    test('fast uses the perceptual+colour metric', () {
+      final a = hf('/a.jpg');
+      final b = hf('/b.jpg');
+      expect(similarityFor(a, b, SimilarityMetric.fast), imageSimilarity(a, b));
+    });
+
+    test('smart uses the embedding metric', () {
+      final a = hf('/a.jpg', embedding: [1, 0]);
+      final b = hf('/b.jpg', embedding: [1, 0]);
+      expect(
+        similarityFor(a, b, SimilarityMetric.smart),
+        embeddingSimilarity(a, b),
+      );
+    });
+  });
+
+  group('groupDuplicates with the Smart metric', () {
+    test('groups by embedding, ignoring perceptual differences', () {
+      // Structurally far apart (200-bit pHash gap) but same embedding direction:
+      // Fast would not group them, Smart should.
+      final a = hf('/a.jpg', bits: 0, embedding: [1, 0, 0]);
+      final b = hf('/b.jpg', bits: 200, embedding: [1, 0, 0]);
+      final fast = groupDuplicates(
+        [a, b],
+        minSimilarity: 0.55,
+        metric: SimilarityMetric.fast,
+      );
+      expect(fast, isEmpty); // far apart for the perceptual metric
+      final smart = groupDuplicates(
+        [a, b],
+        minSimilarity: 0.9,
+        metric: SimilarityMetric.smart,
+      );
+      expect(smart, hasLength(1));
+      expect(smart.single.size, 2);
+    });
+
+    test('records without embeddings never group under Smart (→ fallback)', () {
+      // Two perceptually-identical files but no embeddings: under Smart the
+      // similarity is 0, so nothing groups (the caller would fall back to Fast).
+      final groups = groupDuplicates(
+        [hf('/a.jpg'), hf('/b.jpg')],
+        minSimilarity: 0.55,
+        metric: SimilarityMetric.smart,
+      );
+      expect(groups, isEmpty);
+    });
+  });
+
+  group('HashedFile.withEmbedding', () {
+    test('replaces the embedding, preserving every other field', () {
+      final base = hf('/a.jpg', bits: 3);
+      final out = base.withEmbedding([0.5, 0.5]);
+      expect(out.embedding, [0.5, 0.5]);
+      expect(out.path, base.path);
+      expect(out.pHash, base.pHash);
+      expect(out.colorSig, base.colorSig);
+      expect(out.width, base.width);
+      expect(out.fileSize, base.fileSize);
+    });
+  });
+
   group('hashImageBytes', () {
     test('hashes decodable PNG bytes into a 256-bit pHash', () {
       final png = Uint8List.fromList(img.encodePng(_stripes(16, 16)));
@@ -539,6 +631,7 @@ void main() {
       final json = hf(
         '/a.jpg',
         bits: 4,
+        embedding: [0.1, 0.2],
         width: 40,
         height: 30,
         fileSize: 50,
@@ -546,6 +639,7 @@ void main() {
       expect(json['path'], '/a.jpg');
       expect(json['pHash'], isA<List<int>>());
       expect(json['colorSig'], isA<List<double>>());
+      expect(json['embedding'], [0.1, 0.2]);
       expect(json['width'], 40);
       expect(json['height'], 30);
       expect(json['fileSize'], 50);
@@ -1009,6 +1103,81 @@ void main() {
         expect(out.single.peopleScore, 0.0);
       });
     });
+
+    group('Smart embedding', () {
+      test('folds an available embedder vector onto the record', () async {
+        final paths = writeSources(['a.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+          dims: {paths.first: (100, 100)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          embedder: _FakeEmbedder([0.1, 0.2, 0.3]),
+        );
+        expect(out.single.embedding, [0.1, 0.2, 0.3]);
+      });
+
+      test('an unavailable embedder leaves the embedding empty', () async {
+        final paths = writeSources(['a.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+          dims: {paths.first: (100, 100)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          embedder: _FakeEmbedder([0.1], available: false),
+        );
+        expect(out.single.embedding, isEmpty);
+      });
+
+      test('a null/empty embed result leaves the embedding empty', () async {
+        final paths = writeSources(['a.raf', 'b.raf']);
+        final runner = _BatchRunner(
+          thumbs: {
+            'a.raf': img.encodeJpg(_stripes(20, 20)),
+            'b.raf': img.encodeJpg(_stripes(20, 20, phase: 4)),
+          },
+          dims: {for (final pth in paths) pth: (100, 100)},
+        );
+        final nullOut = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+          embedder: _FakeEmbedder(null),
+        );
+        for (final h in nullOut) {
+          expect(h.embedding, isEmpty);
+        }
+        final emptyOut = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work2'),
+          embedder: _FakeEmbedder(const []),
+        );
+        for (final h in emptyOut) {
+          expect(h.embedding, isEmpty);
+        }
+      });
+
+      test('the default embedder is the no-op (no embedding)', () async {
+        final paths = writeSources(['a.raf']);
+        final runner = _BatchRunner(
+          thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
+          dims: {paths.first: (100, 100)},
+        );
+        final out = await hashFilesBatch(
+          paths,
+          runner: runner,
+          tmpDir: p.join(tmp.path, 'work'),
+        );
+        expect(out.single.embedding, isEmpty);
+      });
+    });
   });
 }
 
@@ -1028,6 +1197,21 @@ class _FakeDetector implements PeopleDetector {
 
   @override
   Future<double?> scoreDecoded(img.Image image) async => _score;
+}
+
+/// An [ImageEmbedder] that returns a fixed [_vector] for any image, used to
+/// drive the Smart-embedding fold without a model.
+class _FakeEmbedder implements ImageEmbedder {
+  _FakeEmbedder(this._vector, {this.available = true});
+
+  final List<double>? _vector;
+  final bool available;
+
+  @override
+  bool get isAvailable => available;
+
+  @override
+  Future<List<double>?> embedDecoded(img.Image image) async => _vector;
 }
 
 /// A [HashedFile] whose signatures are computed from a real decoded [image].

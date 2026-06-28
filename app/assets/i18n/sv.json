@@ -28,7 +28,7 @@
   "help_match_b1": "Hitta filer som tappat sin partner: ta bort föräldralösa RAW-filer utan matchande foto, eller — åt andra hållet — foton utan matchande RAW.",
   "help_match_b2": "Du granskar hela listan och väljer vad som ska ingå innan något flyttas till papperskorgen.",
   "help_duplicates_title": "Hitta dubbletter",
-  "help_duplicates_b1": "Upptäcker visuellt lika foton. Likhetsreglaget går från Exakt till Lös — dra mot Lös för att även fånga lätt redigerade nära-dubbletter, med en levande exempelförhandsvisning av hur strikt varje inställning är.",
+  "help_duplicates_b1": "Hittar visuellt liknande foton. Välj en matchningsmetod högst upp — Snabb (perceptuell hash + färg) eller Smart (embedding-likhet på enheten) — och använd sedan likhetsreglaget från Exakt till Lös, med en live-förhandsvisning av hur strikt varje inställning är.",
   "help_duplicates_b2": "En prioritetskedja avgör vilken kopia som behålls: Upplösning, Kvalitet och Personer & djur. Ordna om reglerna och slå på eller av dem; den första regel som tydligt avgör vinner.",
   "help_duplicates_b3": "Granska varje par, byt vilken sida som behålls, eller avmarkera för att behålla båda. Inget raderas förrän du bekräftar.",
   "help_compare_title": "Jämförelsevisare",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "föräldralös bild",
   "shrink_reason_redundant_raw": "redundant RAW",
   "shrink_reason_redundant_jpg": "redundant JPG",
-  "shrink_reason_low_quality": "låg kvalitet"
+  "shrink_reason_low_quality": "låg kvalitet",
+  "dup_metric_title": "Matchningsmetod",
+  "dup_metric_fast": "Snabb — perceptuell hash",
+  "dup_metric_fast_desc": "Jämför en perceptuell hash (pHash) plus färg. Direkt, för varje fil.",
+  "dup_metric_fast_pro": "Bäst för nästan identiska kopior och omsparningar.",
+  "dup_metric_fast_con": "Missar kraftiga beskärningar, rotationer eller omfärgningar.",
+  "dup_metric_smart": "Smart — embedding-likhet",
+  "dup_metric_smart_desc": "Jämför en embedding av varje foto, på enheten. Körs helt på din dator.",
+  "dup_metric_smart_pro": "Förstår beskärningar, rotationer och omfärgningar av samma motiv.",
+  "dup_metric_smart_con": "Lite långsammare och kräver den medföljande embedding-modellen.",
+  "dup_metric_smart_unavailable": "embedding-modellen är inte tillgänglig här, så Smart faller tillbaka till Snabb.",
+  "lic_role_mobilenet_embed": "Smart dubblettlikhet (inbäddning på enheten)"
 }

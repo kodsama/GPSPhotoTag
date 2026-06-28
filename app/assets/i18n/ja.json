@@ -28,7 +28,7 @@
   "help_match_b1": "相方を失ったファイルを見つけます：対応する写真のない孤立 RAW ファイルを削除するか、逆方向で対応する RAW のない写真を削除します。",
   "help_match_b2": "何かがゴミ箱に移される前に、リスト全体を確認して含めるものを選べます。",
   "help_duplicates_title": "重複を見つける",
-  "help_duplicates_b1": "視覚的に似た写真を見つけます。類似度スライダーは「完全一致」から「ゆるい」まで — 「ゆるい」へ動かすと軽く編集された近い重複も拾え、各設定の厳しさをライブのサンプルでプレビューできます。",
+  "help_duplicates_b1": "視覚的に似た写真を見つけます。上部で照合方法（高速＝知覚ハッシュ＋色、またはスマート＝オンデバイス埋め込み類似度）を選び、厳密から緩めまでの類似度スライダーを使います。各設定の厳しさはライブのプレビューで確認できます。",
   "help_duplicates_b2": "保持の優先順位パイプラインがどのコピーを残すか決めます：解像度、品質、人物と動物。ルールは並べ替え・オンオフ可能で、明確に決着する最初のルールが勝ちます。",
   "help_duplicates_b3": "各ペアを確認し、残す側を入れ替えたり、選択解除して両方残したりできます。確定するまで何も削除されません。",
   "help_compare_title": "比較ビューア",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "孤立画像",
   "shrink_reason_redundant_raw": "冗長 RAW",
   "shrink_reason_redundant_jpg": "冗長 JPG",
-  "shrink_reason_low_quality": "低品質"
+  "shrink_reason_low_quality": "低品質",
+  "dup_metric_title": "照合方法",
+  "dup_metric_fast": "高速 — 知覚ハッシュ",
+  "dup_metric_fast_desc": "知覚ハッシュ（pHash）と色を比較します。瞬時に、すべてのファイルで動作します。",
+  "dup_metric_fast_pro": "ほぼ同一のコピーや再保存に最適です。",
+  "dup_metric_fast_con": "大幅なトリミング、回転、色変更は見逃します。",
+  "dup_metric_smart": "スマート — 埋め込み類似度",
+  "dup_metric_smart_desc": "各写真のオンデバイス埋め込みを比較します。すべてお使いのコンピューター上で実行されます。",
+  "dup_metric_smart_pro": "同じシーンのトリミング、回転、色変更を理解します。",
+  "dup_metric_smart_con": "やや遅く、付属の埋め込みモデルが必要です。",
+  "dup_metric_smart_unavailable": "ここでは埋め込みモデルを利用できないため、スマートは高速に切り替わります。",
+  "lic_role_mobilenet_embed": "スマート重複類似度（オンデバイス埋め込み）"
 }

@@ -68,6 +68,7 @@ class AppController extends ChangeNotifier {
       _lowQParams = Set<QualityParam>.of(prefs.lowQParams);
       _shrinkQualityThreshold = prefs.lowQThreshold;
       _similarity = snapSimilarityPercent(prefs.similarityPercent);
+      _similarityMetric = prefs.similarityMetric;
     }
   }
 
@@ -177,6 +178,7 @@ class AppController extends ChangeNotifier {
     prefs.lowQParams = Set<QualityParam>.of(_lowQParams);
     prefs.lowQThreshold = _shrinkQualityThreshold;
     prefs.similarityPercent = _similarity;
+    prefs.similarityMetric = _similarityMetric;
     prefs.save();
   }
 
@@ -1218,6 +1220,7 @@ class AppController extends ChangeNotifier {
   // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------
 
   int _similarity = similarityMinPercent;
+  SimilarityMetric _similarityMetric = SimilarityMetric.fast;
   KeepPipeline _keepPipeline = KeepPipeline.standard;
   bool _findingDuplicates = false;
   HashProgress _hashProgress = HashProgress();
@@ -1225,10 +1228,26 @@ class AppController extends ChangeNotifier {
   // Set when the user cancels a hashing run so its (unstoppable) result Future
   // is ignored instead of folded into reviewable pairs.
   bool _duplicatesCancelled = false;
+  // Set after a Smart run that had to use Fast because no embedding model was
+  // bundled, so the UI can show a small "fell back to Fast" note.
+  bool _smartFellBackToFast = false;
 
   /// The similarity slider value as a looseness percent (0 = Exact, 100 = Loose,
   /// always a multiple of 10).
   int get similarity => _similarity;
+
+  /// The selected duplicate-finder metric: Fast (perceptual hash + colour) or
+  /// Smart (on-device embedding). Persisted.
+  SimilarityMetric get similarityMetric => _similarityMetric;
+
+  /// Whether the Smart (embedding) metric can actually run here (a model is
+  /// bundled). When false the selector still offers Smart, but a Smart run
+  /// transparently falls back to Fast (surfaced via [smartFellBackToFast]).
+  bool get smartMetricAvailable => _engine.smartAvailable;
+
+  /// Whether the last completed find run selected Smart but had to use Fast
+  /// because no embedding model was available. Drives an inline UI note.
+  bool get smartFellBackToFast => _smartFellBackToFast;
 
   /// Whether duplicate hashing is currently in flight.
   bool get findingDuplicates => _findingDuplicates;
@@ -1261,6 +1280,14 @@ class AppController extends ChangeNotifier {
     final snapped = snapSimilarityPercent(value);
     if (_similarity == snapped) return;
     _similarity = snapped;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Selects the duplicate-finder [metric] (Fast vs Smart) and persists it.
+  void setSimilarityMetric(SimilarityMetric metric) {
+    if (_similarityMetric == metric) return;
+    _similarityMetric = metric;
     _persistPrefs();
     notifyListeners();
   }
@@ -1353,6 +1380,10 @@ class AppController extends ChangeNotifier {
     _hashProgress = HashProgress(total: photos.length);
     _duplicatePairs = null;
     _errorMessage = null;
+    // A Smart run with no bundled embedding model transparently uses Fast; note
+    // it so the UI can tell the user. Fast runs never show the note.
+    _smartFellBackToFast =
+        _similarityMetric == SimilarityMetric.smart && !_engine.smartAvailable;
     _log('Hashing ${photos.length} photo(s) for duplicates…');
     // A determinate run: the total is known up front, so the card ring tracks
     // the hashing fraction.
@@ -1364,6 +1395,7 @@ class AppController extends ChangeNotifier {
       final groups = await _engine.findDuplicates(
         photos,
         minSimilarity: similarityToThreshold(_similarity),
+        metric: _similarityMetric,
         onProgress: (done, total) {
           if (_duplicatesCancelled) return;
           _hashProgress = HashProgress(done: done, total: total);

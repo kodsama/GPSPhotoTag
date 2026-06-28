@@ -8,6 +8,8 @@ import 'package:path/path.dart' as p;
 
 import '../data/photo_formats.dart';
 import '../data/ports/process_runner.dart';
+import 'embedding/embedding_math.dart';
+import 'embedding/image_embedder.dart';
 import 'image_quality.dart';
 import 'keep_pipeline.dart';
 import 'people_detector.dart';
@@ -267,6 +269,39 @@ double imageSimilarity(HashedFile a, HashedFile b) {
       .clamp(0.0, 1.0);
 }
 
+/// The Smart (embedding) similarity of [a] and [b] in 0..1 (1 = identical):
+/// the cosine between their on-device embedding vectors mapped to 0..1 via
+/// [cosineToSimilarity].
+///
+/// Robust to crop/rotation/recolour (the embedding captures what the photo *is*,
+/// not its exact pixels). A missing embedding on either side yields a neutral 0
+/// (never groups), which is how the Smart metric degrades to nothing when the
+/// model is unavailable — callers select [SimilarityMetric.fast] in that case.
+/// Pure.
+double embeddingSimilarity(HashedFile a, HashedFile b) {
+  if (a.embedding.isEmpty || b.embedding.isEmpty) return 0;
+  return cosineToSimilarity(cosineSimilarity(a.embedding, b.embedding));
+}
+
+/// Which per-pair similarity the duplicate finder uses.
+enum SimilarityMetric {
+  /// Perceptual hash (pHash) + colour signature — instant, computed for every
+  /// file, best for near-identical copies. See [imageSimilarity].
+  fast,
+
+  /// On-device embedding (cosine) — understands crops/rotations/recolours, a
+  /// little slower, needs the bundled model. See [embeddingSimilarity].
+  smart,
+}
+
+/// The similarity of [a] and [b] under [metric]: [embeddingSimilarity] for
+/// [SimilarityMetric.smart], else [imageSimilarity]. Pure.
+double similarityFor(HashedFile a, HashedFile b, SimilarityMetric metric) =>
+    switch (metric) {
+      SimilarityMetric.smart => embeddingSimilarity(a, b),
+      SimilarityMetric.fast => imageSimilarity(a, b),
+    };
+
 /// Decodes [bytes] for [path] into a [pHash], or null when the bytes cannot be
 /// decoded (corrupt, unsupported, or empty). Never throws.
 ///
@@ -308,6 +343,7 @@ class HashedFile {
     required this.isRaw,
     this.pHash = const [],
     this.colorSig = const [],
+    this.embedding = const [],
     this.quality = ImageQuality.zero,
     this.peopleScore = 0,
   });
@@ -320,6 +356,12 @@ class HashedFile {
 
   /// The normalised coarse HSV colour signature (empty when unknown).
   final List<double> colorSig;
+
+  /// The L2-normalized on-device embedding vector used by the Smart metric
+  /// ([embeddingSimilarity]); empty when no embedder was available (then the
+  /// Smart metric degrades to Fast). Plain `List<double>` so the record stays
+  /// isolate/CLI portable.
+  final List<double> embedding;
 
   /// Pixel width (0 when unknown).
   final int width;
@@ -355,6 +397,24 @@ class HashedFile {
     path: path,
     pHash: pHash,
     colorSig: colorSig,
+    embedding: embedding,
+    width: width,
+    height: height,
+    fileSize: fileSize,
+    basename: basename,
+    isRaw: isRaw,
+    quality: quality,
+    peopleScore: peopleScore,
+  );
+
+  /// A copy of this record with its Smart-metric [embedding] replaced — used by
+  /// the hashing pipeline to fold an embedder's vector onto the freshly-hashed
+  /// record.
+  HashedFile withEmbedding(List<double> embedding) => HashedFile(
+    path: path,
+    pHash: pHash,
+    colorSig: colorSig,
+    embedding: embedding,
     width: width,
     height: height,
     fileSize: fileSize,
@@ -370,6 +430,7 @@ class HashedFile {
     'path': path,
     'pHash': pHash,
     'colorSig': colorSig,
+    'embedding': embedding,
     'width': width,
     'height': height,
     'fileSize': fileSize,
@@ -402,9 +463,14 @@ class DuplicateGroup {
 bool _areCompanions(HashedFile a, HashedFile b) =>
     a.basename == b.basename && a.isRaw != b.isRaw;
 
-/// Groups [records] whose combined [imageSimilarity] is at least [minSimilarity]
-/// into [DuplicateGroup]s. Pure (no I/O).
+/// Groups [records] whose [metric] similarity is at least [minSimilarity] into
+/// [DuplicateGroup]s. Pure (no I/O).
 ///
+/// - `metric` selects the per-pair similarity: [SimilarityMetric.fast] uses
+///   [imageSimilarity] (pHash + colour), [SimilarityMetric.smart] uses
+///   [embeddingSimilarity] (cosine over the on-device embedding). Smart is
+///   more robust to crop/rotation/recolour but yields a neutral 0 when a record
+///   carries no embedding, so callers fall back to Fast when no embedder ran.
 /// - `minSimilarity` is the cutoff in 0..1: 1.0 groups only ~identical images;
 ///   lower values group looser near-matches. The app's slider maps its
 ///   looseness percent to this cutoff across a trustworthy band.
@@ -423,6 +489,7 @@ List<DuplicateGroup> groupDuplicates(
   List<HashedFile> records, {
   required double minSimilarity,
   KeepPipeline pipeline = KeepPipeline.standard,
+  SimilarityMetric metric = SimilarityMetric.fast,
 }) {
   final used = List<bool>.filled(records.length, false);
   final groups = <DuplicateGroup>[];
@@ -436,7 +503,7 @@ List<DuplicateGroup> groupDuplicates(
       if (used[j]) continue;
       final other = records[j];
       if (_areCompanions(seed, other)) continue;
-      if (imageSimilarity(seed, other) < minSimilarity) continue;
+      if (similarityFor(seed, other, metric) < minSimilarity) continue;
       // A candidate must also not be a companion of any member already pulled
       // in, so a JPG never joins a group seeded by a near-twin of its own RAW.
       if (members.any((m) => _areCompanions(m, other))) continue;
@@ -583,6 +650,7 @@ Future<List<HashedFile>> hashFilesBatch(
   required String tmpDir,
   void Function()? onFileDone,
   PeopleDetector detector = const NoopPeopleDetector(),
+  ImageEmbedder embedder = const NoopImageEmbedder(),
 }) async {
   if (paths.isEmpty) return const [];
   await Directory(tmpDir).create(recursive: true);
@@ -617,7 +685,8 @@ Future<List<HashedFile>> hashFilesBatch(
       final extracted = thumbs[path] ?? previews[path];
       final hashed = _hashFromExtract(path, extracted, meta[path]);
       if (hashed != null) {
-        results.add(await _withTier2(hashed.file, hashed.decoded, detector));
+        final scored = await _withTier2(hashed.file, hashed.decoded, detector);
+        results.add(await _withEmbedding(scored, hashed.decoded, embedder));
       }
       onFileDone?.call();
     }
@@ -752,6 +821,22 @@ Future<HashedFile> _withTier2(
   final score = await detector.scoreDecoded(decoded);
   if (score == null || score <= 0) return file;
   return file.withPeopleScore(score);
+}
+
+/// Folds the Smart-metric embedding onto [file]: when [embedder] is available,
+/// embeds the already-[decoded] thumbnail and returns [file] with that
+/// [HashedFile.embedding]. Otherwise (no embedder, or a null/failed embed) the
+/// record keeps its empty embedding, so the Smart metric degrades to Fast.
+/// Never throws.
+Future<HashedFile> _withEmbedding(
+  HashedFile file,
+  img.Image decoded,
+  ImageEmbedder embedder,
+) async {
+  if (!embedder.isAvailable) return file;
+  final vector = await embedder.embedDecoded(decoded);
+  if (vector == null || vector.isEmpty) return file;
+  return file.withEmbedding(vector);
 }
 
 List<dynamic> _tryDecodeJsonList(String text) {

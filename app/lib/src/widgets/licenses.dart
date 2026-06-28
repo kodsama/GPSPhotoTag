@@ -41,6 +41,11 @@ const _attached = <_Component>[
     'Apache-2.0',
     'lic_role_ssd_mobilenet',
   ),
+  _Component(
+    'MobileNetV2 (ONNX Model Zoo)',
+    'Apache-2.0',
+    'lic_role_mobilenet_embed',
+  ),
   _Component('xml', 'MIT', 'lic_role_xml'),
   _Component('http', 'BSD-3', 'lic_role_http'),
   _Component('archive', 'MIT / Apache', 'lic_role_archive'),

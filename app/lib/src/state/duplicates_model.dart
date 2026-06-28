@@ -115,6 +115,30 @@ String qualityPickedLabel(double threshold, Translator tr) => tr(
   {'percent': (threshold.clamp(0.0, 1.0) * 100).round()},
 );
 
+/// The localization key for a metric's short display name (the segment label).
+String similarityMetricLabelKey(SimilarityMetric metric) => switch (metric) {
+  SimilarityMetric.fast => 'dup_metric_fast',
+  SimilarityMetric.smart => 'dup_metric_smart',
+};
+
+/// The localization key for a metric's one-line explanation.
+String similarityMetricDescKey(SimilarityMetric metric) => switch (metric) {
+  SimilarityMetric.fast => 'dup_metric_fast_desc',
+  SimilarityMetric.smart => 'dup_metric_smart_desc',
+};
+
+/// The localization key for a metric's "pro" (what it is good at).
+String similarityMetricProKey(SimilarityMetric metric) => switch (metric) {
+  SimilarityMetric.fast => 'dup_metric_fast_pro',
+  SimilarityMetric.smart => 'dup_metric_smart_pro',
+};
+
+/// The localization key for a metric's "con" (its trade-off).
+String similarityMetricConKey(SimilarityMetric metric) => switch (metric) {
+  SimilarityMetric.fast => 'dup_metric_fast_con',
+  SimilarityMetric.smart => 'dup_metric_smart_con',
+};
+
 /// One reviewable duplicate pair: the [kept] file and the [other] candidate.
 ///
 /// A group of N members renders N−1 pairs (the best vs each other member). The

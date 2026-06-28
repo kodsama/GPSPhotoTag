@@ -52,7 +52,7 @@ const Map<String, String> kEnglishStrings = {
       'You review the full list and choose what to include before anything is moved to the Trash.',
   'help_duplicates_title': 'Find duplicates',
   'help_duplicates_b1':
-      'Spots visually-similar photos. The similarity slider ranges from Exact to Loose — drag toward Loose to also catch lightly-edited near-duplicates, with a live example preview of how strict each setting is.',
+      'Spots visually-similar photos. Choose a matching method at the top — Fast (perceptual hash + colour) or Smart (on-device embedding similarity) — then use the similarity slider from Exact to Loose, with a live example preview of how strict each setting is.',
   'help_duplicates_b2':
       'A Keep priority pipeline decides which copy to keep: Resolution, Quality, and People & animals. Reorder the rules and toggle them on or off; the first rule that clearly decides wins.',
   'help_duplicates_b3':
@@ -453,4 +453,20 @@ const Map<String, String> kEnglishStrings = {
   'shrink_reason_redundant_raw': 'redundant RAW',
   'shrink_reason_redundant_jpg': 'redundant JPG',
   'shrink_reason_low_quality': 'low quality',
+  'dup_metric_title': 'Matching method',
+  'dup_metric_fast': 'Fast — perceptual hash',
+  'dup_metric_fast_desc':
+      'Compares a perceptual hash (pHash) plus colour. Instant, runs on every file.',
+  'dup_metric_fast_pro': 'Best for near-identical copies and re-saves.',
+  'dup_metric_fast_con': 'Misses heavy crops, rotations or recolours.',
+  'dup_metric_smart': 'Smart — embedding similarity',
+  'dup_metric_smart_desc':
+      'Compares an on-device embedding of each photo. Runs entirely on your computer.',
+  'dup_metric_smart_pro':
+      'Understands crops, rotations and recolours of the same scene.',
+  'dup_metric_smart_con': 'A little slower, and needs the bundled embedding model.',
+  'dup_metric_smart_unavailable':
+      'The embedding model is not available here, so Smart falls back to Fast.',
+  'lic_role_mobilenet_embed':
+      'Smart duplicate similarity (on-device embedding)',
 };

@@ -28,7 +28,7 @@
   "help_match_b1": "查找失去配对的文件：删除没有对应照片的孤立 RAW 文件，或——反方向——没有对应 RAW 的照片。",
   "help_match_b2": "在任何内容移入回收站之前，你都会审阅完整列表并选择要包含的项目。",
   "help_duplicates_title": "查找重复",
-  "help_duplicates_b1": "找出视觉上相似的照片。相似度滑块从“精确”到“宽松”——拖向“宽松”还能捕捉轻微编辑过的近似重复，并实时预览每档设置的严格程度。",
+  "help_duplicates_b1": "查找视觉上相似的照片。在顶部选择匹配方式——快速（感知哈希＋颜色）或智能（设备端嵌入相似度）——然后使用从精确到宽松的相似度滑块，并通过实时示例预览了解每个设置的严格程度。",
   "help_duplicates_b2": "保留优先级流程决定保留哪一份：分辨率、质量以及人物与动物。可重新排序并开关各项规则；第一条明确分出胜负的规则获胜。",
   "help_duplicates_b3": "审阅每一对，可交换保留的一方，或取消选择以两者都保留。在你确认之前，不会删除任何内容。",
   "help_compare_title": "对比查看器",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "孤立图像",
   "shrink_reason_redundant_raw": "冗余 RAW",
   "shrink_reason_redundant_jpg": "冗余 JPG",
-  "shrink_reason_low_quality": "低质量"
+  "shrink_reason_low_quality": "低质量",
+  "dup_metric_title": "匹配方式",
+  "dup_metric_fast": "快速 — 感知哈希",
+  "dup_metric_fast_desc": "比较感知哈希（pHash）和颜色。即时，对每个文件都有效。",
+  "dup_metric_fast_pro": "最适合查找几乎相同的副本和重新保存的文件。",
+  "dup_metric_fast_con": "会漏掉大幅裁剪、旋转或重新着色的图片。",
+  "dup_metric_smart": "智能 — 嵌入相似度",
+  "dup_metric_smart_desc": "比较每张照片的本地嵌入向量。完全在您的电脑上运行。",
+  "dup_metric_smart_pro": "能识别同一场景的裁剪、旋转和重新着色。",
+  "dup_metric_smart_con": "稍慢一些，并且需要内置的嵌入模型。",
+  "dup_metric_smart_unavailable": "此处无法使用 嵌入模型，因此智能模式回退为快速模式。",
+  "lic_role_mobilenet_embed": "智能重复相似度（设备端嵌入）"
 }

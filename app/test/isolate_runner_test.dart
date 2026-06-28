@@ -300,6 +300,30 @@ void main() {
     }
   });
 
+  test('smartAvailable is false when no embedding bundle is configured', () {
+    const runner = IsolateRunner(); // no onnxBundleDir
+    expect(runner.smartAvailable, isFalse);
+    const missing = IsolateRunner(onnxBundleDir: '/no/such/onnx/bundle');
+    expect(missing.smartAvailable, isFalse);
+  });
+
+  test('a Smart run with no model bundled falls back to Fast grouping', () async {
+    // Two byte-identical JPEGs: with no embedding model the Smart metric has no
+    // vectors, so findDuplicates degrades to Fast and still groups the copies.
+    final a = await writeJpegWithDate(tmp, 'a.jpg');
+    final b = '${tmp.path}/b.jpg';
+    File(b).writeAsBytesSync(File(a).readAsBytesSync());
+
+    const runner = IsolateRunner(); // smartAvailable == false here
+    final groups = await runner.findDuplicates(
+      [a, b],
+      minSimilarity: 1,
+      metric: SimilarityMetric.smart,
+    );
+    expect(groups, hasLength(1));
+    expect(groups.single.size, 2);
+  });
+
   test('scan runs on a worker isolate and reports the tree', () async {
     final jpg = await writeJpegWithDate(tmp, 'a.jpg');
     writeGpx(tmp, 'track.gpx', DateTime(2026));

@@ -78,6 +78,62 @@ void main() {
       expect(c.duplicatePairs, isNull);
     });
 
+    test('passes the selected metric to the engine', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetScan(fakeScan(photos: const ['/a.jpg', '/b.jpg']));
+      c.openAction(LibraryAction.duplicates);
+
+      // Fast by default.
+      await c.runFindDuplicates();
+      expect(fake.lastDuplicateMetric, SimilarityMetric.fast);
+
+      // Switching to Smart drives a Smart run.
+      c.setSimilarityMetric(SimilarityMetric.smart);
+      await c.runFindDuplicates();
+      expect(fake.lastDuplicateMetric, SimilarityMetric.smart);
+    });
+
+    test(
+      'flags the Smart→Fast fallback only when Smart is unavailable',
+      () async {
+        final fake = FakeEngineRunner()..smartAvailableValue = false;
+        final c = AppController(runner: fake)
+          ..debugSetScan(fakeScan(photos: const ['/a.jpg', '/b.jpg']));
+        c.openAction(LibraryAction.duplicates);
+        expect(c.smartMetricAvailable, isFalse);
+
+        // Fast run never flags a fallback.
+        await c.runFindDuplicates();
+        expect(c.smartFellBackToFast, isFalse);
+
+        // Smart selected but unavailable → falls back, flagged.
+        c.setSimilarityMetric(SimilarityMetric.smart);
+        await c.runFindDuplicates();
+        expect(c.smartFellBackToFast, isTrue);
+
+        // When Smart IS available, no fallback note.
+        fake.smartAvailableValue = true;
+        await c.runFindDuplicates();
+        expect(c.smartFellBackToFast, isFalse);
+      },
+    );
+
+    test('setSimilarityMetric notifies only on a real change', () {
+      final c = AppController(runner: FakeEngineRunner());
+      var notifications = 0;
+      c.addListener(() => notifications++);
+      expect(c.similarityMetric, SimilarityMetric.fast);
+
+      c.setSimilarityMetric(SimilarityMetric.smart);
+      expect(c.similarityMetric, SimilarityMetric.smart);
+      expect(notifications, 1);
+
+      // Re-selecting the same metric is a no-op.
+      c.setSimilarityMetric(SimilarityMetric.smart);
+      expect(notifications, 1);
+    });
+
     test('folds worker progress ticks into live hashed/total state', () async {
       final fake = FakeEngineRunner()..duplicatesGate = Completer<void>();
       final c = AppController(runner: fake)

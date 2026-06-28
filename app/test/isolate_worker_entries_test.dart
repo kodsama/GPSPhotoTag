@@ -268,6 +268,57 @@ void main() {
       },
     );
 
+    test(
+      'hashFilesEntry computes a Smart embedding when embed + a model bundled',
+      () async {
+        final bundleDir = _onnxBundleDir();
+        final hasBundle =
+            bundleDir != null &&
+            (resolveEmbeddingBundle(bundleDir)?.isComplete ?? false);
+        if (!hasBundle) {
+          markTestSkipped('no ONNX bundle (run tool/fetch-onnx.sh)');
+          return;
+        }
+        final person = p.join(tmp.path, 'person.jpg');
+        File(
+          person,
+        ).writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [person],
+              bundleDir: null,
+              onnxBundleDir: bundleDir,
+              embed: true,
+            ),
+          ),
+        );
+        final hashed = events.whereType<HashedFile>().single;
+        expect(hashed.embedding, isNotEmpty);
+        expect(hashed.embedding.length, 1000);
+      },
+    );
+
+    test(
+      'hashFilesEntry leaves the embedding empty when embed is false',
+      () async {
+        final jpg = await writeJpegWithDate(tmp, 'noembed.jpg');
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [jpg],
+              bundleDir: null,
+              onnxBundleDir: _onnxBundleDir(),
+            ),
+          ),
+        );
+        final hashed = events.whereType<HashedFile>().single;
+        expect(hashed.embedding, isEmpty);
+      },
+    );
+
     test('hashFilesEntry processes more than one chunk', () async {
       // More paths than [hashBatchChunk] forces a second batch iteration. The
       // files are non-images (skipped) but each still ticks, so progress reaches

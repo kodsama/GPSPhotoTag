@@ -213,15 +213,27 @@ class FakeEngineRunner implements EngineRunner {
   /// test can drive ticks and observe the controller's live hashing state.
   void Function(int done, int total)? lastOnProgress;
 
+  /// The metric passed to the last [findDuplicates] call.
+  SimilarityMetric? lastDuplicateMetric;
+
+  /// Whether this fake reports the Smart metric as available (drives the
+  /// controller's "fell back to Fast" note in tests).
+  bool smartAvailableValue = true;
+
+  @override
+  bool get smartAvailable => smartAvailableValue;
+
   @override
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
     void Function(int done, int total)? onProgress,
   }) async {
     calls.add('findDuplicates');
     lastDuplicateMinSimilarity = minSimilarity;
     lastDuplicatePaths = paths;
+    lastDuplicateMetric = metric;
     lastOnProgress = onProgress;
     if (duplicatesGate != null) await duplicatesGate!.future;
     return duplicateGroups;
@@ -233,13 +245,18 @@ class FakeEngineRunner implements EngineRunner {
   /// Paths passed to the last [hashFiles] call.
   List<String>? lastHashFilesPaths;
 
+  /// Whether the last [hashFiles] call requested embeddings.
+  bool? lastHashFilesEmbed;
+
   @override
   Future<List<HashedFile>> hashFiles(
     List<String> paths, {
+    bool embed = false,
     void Function(int done, int total)? onProgress,
   }) async {
     calls.add('hashFiles');
     lastHashFilesPaths = paths;
+    lastHashFilesEmbed = embed;
     lastOnProgress = onProgress;
     if (duplicatesGate != null) await duplicatesGate!.future;
     return hashedFiles;
@@ -295,15 +312,20 @@ class ThrowingEngineRunner implements EngineRunner {
       throw StateError('extractPreview blew up');
 
   @override
+  bool get smartAvailable => false;
+
+  @override
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
     required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
     void Function(int done, int total)? onProgress,
   }) async => throw StateError('findDuplicates blew up');
 
   @override
   Future<List<HashedFile>> hashFiles(
     List<String> paths, {
+    bool embed = false,
     void Function(int done, int total)? onProgress,
   }) async => throw StateError('hashFiles blew up');
 }

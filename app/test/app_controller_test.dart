@@ -538,6 +538,39 @@ void main() {
       },
     );
 
+    test('the similarity metric loads, persists, and round-trips', () async {
+      // A loaded Smart value applies on the controller.
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json')
+        ..similarityMetric = SimilarityMetric.smart;
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.similarityMetric, SimilarityMetric.smart);
+
+      // Switching writes it back into the shared bag.
+      c.setSimilarityMetric(SimilarityMetric.fast);
+      expect(prefs.similarityMetric, SimilarityMetric.fast);
+
+      // Round-trips through a file, defaulting to Fast for an unknown value.
+      await prefs.save();
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.similarityMetric, SimilarityMetric.fast);
+
+      File(
+        '${dir.path}/preferences.json',
+      ).writeAsStringSync('{"similarityMetric": "smart"}');
+      expect(
+        (await AppPrefs.load(dir.path)).similarityMetric,
+        SimilarityMetric.smart,
+      );
+
+      File(
+        '${dir.path}/preferences.json',
+      ).writeAsStringSync('{"similarityMetric": "bogus"}');
+      expect(
+        (await AppPrefs.load(dir.path)).similarityMetric,
+        SimilarityMetric.fast,
+      );
+    });
+
     test('setDefaultRawMode rejects embed without exiftool', () {
       final c = AppController(runner: FakeEngineRunner(), prefs: AppPrefs());
       c.setDefaultRawMode(RawMode.embed);

@@ -14,8 +14,13 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-/// The model file name shipped in every bundle (Apache-2.0 SSD-MobileNet v1).
+/// The detector model file name shipped in every bundle (Apache-2.0 SSD-
+/// MobileNet v1, used by the Tier-2 people/animal detector).
 const String kOnnxModelFileName = 'ssd_mobilenet_v1_12.onnx';
+
+/// The embedding model file name shipped in every bundle (Apache-2.0
+/// MobileNetV2-12 from the ONNX Model Zoo, used by the Smart duplicate metric).
+const String kEmbeddingModelFileName = 'mobilenetv2-12.onnx';
 
 /// The ONNX Runtime shared-library file name for [operatingSystem]
 /// ([Platform.operatingSystem] by default): `libonnxruntime.dylib` on macOS,
@@ -59,12 +64,30 @@ class OnnxBundle {
 /// The returned bundle may still be incomplete (files absent) — callers check
 /// [OnnxBundle.isComplete]. [operatingSystem] overrides the host OS so the
 /// per-platform library name is testable on any machine.
-OnnxBundle? resolveOnnxBundle(String? bundleDir, {String? operatingSystem}) {
+OnnxBundle? resolveOnnxBundle(String? bundleDir, {String? operatingSystem}) =>
+    _resolveBundle(bundleDir, kOnnxModelFileName, operatingSystem);
+
+/// Resolves the embedding [OnnxBundle] for [bundleDir] — the same per-platform
+/// ONNX Runtime library paired with the [kEmbeddingModelFileName] model — or
+/// null when no bundle is possible here (no [bundleDir] or an unsupported
+/// platform). The returned bundle may still be incomplete (files absent), which
+/// callers check via [OnnxBundle.isComplete] so the Smart metric degrades to
+/// Fast when the model is not present.
+OnnxBundle? resolveEmbeddingBundle(
+  String? bundleDir, {
+  String? operatingSystem,
+}) => _resolveBundle(bundleDir, kEmbeddingModelFileName, operatingSystem);
+
+OnnxBundle? _resolveBundle(
+  String? bundleDir,
+  String modelFileName,
+  String? operatingSystem,
+) {
   if (bundleDir == null) return null;
   final libName = ortLibraryFileName(operatingSystem: operatingSystem);
   if (libName == null) return null;
   return OnnxBundle(
     libraryPath: p.join(bundleDir, libName),
-    modelPath: p.join(bundleDir, kOnnxModelFileName),
+    modelPath: p.join(bundleDir, modelFileName),
   );
 }

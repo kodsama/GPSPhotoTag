@@ -14,7 +14,8 @@
 #   app/assets/onnx/osx-x64/libonnxruntime.dylib
 #   app/assets/onnx/linux-x64/libonnxruntime.so
 #   app/assets/onnx/win-x64/onnxruntime.dll
-#   app/assets/onnx/ssd_mobilenet_v1_12.onnx
+#   app/assets/onnx/ssd_mobilenet_v1_12.onnx   (Tier-2 people/animal detector)
+#   app/assets/onnx/mobilenetv2-12.onnx        (Smart duplicate-metric embedder)
 #
 # At runtime the host platform's library + the shared model resolve from one
 # bundle dir (see app/lib/src/engine/onnx_bundle_dir.dart and the engine's
@@ -29,6 +30,10 @@ DEST="$REPO_ROOT/app/assets/onnx"
 ORT_VER="${ORT_VERSION:-1.27.0}"
 MODEL_FILE="ssd_mobilenet_v1_12.onnx"
 MODEL_URL="https://huggingface.co/onnxmodelzoo/ssd_mobilenet_v1_12/resolve/main/${MODEL_FILE}"
+# Apache-2.0 MobileNetV2-12 (ONNX Model Zoo): the image-embedding model behind
+# the Smart duplicate-finder metric. Shared across platforms like the detector.
+EMBED_FILE="mobilenetv2-12.onnx"
+EMBED_URL="https://huggingface.co/onnxmodelzoo/mobilenetv2-12/resolve/main/${EMBED_FILE}"
 
 mkdir -p "$DEST"
 
@@ -39,12 +44,18 @@ for plat in osx-arm64 osx-x64 linux-x64 win-x64; do
   mkdir -p "$DEST/$plat"
 done
 
-# --- The model (shared across platforms; Apache-2.0). ----------------------
+# --- The models (shared across platforms; both Apache-2.0). ----------------
 if [ ! -s "$DEST/$MODEL_FILE" ]; then
   echo "downloading $MODEL_FILE"
   curl -fsSL "$MODEL_URL" -o "$DEST/$MODEL_FILE"
 fi
 echo "model: $DEST/$MODEL_FILE ($(wc -c < "$DEST/$MODEL_FILE") bytes)"
+
+if [ ! -s "$DEST/$EMBED_FILE" ]; then
+  echo "downloading $EMBED_FILE"
+  curl -fsSL "$EMBED_URL" -o "$DEST/$EMBED_FILE"
+fi
+echo "embed model: $DEST/$EMBED_FILE ($(wc -c < "$DEST/$EMBED_FILE") bytes)"
 
 # --- ONNX Runtime native library, per platform. ----------------------------
 # $1 = ORT release suffix (e.g. osx-arm64), $2 = our platform dir (osx-arm64),
@@ -123,5 +134,6 @@ case "$(uname -s)" in
 esac
 if [ -n "$HOST_DIR" ] && [ -d "$DEST/$HOST_DIR" ]; then
   cp -f "$DEST/$MODEL_FILE" "$DEST/$HOST_DIR/$MODEL_FILE"
+  cp -f "$DEST/$EMBED_FILE" "$DEST/$HOST_DIR/$EMBED_FILE"
   echo "host bundle dir: $DEST/$HOST_DIR"
 fi

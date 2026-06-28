@@ -28,7 +28,7 @@
   "help_match_b1": "Find filer, der har mistet deres makker: fjern forældreløse RAW-filer uden et matchende foto, eller — den anden vej — fotos uden en matchende RAW.",
   "help_match_b2": "Du gennemgår hele listen og vælger, hvad der skal med, før noget flyttes til papirkurven.",
   "help_duplicates_title": "Find dubletter",
-  "help_duplicates_b1": "Finder visuelt ens fotos. Lighedsskyderen går fra Nøjagtig til Løs — træk mod Løs for også at fange let redigerede nær-dubletter, med en levende eksempelforhåndsvisning af, hvor streng hver indstilling er.",
+  "help_duplicates_b1": "Finder visuelt ens fotos. Vælg en matchmetode øverst — Hurtig (perceptuel hash + farve) eller Smart (embedding-lighed på enheden) — og brug derefter lighedsskyderen fra Nøjagtig til Løs, med en live-forhåndsvisning af, hvor streng hver indstilling er.",
   "help_duplicates_b2": "En behold-prioritetskæde afgør, hvilken kopi der beholdes: Opløsning, Kvalitet og Personer & dyr. Omarrangér reglerne, og slå dem til eller fra; den første regel, der afgør klart, vinder.",
   "help_duplicates_b3": "Gennemgå hvert par, byt hvilken side der beholdes, eller fravælg for at beholde begge. Intet slettes, før du bekræfter.",
   "help_compare_title": "Sammenligningsviser",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "forældreløst billede",
   "shrink_reason_redundant_raw": "overflødig RAW",
   "shrink_reason_redundant_jpg": "overflødig JPG",
-  "shrink_reason_low_quality": "lav kvalitet"
+  "shrink_reason_low_quality": "lav kvalitet",
+  "dup_metric_title": "Matchmetode",
+  "dup_metric_fast": "Hurtig — perceptuel hash",
+  "dup_metric_fast_desc": "Sammenligner en perceptuel hash (pHash) plus farve. Øjeblikkeligt, på hver fil.",
+  "dup_metric_fast_pro": "Bedst til næsten identiske kopier og gemte versioner.",
+  "dup_metric_fast_con": "Overser kraftige beskæringer, rotationer eller omfarvninger.",
+  "dup_metric_smart": "Smart — embedding-lighed",
+  "dup_metric_smart_desc": "Sammenligner en embedding af hvert foto, på enheden. Kører helt på din computer.",
+  "dup_metric_smart_pro": "Forstår beskæringer, rotationer og omfarvninger af samme motiv.",
+  "dup_metric_smart_con": "Lidt langsommere og kræver den medfølgende AI-model.",
+  "dup_metric_smart_unavailable": "embedding-modellen er ikke tilgængelig her, så Smart falder tilbage til Hurtig.",
+  "lic_role_mobilenet_embed": "Smart dublet-lighed (indlejring på enheden)"
 }

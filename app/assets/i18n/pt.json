@@ -28,7 +28,7 @@
   "help_match_b1": "Encontre arquivos que perderam o par: remova arquivos RAW órfãos sem foto correspondente, ou — no sentido inverso — fotos sem RAW correspondente.",
   "help_match_b2": "Você revisa a lista completa e escolhe o que incluir antes de qualquer coisa ir para a Lixeira.",
   "help_duplicates_title": "Encontrar duplicatas",
-  "help_duplicates_b1": "Detecta fotos visualmente parecidas. O controle de similaridade vai de Exato a Solto — arraste para Solto para também pegar quase-duplicatas levemente editadas, com uma pré-visualização ao vivo de quão rigoroso é cada ajuste.",
+  "help_duplicates_b1": "Identifica fotos visualmente semelhantes. Escolha um método de correspondência no topo — Rápido (hash perceptual + cor) ou Inteligente (similaridade por embedding no dispositivo) — e use o controle de similaridade de Exato a Flexível, com uma prévia ao vivo de quão rígido é cada ajuste.",
   "help_duplicates_b2": "Uma sequência de prioridade decide qual cópia manter: Resolução, Qualidade e Pessoas e animais. Reordene as regras e ligue ou desligue cada uma; a primeira regra que decide claramente vence.",
   "help_duplicates_b3": "Revise cada par, troque qual lado é mantido, ou desmarque para manter ambos. Nada é apagado até você confirmar.",
   "help_compare_title": "Visualizador de comparação",
@@ -378,5 +378,16 @@
   "shrink_reason_orphan_image": "imagem órfã",
   "shrink_reason_redundant_raw": "RAW redundante",
   "shrink_reason_redundant_jpg": "JPG redundante",
-  "shrink_reason_low_quality": "baixa qualidade"
+  "shrink_reason_low_quality": "baixa qualidade",
+  "dup_metric_title": "Método de correspondência",
+  "dup_metric_fast": "Rápido — hash perceptual",
+  "dup_metric_fast_desc": "Compara um hash perceptual (pHash) e a cor. Instantâneo, em cada arquivo.",
+  "dup_metric_fast_pro": "Ideal para cópias quase idênticas e regravações.",
+  "dup_metric_fast_con": "Não detecta cortes, rotações ou recolorações fortes.",
+  "dup_metric_smart": "Inteligente — similaridade por embedding",
+  "dup_metric_smart_desc": "Compara um embedding neuronal de cada foto, no dispositivo. Executa inteiramente no seu computador.",
+  "dup_metric_smart_pro": "Entende cortes, rotações e recolorações da mesma cena.",
+  "dup_metric_smart_con": "Um pouco mais lento e precisa do modelo de embedding incluído.",
+  "dup_metric_smart_unavailable": "O modelo de embedding não está disponível aqui, então Inteligente volta para Rápido.",
+  "lic_role_mobilenet_embed": "Similaridade inteligente de duplicatas (embedding no dispositivo)"
 }

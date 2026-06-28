@@ -9,6 +9,7 @@ import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/duplicates_model.dart';
 import '../state/library_action.dart' show Translator;
+import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/image_compare_viewer.dart';
 import '../widgets/run_view.dart';
@@ -78,6 +79,8 @@ class _Review extends StatelessWidget {
         ],
         Text(context.tr('dup_intro'), style: text.bodyMedium),
         const SizedBox(height: 16),
+        _MetricSelector(controller: controller),
+        const SizedBox(height: 20),
         _SimilaritySlider(controller: controller),
         const SizedBox(height: 20),
         _KeepPipelinePanel(controller: controller),
@@ -97,6 +100,177 @@ class _Review extends StatelessWidget {
           const SizedBox(height: 20),
           _Results(controller: controller, pairs: pairs, random: random),
         ],
+      ],
+    );
+  }
+}
+
+/// The top-of-screen metric selector: a Fast vs Smart choice, each shown as a
+/// tappable card with a one-line explanation, a pro/con pair, and a small
+/// illustration (mirroring the example-scene explain-with-pictures style). The
+/// chosen metric is persisted and drives which similarity groups the files. When
+/// Smart is selected but no model is bundled, an inline note says it falls back
+/// to Fast.
+class _MetricSelector extends StatelessWidget {
+  const _MetricSelector({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final selected = controller.similarityMetric;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.tr('dup_metric_title'), style: text.titleSmall),
+        const SizedBox(height: 8),
+        for (final metric in SimilarityMetric.values) ...[
+          _MetricCard(
+            metric: metric,
+            selected: metric == selected,
+            onSelected: controller.findingDuplicates
+                ? null
+                : () => controller.setSimilarityMetric(metric),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (selected == SimilarityMetric.smart &&
+            !controller.smartMetricAvailable)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    context.tr('dup_metric_smart_unavailable'),
+                    style: text.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One metric option as a selectable card: an illustration, the metric name with
+/// a radio indicator, a one-line explanation, and a pro/con pair.
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.metric,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final SimilarityMetric metric;
+  final bool selected;
+  final VoidCallback? onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final smart = metric == SimilarityMetric.smart;
+    return InkWell(
+      onTap: onSelected,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected
+              ? scheme.primaryContainer.withValues(alpha: 0.4)
+              : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? scheme.primary : scheme.outline,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            MetricIllustration(transformed: smart, glyph: smart ? '≈' : '='),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        size: 18,
+                        color: selected ? scheme.primary : scheme.outline,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          context.tr(similarityMetricLabelKey(metric)),
+                          style: text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    context.tr(similarityMetricDescKey(metric)),
+                    style: text.bodySmall,
+                  ),
+                  const SizedBox(height: 6),
+                  _ProCon(
+                    icon: Icons.add_circle_outline,
+                    color: AppColors.success,
+                    label: context.tr(similarityMetricProKey(metric)),
+                  ),
+                  const SizedBox(height: 2),
+                  _ProCon(
+                    icon: Icons.remove_circle_outline,
+                    color: scheme.onSurfaceVariant,
+                    label: context.tr(similarityMetricConKey(metric)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A single pro or con line: a small coloured icon plus its text.
+class _ProCon extends StatelessWidget {
+  const _ProCon({required this.icon, required this.color, required this.label});
+
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ),
       ],
     );
   }

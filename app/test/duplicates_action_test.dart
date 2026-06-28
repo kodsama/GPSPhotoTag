@@ -113,7 +113,15 @@ void main() {
       // The example pair renders under the slider at the Exact default.
       expect(find.byType(ExampleScenePair), findsOneWidget);
       expect(find.text('Identical copies'), findsOneWidget);
-      expect(find.text('≈'), findsOneWidget);
+      // The example pair carries an "≈" glyph (scoped to it, since the Smart
+      // metric card also shows one).
+      expect(
+        find.descendant(
+          of: find.byType(ExampleScenePair),
+          matching: find.text('≈'),
+        ),
+        findsOneWidget,
+      );
 
       // Driving the controller to Loose (100%) updates the caption live, and
       // the picked label shows the percent.
@@ -122,6 +130,68 @@ void main() {
       expect(find.text('Loosely similar scenes'), findsOneWidget);
       expect(find.text('Loosely similar scenes · 100%'), findsOneWidget);
       expect(find.text('Identical copies'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the metric selector renders both options with explanation, pros/cons '
+    'and an illustration',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+      await tester.pumpWidget(_host(c));
+
+      // Both option labels and their explanations render.
+      expect(find.text(enTr('dup_metric_title')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_fast')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_fast_desc')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart_desc')), findsOneWidget);
+      // Pros/cons for each option.
+      expect(find.text(enTr('dup_metric_fast_pro')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_fast_con')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart_pro')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart_con')), findsOneWidget);
+      // One illustration per option (Fast "=" + Smart "≈").
+      expect(find.byType(MetricIllustration), findsNWidgets(2));
+    },
+  );
+
+  testWidgets('selecting Smart persists the metric and drives the run', (
+    tester,
+  ) async {
+    final fake = FakeEngineRunner();
+    final c = AppController(runner: fake)
+      ..debugSetScan(fakeScan(photos: const ['/a.jpg', '/b.jpg']))
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+    expect(c.similarityMetric, SimilarityMetric.fast);
+
+    // Tap the Smart card.
+    await tester.tap(find.text(enTr('dup_metric_smart')));
+    await tester.pump();
+    expect(c.similarityMetric, SimilarityMetric.smart);
+
+    // Running uses the selected metric.
+    await c.runFindDuplicates();
+    expect(fake.lastDuplicateMetric, SimilarityMetric.smart);
+  });
+
+  testWidgets(
+    'shows the fallback note when Smart is selected but unavailable',
+    (tester) async {
+      final c = AppController(
+        runner: FakeEngineRunner()..smartAvailableValue = false,
+      )..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+      await tester.pumpWidget(_host(c));
+
+      // No note while Fast is selected.
+      expect(find.text(enTr('dup_metric_smart_unavailable')), findsNothing);
+
+      // Selecting Smart (unavailable) shows the inline fallback note.
+      await tester.tap(find.text(enTr('dup_metric_smart')));
+      await tester.pump();
+      expect(find.text(enTr('dup_metric_smart_unavailable')), findsOneWidget);
     },
   );
 
