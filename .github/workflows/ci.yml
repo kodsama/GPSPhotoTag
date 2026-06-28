@@ -136,3 +136,85 @@ jobs:
             packages/mcp/coverage/lcov.info
             app/coverage/lcov.info
           if-no-files-found: warn
+
+  # Desktop build matrix: prove the Flutter app compiles on every supported
+  # desktop OS. Each job vendors that OS's exiftool flavour (apt Perl on Linux,
+  # the self-contained exe on Windows, the macOS path) + the ONNX Runtime lib,
+  # then runs `flutter build <os>`. Correctness of the Windows/Linux resolver
+  # branches is unit-tested in lint-and-test (injected-OS seams) so this matrix
+  # only needs to confirm the build links and bundles assets.
+  build-desktop:
+    name: Build ${{ matrix.target }}
+    needs: lint-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: macos
+          - os: windows-latest
+            target: windows
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Print toolchain versions
+        run: flutter --version
+
+      # Linux desktop build deps: GTK + the bits desktop_drop / file_selector
+      # need (keybinder, secret service), plus the toolchain CMake/Ninja need.
+      - name: Install Linux build deps
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev libkeybinder-3.0-dev libsecret-1-dev \
+            libimage-exiftool-perl
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # Vendor exiftool for the matching OS. Linux/macOS vendor the Perl
+      # distribution; Windows additionally fetches the self-contained exe via
+      # the --windows flag (Windows has no Perl to run the script).
+      - name: Vendor bundled exiftool (Linux/macOS)
+        if: matrix.target != 'windows'
+        run: bash tool/fetch-exiftool.sh
+
+      - name: Vendor bundled exiftool (Windows self-contained exe)
+        if: matrix.target == 'windows'
+        shell: bash
+        run: bash tool/fetch-exiftool.sh --windows
+
+      # Vendor the host platform's ONNX Runtime lib + the shared detector model
+      # so the app's declared assets exist for the build.
+      - name: Vendor ONNX Runtime + detector model
+        shell: bash
+        run: bash tool/fetch-onnx.sh
+
+      - name: Build app
+        working-directory: app
+        run: flutter build ${{ matrix.target }} --release
+
+      # Tag pushes get the raw build output as a downloadable artifact, aligning
+      # with release.yml's intent (which additionally packages installers).
+      - name: Upload build artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.target }}
+          path: |
+            app/build/macos/Build/Products/Release/*.app
+            app/build/windows/x64/runner/Release/**
+            app/build/linux/x64/release/bundle/**
+          if-no-files-found: warn

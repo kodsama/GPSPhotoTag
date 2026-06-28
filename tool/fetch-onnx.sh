@@ -48,26 +48,34 @@ echo "model: $DEST/$MODEL_FILE ($(wc -c < "$DEST/$MODEL_FILE") bytes)"
 
 # --- ONNX Runtime native library, per platform. ----------------------------
 # $1 = ORT release suffix (e.g. osx-arm64), $2 = our platform dir (osx-arm64),
-# $3 = the dylib/so/dll name inside the release, $4 = our target file name.
+# $3 = the dylib/so/dll name inside the release, $4 = our target file name,
+# $5 = archive extension ("tgz" for macOS/Linux, "zip" for Windows).
 fetch_ort() {
-  local rel_suffix="$1" plat_dir="$2" libname="$3" target="$4"
+  local rel_suffix="$1" plat_dir="$2" libname="$3" target="$4" ext="${5:-tgz}"
   local outdir="$DEST/$plat_dir"
   if [ -s "$outdir/$target" ]; then
     echo "ort $plat_dir already present"
     return 0
   fi
   mkdir -p "$outdir"
-  local tmp tgz base url
+  local tmp base url archive
   tmp="$(mktemp -d)"
   base="onnxruntime-${rel_suffix}-${ORT_VER}"
-  url="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VER}/${base}.tgz"
+  archive="$tmp/ort.$ext"
+  url="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VER}/${base}.${ext}"
   echo "downloading $url"
-  if ! curl -fsSL "$url" -o "$tmp/ort.tgz"; then
+  if ! curl -fsSL "$url" -o "$archive"; then
     echo "WARN: could not download ORT for $plat_dir ($url); skipping" >&2
     rm -rf "$tmp"
     return 0
   fi
-  tar xzf "$tmp/ort.tgz" -C "$tmp"
+  # The Windows distribution is a .zip; macOS/Linux are .tgz. Use unzip for zip
+  # (more reliable than tar's libarchive zip support across runners).
+  if [ "$ext" = "zip" ]; then
+    unzip -q -o "$archive" -d "$tmp"
+  else
+    tar xzf "$archive" -C "$tmp"
+  fi
   local found
   found="$(find "$tmp" -name "$libname" -type f | head -1)"
   if [ -z "$found" ]; then
@@ -94,6 +102,12 @@ case "$(uname -s)" in
     ;;
   Linux)
     fetch_ort "linux-x64" "linux-x64" "libonnxruntime.so.${ORT_VER}" "libonnxruntime.so"
+    ;;
+  # Windows CI runs this under Git Bash, where uname -s is MINGW*/MSYS*/CYGWIN*.
+  # The Windows ORT release zip lays the dll at runtime/onnxruntime.dll; `tar`
+  # on the runners handles .zip via libarchive (fetch_ort calls tar xzf).
+  MINGW*|MSYS*|CYGWIN*)
+    fetch_ort "win-x64" "win-x64" "onnxruntime.dll" "onnxruntime.dll" "zip"
     ;;
   *)
     echo "unsupported host for ORT fetch: $(uname -s); model is present, lib skipped" >&2
