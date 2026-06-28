@@ -152,7 +152,7 @@
   "dup_intro": "Arrastra hacia Amplio para detectar también casi-duplicados ligeramente editados. No se elimina nada hasta que revises y confirmes.",
   "dup_find": "Buscar duplicados",
   "dup_similarity": "Similitud",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "Exacto",
   "dup_loose": "Amplio",
   "dup_none_found": "No se encontraron duplicados.",

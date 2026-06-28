@@ -152,7 +152,7 @@
   "dup_intro": "Træk mod Løs for også at fange let redigerede næsten-dubletter. Intet fjernes, før du har gennemgået og bekræftet.",
   "dup_find": "Find dubletter",
   "dup_similarity": "Lighed",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "Nøjagtig",
   "dup_loose": "Løs",
   "dup_none_found": "Ingen dubletter fundet.",

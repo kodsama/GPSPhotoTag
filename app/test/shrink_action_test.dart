@@ -57,7 +57,6 @@ Widget _actionHost(AppController c) => ControllerScope(
 HashedFile _hf(String path, {int size = 1000, double quality = 0.9}) =>
     HashedFile(
       path: path,
-      hash: 0,
       width: 10,
       height: 10,
       fileSize: size,
@@ -435,7 +434,6 @@ void main() {
       // A photo that is fine overall but bad on sharpness alone.
       final soft = HashedFile(
         path: '/library/soft.jpg',
-        hash: 0,
         width: 10,
         height: 10,
         fileSize: 1234,

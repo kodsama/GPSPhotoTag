@@ -24,7 +24,6 @@ HashedFile _hf(
   int size = 2048,
 }) => HashedFile(
   path: path,
-  hash: 0,
   width: width,
   height: height,
   fileSize: size,
@@ -86,11 +85,22 @@ void main() {
     expect(find.text('Exact'), findsOneWidget);
     expect(find.text('Loose'), findsOneWidget);
 
+    // The slider spans 0..100 with 10 divisions (11 stops), and its value snaps
+    // to multiples of 10.
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.min, 0);
+    expect(slider.max, 100);
+    expect(slider.divisions, 10);
+
+    // The picked-setting label shows the looseness as a percent.
+    expect(find.text('Identical copies · 0%'), findsOneWidget);
+
     // Dragging the slider toward Loose raises the similarity (exercises the
-    // onChanged seam → setSimilarity).
+    // onChanged seam → setSimilarity); it lands on a multiple of 10.
     await tester.drag(find.byType(Slider), const Offset(200, 0));
     await tester.pump();
     expect(c.similarity, greaterThan(0));
+    expect(c.similarity % 10, 0);
   });
 
   testWidgets(
@@ -105,10 +115,12 @@ void main() {
       expect(find.text('Identical copies'), findsOneWidget);
       expect(find.text('≈'), findsOneWidget);
 
-      // Driving the controller to Loose updates the caption live.
-      c.setSimilarity(similaritySteps);
+      // Driving the controller to Loose (100%) updates the caption live, and
+      // the picked label shows the percent.
+      c.setSimilarity(similarityMaxPercent);
       await tester.pump();
       expect(find.text('Loosely similar scenes'), findsOneWidget);
+      expect(find.text('Loosely similar scenes · 100%'), findsOneWidget);
       expect(find.text('Identical copies'), findsNothing);
     },
   );
@@ -281,7 +293,6 @@ void main() {
         DuplicatePair(
           kept: HashedFile(
             path: '/big.jpg',
-            hash: 0,
             width: 300,
             height: 300,
             fileSize: 10,
@@ -296,7 +307,6 @@ void main() {
           ),
           other: HashedFile(
             path: '/crisp.jpg',
-            hash: 0,
             width: 100,
             height: 100,
             fileSize: 10,

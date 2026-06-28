@@ -202,7 +202,7 @@ const Map<String, String> kEnglishStrings = {
       'Drag toward Loose to also catch lightly-edited near-duplicates. Nothing is removed until you review and confirm.',
   'dup_find': 'Find duplicates',
   'dup_similarity': 'Similarity',
-  'dup_similarity_value': '{label} · {step}/{total}',
+  'dup_similarity_value': '{label} · {percent}%',
   'dup_exact': 'Exact',
   'dup_loose': 'Loose',
   'dup_none_found': 'No duplicates found.',

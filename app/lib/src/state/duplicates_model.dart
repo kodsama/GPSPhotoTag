@@ -4,49 +4,73 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import 'library_action.dart' show Translator;
 
-/// Pure helpers behind the Find-Duplicates review: the similarity-slider ↔
-/// Hamming-threshold mapping, expanding a group into reviewable pairs, the swap
+/// Pure helpers behind the Find-Duplicates review: the looseness-percent ↔
+/// min-similarity mapping, expanding a group into reviewable pairs, the swap
 /// that flips which side is kept, collecting the selected removal set, and the
 /// silly-word confirm gate. Kept Flutter-free so they are unit-testable.
 
-/// The number of discrete similarity steps the slider offers (0..[similaritySteps]).
-///
-/// Capped at 15: on a 64-bit dHash a Hamming distance beyond ~15 stops being
-/// meaningful (unrelated photos start matching), so the loosest useful setting
-/// is 15 bits apart. Going higher grouped completely different images.
-const int similaritySteps = 15;
+/// The number of slider divisions: 0..100 in steps of 10 (11 stops). The slider
+/// value IS the looseness percent (0 = Exact, 100 = Loose).
+const int similaritySteps = 10;
 
-/// Maps a similarity slider value (0 = Exact, [similaritySteps] = Loose) to a
-/// Hamming-distance threshold for [groupDuplicates].
-///
-/// 0 → 0 (only bit-identical previews group); each step up adds one bit of
-/// tolerance, so the loosest setting groups previews up to [similaritySteps]
-/// bits apart. Out-of-range inputs are clamped.
-int similarityToThreshold(int slider) => slider.clamp(0, similaritySteps);
+/// The minimum percent the slider can take (Exact).
+const int similarityMinPercent = 0;
 
-/// Normalises a similarity slider value (0..[similaritySteps]) to a 0..1
-/// "scene variance" the example-pair painter uses to perturb its right tile.
+/// The maximum percent the slider can take (Loose).
+const int similarityMaxPercent = 100;
+
+/// The min-similarity cutoff at the Exact (0%) end: only ~identical images group.
+const double _exactSimilarity = 0.98;
+
+/// The min-similarity cutoff at the Loose (100%) end. Deliberately kept high
+/// enough (~0.55) that the loosest setting still groups genuinely-similar photos
+/// rather than unrelated ones — the whole point of the new metric's full-range,
+/// trustworthy distance.
+const double _looseSimilarity = 0.55;
+
+/// Maps a looseness [percent] (0 = Exact, 100 = Loose) to the min-similarity
+/// cutoff (0..1) [groupDuplicates] uses.
 ///
-/// 0 at Exact (pixel-identical preview), 1 at Loose, and strictly increasing in
-/// between. Out-of-range inputs are clamped. Pure so the painter stays
-/// deterministic and the mapping is unit-testable.
-double sceneVariance(int slider) =>
-    slider.clamp(0, similaritySteps) / similaritySteps;
+/// Linearly interpolates across the trustworthy band [_looseSimilarity] (loose)
+/// .. [_exactSimilarity] (exact): 0% → 0.98 (only near-identical group), 100% →
+/// 0.55 (still genuinely-similar, never random). DECREASING in the percent (a
+/// looser setting accepts a lower similarity). Out-of-range inputs are clamped.
+double similarityToThreshold(int percent) {
+  final p = percent.clamp(similarityMinPercent, similarityMaxPercent) / 100;
+  return _exactSimilarity - p * (_exactSimilarity - _looseSimilarity);
+}
+
+/// Snaps an arbitrary [value] to the nearest valid slider stop: a multiple of 10
+/// clamped to 0..100. Used to migrate/clamp a persisted value and to snap the
+/// slider's continuous drag. Pure.
+int snapSimilarityPercent(int value) {
+  final clamped = value.clamp(similarityMinPercent, similarityMaxPercent);
+  return ((clamped / 10).round()) * 10;
+}
+
+/// Normalises a looseness [percent] (0..100) to a 0..1 "scene variance" the
+/// example-pair painter uses to perturb its right tile.
+///
+/// 0 at Exact, 1 at Loose, strictly increasing in between (simply `percent/100`).
+/// Out-of-range inputs are clamped. Pure so the painter stays deterministic and
+/// the mapping is unit-testable.
+double sceneVariance(int percent) =>
+    percent.clamp(similarityMinPercent, similarityMaxPercent) / 100;
 
 /// The localization KEY for a short, human descriptor of what the current
-/// similarity [slider] level catches, shown as the example-pair caption.
+/// looseness [percent] catches, shown as the example-pair caption.
 ///
-/// Buckets the slider into five bands: Exact (0) → identical copies; low → light
-/// re-encodes; mid → small edits; high → the same scene shot differently; and
-/// the loosest band → only loosely-similar scenes ("kind of the same"). Out-of-
-/// range inputs are clamped. Pure so the bucket boundaries are testable; the
-/// widget layer resolves the key through `context.tr`.
-String similarityExampleKey(int slider) {
-  final value = slider.clamp(0, similaritySteps);
+/// Buckets the percent into five bands: Exact (0) → identical copies; low (≤20) →
+/// light re-encodes; mid (≤50) → small edits; high (≤80) → the same scene shot
+/// differently; and the loosest band → only loosely-similar scenes ("kind of the
+/// same"). Out-of-range inputs are clamped. Pure so the bucket boundaries are
+/// testable; the widget layer resolves the key through `context.tr`.
+String similarityExampleKey(int percent) {
+  final value = percent.clamp(similarityMinPercent, similarityMaxPercent);
   if (value == 0) return 'sim_identical';
-  if (value <= 3) return 'sim_resaved';
-  if (value <= 7) return 'sim_minor';
-  if (value <= 11) return 'sim_same_scene';
+  if (value <= 20) return 'sim_resaved';
+  if (value <= 50) return 'sim_minor';
+  if (value <= 80) return 'sim_same_scene';
   return 'sim_loose';
 }
 

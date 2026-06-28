@@ -16,7 +16,6 @@ HashedFile _hf(
   double quality = 0.5,
 }) => HashedFile(
   path: path,
-  hash: 0,
   width: width,
   height: height,
   fileSize: size,
@@ -47,12 +46,12 @@ void main() {
             fakeScan(photos: const ['/best.jpg', '/dup.jpg', '/x.jpg']),
           );
         c.openAction(LibraryAction.duplicates);
-        c.setSimilarity(4);
+        c.setSimilarity(40);
         c.setFileIncluded('/x.jpg', false); // exclude one
 
         await c.runFindDuplicates();
 
-        expect(fake.lastDuplicateThreshold, similarityToThreshold(4));
+        expect(fake.lastDuplicateMinSimilarity, similarityToThreshold(40));
         expect(fake.lastDuplicatePaths, ['/best.jpg', '/dup.jpg']);
         expect(c.duplicatePairs, hasLength(1));
         expect(c.duplicatePairs!.single.kept.path, '/best.jpg');
@@ -114,14 +113,15 @@ void main() {
   });
 
   group('similarity slider', () {
-    test('clamps and notifies only on change', () {
+    test('snaps, clamps, and notifies only on change', () {
       final c = AppController(runner: FakeEngineRunner());
       var notifies = 0;
       c.addListener(() => notifies++);
-      c.setSimilarity(3);
-      c.setSimilarity(3); // no change → no notify
-      c.setSimilarity(999); // clamps to max
-      expect(c.similarity, similaritySteps);
+      c.setSimilarity(34); // snaps to 30 → change → notify
+      expect(c.similarity, 30);
+      c.setSimilarity(31); // snaps to 30 again → no change → no notify
+      c.setSimilarity(999); // clamps to 100 → change → notify
+      expect(c.similarity, similarityMaxPercent);
       expect(notifies, 2);
     });
   });

@@ -235,7 +235,8 @@ class IsolateRunner implements EngineRunner {
   }
 
   /// Perceptually hashes [paths] across worker isolates, then groups the
-  /// returned [HashedFile]s within [threshold] on the UI isolate (cheap, pure).
+  /// returned [HashedFile]s at or above [minSimilarity] on the UI isolate
+  /// (cheap, pure).
   ///
   /// Fans the paths out round-robin across a CPU-bounded set of workers (each
   /// running its own bundled exiftool for RAW/HEIC previews), collects every
@@ -244,11 +245,11 @@ class IsolateRunner implements EngineRunner {
   @override
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
-    required int threshold,
+    required double minSimilarity,
     void Function(int done, int total)? onProgress,
   }) async {
     final all = await hashFiles(paths, onProgress: onProgress);
-    return groupDuplicates(all, threshold: threshold);
+    return groupDuplicates(all, minSimilarity: minSimilarity);
   }
 
   /// Fans [paths] out round-robin across CPU-bounded workers (each with its own

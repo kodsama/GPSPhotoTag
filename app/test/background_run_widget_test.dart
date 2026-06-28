@@ -79,7 +79,6 @@ void main() {
           DuplicateGroup(
             best: HashedFile(
               path: '/best.jpg',
-              hash: 0,
               width: 10,
               height: 10,
               fileSize: 1,
@@ -89,7 +88,6 @@ void main() {
             duplicates: [
               HashedFile(
                 path: '/dup.jpg',
-                hash: 0,
                 width: 10,
                 height: 10,
                 fileSize: 1,

@@ -263,12 +263,12 @@ void main() {
 
   test('findDuplicates returns empty for no paths', () async {
     const runner = IsolateRunner();
-    expect(await runner.findDuplicates(const [], threshold: 0), isEmpty);
+    expect(await runner.findDuplicates(const [], minSimilarity: 1), isEmpty);
   });
 
   test('findDuplicates hashes on workers and groups identical JPEGs', () async {
-    // Two byte-identical JPEGs (same pixels) → identical dHash → one group; a
-    // visually different third file stays out.
+    // Two byte-identical JPEGs (same pixels) → identical signatures → one group;
+    // a visually different third file stays out.
     final a = await writeJpegWithDate(tmp, 'a.jpg');
     final bBytes = File(a).readAsBytesSync();
     final b = '${tmp.path}/b.jpg';
@@ -280,7 +280,7 @@ void main() {
     var lastTotal = 0;
     final groups = await runner.findDuplicates(
       [a, b, c],
-      threshold: 0,
+      minSimilarity: 1,
       onProgress: (done, total) {
         ticks.add(done);
         lastTotal = total;

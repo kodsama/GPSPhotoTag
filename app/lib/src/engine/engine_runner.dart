@@ -55,16 +55,16 @@ abstract interface class EngineRunner {
   Future<String?> extractPreview(String path, {bool full = false});
 
   /// Perceptually hashes [paths] across worker isolates and groups files whose
-  /// hashes are within [threshold] Hamming distance, returning the duplicate
-  /// groups (undecodable files and RAW companions are excluded). RAW/HEIC are
-  /// hashed via their embedded preview using the bundled exiftool.
+  /// combined similarity is at least [minSimilarity] (0..1), returning the
+  /// duplicate groups (undecodable files and RAW companions are excluded).
+  /// RAW/HEIC are hashed via their embedded preview using the bundled exiftool.
   ///
   /// [onProgress] (when given) is called as files finish hashing with the
   /// running `done` count against the fixed `total` (= `paths.length`), so the
   /// UI can show determinate progress instead of an indeterminate spinner.
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
-    required int threshold,
+    required double minSimilarity,
     void Function(int done, int total)? onProgress,
   });
 

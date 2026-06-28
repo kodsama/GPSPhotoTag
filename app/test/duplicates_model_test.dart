@@ -13,7 +13,6 @@ HashedFile _hf(
   int size = 10,
 }) => HashedFile(
   path: path,
-  hash: 0,
   width: width,
   height: height,
   fileSize: size,
@@ -35,39 +34,58 @@ class _FixedRandom implements Random {
 
 void main() {
   group('similarityToThreshold', () {
-    test('caps looseness at 15 steps', () {
-      // Beyond ~15 Hamming bits on a 64-bit dHash, unrelated photos match,
-      // so the loosest useful setting is 15.
-      expect(similaritySteps, 15);
+    test('offers 11 stops over 0..100 (steps of 10)', () {
+      expect(similaritySteps, 10);
+      expect(similarityMinPercent, 0);
+      expect(similarityMaxPercent, 100);
     });
 
-    test('maps Exact (0) to threshold 0 and Loose to the max steps', () {
-      expect(similarityToThreshold(0), 0);
-      expect(similarityToThreshold(similaritySteps), similaritySteps);
-      // The loosest setting groups previews up to 15 bits apart.
-      expect(similarityToThreshold(similaritySteps), 15);
+    test('maps Exact (0%) to ~0.98 and Loose (100%) to ~0.55', () {
+      expect(similarityToThreshold(0), closeTo(0.98, 1e-9));
+      expect(similarityToThreshold(100), closeTo(0.55, 1e-9));
     });
 
-    test('is monotonic and clamps out-of-range', () {
-      expect(similarityToThreshold(3), lessThan(similarityToThreshold(5)));
-      expect(similarityToThreshold(-1), 0);
-      expect(similarityToThreshold(999), similaritySteps);
+    test('stays inside the trustworthy band so Loose never groups randoms', () {
+      // Across the whole slider the cutoff never drops below the loose floor:
+      // the loosest setting still demands genuine (≥0.55) similarity.
+      for (var pct = 0; pct <= 100; pct += 10) {
+        expect(similarityToThreshold(pct), inInclusiveRange(0.55, 0.98));
+      }
+    });
+
+    test('is monotonically DECREASING in the percent and clamps', () {
+      // A looser (higher) percent accepts a LOWER min-similarity.
+      expect(similarityToThreshold(30), greaterThan(similarityToThreshold(50)));
+      expect(similarityToThreshold(-10), closeTo(0.98, 1e-9));
+      expect(similarityToThreshold(999), closeTo(0.55, 1e-9));
+    });
+  });
+
+  group('snapSimilarityPercent', () {
+    test('snaps to the nearest multiple of 10 and clamps to 0..100', () {
+      expect(snapSimilarityPercent(0), 0);
+      expect(snapSimilarityPercent(4), 0);
+      expect(snapSimilarityPercent(5), 10);
+      expect(snapSimilarityPercent(47), 50);
+      expect(snapSimilarityPercent(100), 100);
+      expect(snapSimilarityPercent(-20), 0);
+      expect(snapSimilarityPercent(999), 100);
     });
   });
 
   group('sceneVariance', () {
     test('is 0 at Exact and 1 at Loose', () {
       expect(sceneVariance(0), 0);
-      expect(sceneVariance(similaritySteps), 1);
+      expect(sceneVariance(100), 1);
     });
 
     test('is monotonic across the range', () {
-      expect(sceneVariance(2), lessThan(sceneVariance(5)));
-      expect(sceneVariance(5), lessThan(sceneVariance(9)));
+      expect(sceneVariance(20), lessThan(sceneVariance(50)));
+      expect(sceneVariance(50), lessThan(sceneVariance(90)));
     });
 
     test('clamps out-of-range inputs to 0..1', () {
-      expect(sceneVariance(-5), 0);
+      expect(sceneVariance(-50), 0);
       expect(sceneVariance(999), 1);
     });
   });
@@ -75,29 +93,29 @@ void main() {
   group('similarityExampleKey', () {
     String label(int v) => enTr(similarityExampleKey(v));
 
-    test('Exact (0) reads as identical copies', () {
+    test('Exact (0%) reads as identical copies', () {
       expect(similarityExampleKey(0), 'sim_identical');
       expect(label(0), 'Identical copies');
     });
 
     test('the low band reads as a re-save/resize', () {
-      expect(label(1), 'Re-saved or resized');
-      expect(label(3), 'Re-saved or resized');
+      expect(label(10), 'Re-saved or resized');
+      expect(label(20), 'Re-saved or resized');
     });
 
     test('the mid band reads as minor edits', () {
-      expect(label(4), 'Minor edits (crop, exposure)');
-      expect(label(7), 'Minor edits (crop, exposure)');
+      expect(label(30), 'Minor edits (crop, exposure)');
+      expect(label(50), 'Minor edits (crop, exposure)');
     });
 
     test('the high band reads as a different shot of the same scene', () {
-      expect(label(8), 'Same scene, a different shot');
-      expect(label(11), 'Same scene, a different shot');
+      expect(label(60), 'Same scene, a different shot');
+      expect(label(80), 'Same scene, a different shot');
     });
 
     test('the loosest band reads as loosely-similar scenes', () {
-      expect(label(12), 'Loosely similar scenes');
-      expect(label(similaritySteps), 'Loosely similar scenes');
+      expect(label(90), 'Loosely similar scenes');
+      expect(label(100), 'Loosely similar scenes');
     });
 
     test('clamps out-of-range inputs to the end buckets', () {
@@ -188,7 +206,6 @@ void main() {
       final group = DuplicateGroup(
         best: HashedFile(
           path: '/big.jpg',
-          hash: 0,
           width: 300,
           height: 300,
           fileSize: 10,
@@ -204,7 +221,6 @@ void main() {
         duplicates: [
           HashedFile(
             path: '/crisp.jpg',
-            hash: 0,
             width: 100,
             height: 100,
             fileSize: 10,

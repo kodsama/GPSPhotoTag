@@ -30,6 +30,7 @@ class AppPrefs {
     this.localeCode,
     Set<QualityParam>? lowQParams,
     this.lowQThreshold = 0.35,
+    this.similarityPercent = 0,
   }) : lowQParams = lowQParams ?? QualityParam.values.toSet();
 
   /// The backing JSON file path, or null when persistence is disabled.
@@ -67,6 +68,10 @@ class AppPrefs {
   /// The Shrink "low quality" stage's quality threshold in 0..1 (default 0.35).
   double lowQThreshold;
 
+  /// The duplicate-finder looseness slider, a percent 0..100 (default 0 = Exact).
+  /// Snapped to a multiple of 10 by the controller on use.
+  int similarityPercent;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -92,6 +97,10 @@ class AppPrefs {
       if (params is List) prefs.lowQParams = _parseLowQParams(params);
       final lowQT = map['lowQThreshold'];
       if (lowQT is num) prefs.lowQThreshold = lowQT.toDouble().clamp(0.0, 1.0);
+      // Clamp any persisted value into the new 0..100 looseness range; an old
+      // 0..15-step value lands at the strict end and is snapped on use.
+      final sim = map['similarityPercent'];
+      if (sim is int) prefs.similarityPercent = sim.clamp(0, 100);
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -114,6 +123,7 @@ class AppPrefs {
           'localeCode': localeCode,
           'lowQParams': [for (final p in lowQParams) p.name],
           'lowQThreshold': lowQThreshold,
+          'similarityPercent': similarityPercent,
         }),
       );
     } on Object {

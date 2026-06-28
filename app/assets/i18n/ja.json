@@ -152,7 +152,7 @@
   "dup_intro": "「ゆるい」方向へドラッグすると、軽く編集されたほぼ重複も検出します。確認して承認するまで何も削除されません。",
   "dup_find": "重複を検出",
   "dup_similarity": "類似度",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "完全一致",
   "dup_loose": "ゆるい",
   "dup_none_found": "重複は見つかりませんでした。",

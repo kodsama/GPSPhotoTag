@@ -199,8 +199,8 @@ class FakeEngineRunner implements EngineRunner {
   /// Canned duplicate groups returned by [findDuplicates].
   List<DuplicateGroup> duplicateGroups = const [];
 
-  /// The threshold passed to the last [findDuplicates] call.
-  int? lastDuplicateThreshold;
+  /// The min-similarity cutoff passed to the last [findDuplicates] call.
+  double? lastDuplicateMinSimilarity;
 
   /// Paths passed to the last [findDuplicates] call.
   List<String>? lastDuplicatePaths;
@@ -216,11 +216,11 @@ class FakeEngineRunner implements EngineRunner {
   @override
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
-    required int threshold,
+    required double minSimilarity,
     void Function(int done, int total)? onProgress,
   }) async {
     calls.add('findDuplicates');
-    lastDuplicateThreshold = threshold;
+    lastDuplicateMinSimilarity = minSimilarity;
     lastDuplicatePaths = paths;
     lastOnProgress = onProgress;
     if (duplicatesGate != null) await duplicatesGate!.future;
@@ -297,7 +297,7 @@ class ThrowingEngineRunner implements EngineRunner {
   @override
   Future<List<DuplicateGroup>> findDuplicates(
     List<String> paths, {
-    required int threshold,
+    required double minSimilarity,
     void Function(int done, int total)? onProgress,
   }) async => throw StateError('findDuplicates blew up');
 

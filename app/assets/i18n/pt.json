@@ -152,7 +152,7 @@
   "dup_intro": "Arraste para Amplo para também capturar quase-duplicatas levemente editadas. Nada é removido até você revisar e confirmar.",
   "dup_find": "Encontrar duplicatas",
   "dup_similarity": "Similaridade",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "Exato",
   "dup_loose": "Amplo",
   "dup_none_found": "Nenhuma duplicata encontrada.",

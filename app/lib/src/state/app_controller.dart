@@ -67,6 +67,7 @@ class AppController extends ChangeNotifier {
       _localeCode = prefs.localeCode;
       _lowQParams = Set<QualityParam>.of(prefs.lowQParams);
       _shrinkQualityThreshold = prefs.lowQThreshold;
+      _similarity = snapSimilarityPercent(prefs.similarityPercent);
     }
   }
 
@@ -175,6 +176,7 @@ class AppController extends ChangeNotifier {
     prefs.localeCode = _localeCode;
     prefs.lowQParams = Set<QualityParam>.of(_lowQParams);
     prefs.lowQThreshold = _shrinkQualityThreshold;
+    prefs.similarityPercent = _similarity;
     prefs.save();
   }
 
@@ -1215,7 +1217,7 @@ class AppController extends ChangeNotifier {
 
   // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------
 
-  int _similarity = 0;
+  int _similarity = similarityMinPercent;
   KeepPipeline _keepPipeline = KeepPipeline.standard;
   bool _findingDuplicates = false;
   HashProgress _hashProgress = HashProgress();
@@ -1224,7 +1226,8 @@ class AppController extends ChangeNotifier {
   // is ignored instead of folded into reviewable pairs.
   bool _duplicatesCancelled = false;
 
-  /// The similarity slider value (0 = Exact, [similaritySteps] = Loose).
+  /// The similarity slider value as a looseness percent (0 = Exact, 100 = Loose,
+  /// always a multiple of 10).
   int get similarity => _similarity;
 
   /// Whether duplicate hashing is currently in flight.
@@ -1252,11 +1255,13 @@ class AppController extends ChangeNotifier {
   /// Number of files the "Remove duplicates" button will trash.
   int get duplicateRemovalCount => duplicateRemovalPaths.length;
 
-  /// Sets the similarity slider (clamped to 0..[similaritySteps]).
+  /// Sets the similarity slider, snapping to the nearest multiple of 10 and
+  /// clamping to 0..100, then persists the choice.
   void setSimilarity(int value) {
-    final clamped = value.clamp(0, similaritySteps);
-    if (_similarity == clamped) return;
-    _similarity = clamped;
+    final snapped = snapSimilarityPercent(value);
+    if (_similarity == snapped) return;
+    _similarity = snapped;
+    _persistPrefs();
     notifyListeners();
   }
 
@@ -1358,7 +1363,7 @@ class AppController extends ChangeNotifier {
     try {
       final groups = await _engine.findDuplicates(
         photos,
-        threshold: similarityToThreshold(_similarity),
+        minSimilarity: similarityToThreshold(_similarity),
         onProgress: (done, total) {
           if (_duplicatesCancelled) return;
           _hashProgress = HashProgress(done: done, total: total);

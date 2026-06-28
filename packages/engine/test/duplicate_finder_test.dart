@@ -120,11 +120,32 @@ class _BatchRunner implements ProcessRunner {
   }
 }
 
+/// A 256-bit pHash (4×64-bit words) with the first [setBits] high bits set, so
+/// two such hashes differ by a known number of bits — letting grouping tests
+/// dial [imageSimilarity] precisely.
+List<int> _pHashWithBits(int setBits) {
+  final words = List<int>.filled(4, 0);
+  for (var b = 0; b < setBits; b++) {
+    words[b ~/ 64] |= 1 << (63 - (b % 64));
+  }
+  return words;
+}
+
+/// A normalised colour signature with all its mass in one bin, so two equal
+/// signatures have colour distance 0 (and identical palettes contribute the
+/// maximum colour agreement to [imageSimilarity]).
+List<double> _flatColorSig() => [
+  1.0,
+  for (var i = 1; i < colorSignatureLength; i++) 0.0,
+];
+
 /// Builds a [HashedFile] with sensible defaults so each test sets only what it
-/// cares about.
+/// cares about. [bits] is how many leading pHash bits are set (controls the
+/// structural distance between two records).
 HashedFile hf(
-  String path,
-  int hash, {
+  String path, {
+  int bits = 0,
+  List<double>? colorSig,
   int width = 100,
   int height = 100,
   int fileSize = 1000,
@@ -132,7 +153,8 @@ HashedFile hf(
   bool isRaw = false,
 }) => HashedFile(
   path: path,
-  hash: hash,
+  pHash: _pHashWithBits(bits),
+  colorSig: colorSig ?? _flatColorSig(),
   width: width,
   height: height,
   fileSize: fileSize,
@@ -141,83 +163,202 @@ HashedFile hf(
 );
 
 void main() {
-  group('dHashFromLuma', () {
-    test('sets a bit when the left pixel is brighter than its right', () {
-      // A single bright pixel at the top-left of an otherwise dark row → the
-      // first comparison (col0 > col1) sets the most-significant bit.
-      final luma = List<int>.filled(9 * 8, 0);
-      luma[0] = 255;
-      final hash = dHashFromLuma(luma);
-      // The top-left comparison is the highest of the 64 bits.
-      expect(hash & (1 << 63), isNot(0));
+  group('dct1d / dct2d', () {
+    test('a constant signal concentrates all energy in the DC coefficient', () {
+      final flat = List<double>.filled(32, 5);
+      final out = dct1d(flat);
+      // DC term holds the energy; every other coefficient is ~0.
+      expect(out[0], greaterThan(0));
+      for (var k = 1; k < 32; k++) {
+        expect(out[k], closeTo(0, 1e-9));
+      }
     });
 
-    test('a flat image yields an all-zero hash', () {
-      expect(dHashFromLuma(List<int>.filled(9 * 8, 128)), 0);
+    test('a flat 2-D plane is all-DC after the 2-D transform', () {
+      final plane = List<double>.filled(32 * 32, 7);
+      final coeffs = dct2d(plane);
+      expect(coeffs[0], greaterThan(0)); // DC
+      // Any non-DC low-frequency coefficient is ~0 for a constant field.
+      expect(coeffs[1], closeTo(0, 1e-6));
+      expect(coeffs[32], closeTo(0, 1e-6));
     });
 
-    test('rejects a luma list of the wrong length', () {
-      expect(() => dHashFromLuma(const [1, 2, 3]), throwsArgumentError);
-    });
-
-    test('honours custom grid dimensions', () {
-      // 3x2 grid → 2 comparisons per row, 2 rows = 4 bits.
-      final hash = dHashFromLuma(
-        const [
-          9, 0, 0, // row 0: 9>0 set, 0>0 clear → 10
-          0, 0, 9, // row 1: 0>0 clear, 0>9 clear → 00
-        ],
-        width: 3,
-        height: 2,
-      );
-      expect(hash, 0x8); // 1000
+    test('rejects a plane of the wrong length', () {
+      expect(() => dct2d(const [1, 2, 3]), throwsArgumentError);
     });
   });
 
-  group('dHash on synthetic images', () {
+  group('pHashFromLuma', () {
+    test('a flat field hashes deterministically (same input → same hash)', () {
+      // Every non-DC coefficient is ~0, so the hash is dominated by float noise
+      // around the median — but it is still fully deterministic, which is all
+      // grouping needs (two identical inputs must collide).
+      expect(
+        pHashFromLuma(List<double>.filled(32 * 32, 128)),
+        pHashFromLuma(List<double>.filled(32 * 32, 128)),
+      );
+    });
+
+    test('returns four 64-bit words (256 bits total)', () {
+      final luma = [for (var i = 0; i < 32 * 32; i++) (i % 8) * 32.0];
+      final hash = pHashFromLuma(luma);
+      expect(hash, hasLength(4));
+      // A structured pattern sets a non-trivial number of bits.
+      expect(hammingPHash(hash, const [0, 0, 0, 0]), greaterThan(0));
+    });
+
+    test('the DC bit (position 0) is never set', () {
+      // A bright top-left ramp has a large DC, yet the DC bit stays 0.
+      final luma = [for (var i = 0; i < 32 * 32; i++) i.toDouble()];
+      final hash = pHashFromLuma(luma);
+      expect(hash[0] & (1 << 63), 0);
+    });
+  });
+
+  group('pHash on synthetic images', () {
     test('identical images produce equal hashes', () {
-      final a = _stripes(64, 64);
-      final b = _stripes(64, 64);
-      expect(dHash(a), dHash(b));
+      expect(pHash(_stripes(64, 64)), pHash(_stripes(64, 64)));
     });
 
     test('a flat vs a striped image differ in bits', () {
       final flat = img.Image(width: 64, height: 64)
         ..clear(img.ColorRgb8(128, 128, 128));
       final striped = _stripes(64, 64);
-      // The flat image sets no horizontal-comparison bits; the striped one sets
-      // several, so the hashes differ.
-      expect(hamming(dHash(flat), dHash(striped)), greaterThan(0));
+      expect(hammingPHash(pHash(flat), pHash(striped)), greaterThan(0));
     });
 
-    test('a horizontally-shifted image differs from the original', () {
-      final striped = _stripes(64, 64);
-      // Shifting the stripes by half a period inverts the bright/dark ordering
-      // across the horizontal comparisons, so the dHash changes.
-      final shifted = _stripes(64, 64, phase: 4);
-      expect(dHash(striped), isNot(dHash(shifted)));
+    test('robust to a brightness shift (the DC term is excluded)', () {
+      // A +30 brightness offset shifts mainly the DC term (excluded from the
+      // hash), so only a small fraction of the 256 structural bits move — far
+      // fewer than the ~128 an unrelated image would.
+      final base = _stripes(64, 64, low: 20, high: 200);
+      final brighter = _stripes(64, 64, low: 50, high: 230);
+      expect(hammingPHash(pHash(base), pHash(brighter)), lessThan(32));
     });
   });
 
-  group('hamming', () {
+  group('hammingPHash', () {
     test('equal hashes have distance 0', () {
-      expect(hamming(0xDEADBEEF, 0xDEADBEEF), 0);
+      expect(hammingPHash(_pHashWithBits(40), _pHashWithBits(40)), 0);
     });
 
-    test('counts differing bits', () {
-      expect(hamming(0x0, 0xF), 4);
-      expect(hamming(0x1, 0x0), 1);
+    test('counts differing bits across all four words', () {
+      // bits 0..63 set vs bits 0..127 set differ in bits 64..127 (64 bits).
+      expect(hammingPHash(_pHashWithBits(64), _pHashWithBits(128)), 64);
     });
 
-    test('is symmetric', () {
-      expect(hamming(0xAB, 0xCD), hamming(0xCD, 0xAB));
+    test('tolerates differing lengths (compares the common prefix)', () {
+      expect(hammingPHash(const [0xFF], const [0x0F, 0xFF]), 4);
+    });
+  });
+
+  group('colorSignature / colorDistance', () {
+    test('has the fixed length and sums to ~1 (normalised)', () {
+      final sig = colorSignature(_stripes(32, 32));
+      expect(sig, hasLength(colorSignatureLength));
+      expect(sig.reduce((a, b) => a + b), closeTo(1, 1e-9));
+    });
+
+    test('an empty image yields an all-zero signature', () {
+      final sig = colorSignature(img.Image(width: 0, height: 0));
+      expect(sig.every((v) => v == 0), isTrue);
+    });
+
+    test('identical palettes have distance 0', () {
+      final red = img.Image(width: 16, height: 16)
+        ..clear(img.ColorRgb8(220, 10, 10));
+      expect(
+        colorDistance(colorSignature(red), colorSignature(red)),
+        closeTo(0, 1e-9),
+      );
+    });
+
+    test('disjoint palettes (red vs green) are far apart', () {
+      final red = img.Image(width: 16, height: 16)
+        ..clear(img.ColorRgb8(220, 10, 10));
+      final green = img.Image(width: 16, height: 16)
+        ..clear(img.ColorRgb8(10, 220, 10));
+      expect(
+        colorDistance(colorSignature(red), colorSignature(green)),
+        greaterThan(0.5),
+      );
+    });
+
+    test('a black image bins into the darkest achromatic value bin', () {
+      final black = img.Image(width: 8, height: 8)
+        ..clear(img.ColorRgb8(0, 0, 0));
+      final grey = img.Image(width: 8, height: 8)
+        ..clear(img.ColorRgb8(128, 128, 128));
+      // Both achromatic but different brightness → a non-zero distance.
+      expect(
+        colorDistance(colorSignature(black), colorSignature(grey)),
+        greaterThan(0),
+      );
+    });
+
+    test('empty inputs give distance 0', () {
+      expect(colorDistance(const [], const []), 0);
+    });
+  });
+
+  group('imageSimilarity', () {
+    test('identical signatures score 1.0', () {
+      final a = hf('/a.jpg');
+      final b = hf('/b.jpg');
+      expect(imageSimilarity(a, b), closeTo(1, 1e-9));
+    });
+
+    test('a resized/recompressed near-copy scores high', () {
+      // A few differing structural bits, same palette.
+      final a = hf('/a.jpg', bits: 0);
+      final b = hf('/b.jpg', bits: 4);
+      expect(imageSimilarity(a, b), greaterThan(0.98));
+    });
+
+    test('a different-palette same-structure frame drops via colour', () {
+      final a = hf('/a.jpg', colorSig: _oneHot(0));
+      final b = hf('/b.jpg', colorSig: _oneHot(3));
+      // Structure identical (1.0 * 0.7) but palette disjoint (0 * 0.3).
+      expect(imageSimilarity(a, b), closeTo(0.7, 1e-9));
+    });
+
+    test('an unrelated image (far structure + palette) scores low', () {
+      final a = hf('/a.jpg', bits: 0, colorSig: _oneHot(0));
+      final b = hf('/b.jpg', bits: 200, colorSig: _oneHot(5));
+      expect(imageSimilarity(a, b), lessThan(0.55));
+    });
+
+    test('a brightness-shifted real image still scores high', () {
+      final base = _hashedImage('/a.jpg', _stripes(64, 64, low: 20, high: 200));
+      final bright = _hashedImage(
+        '/b.jpg',
+        _stripes(64, 64, low: 50, high: 230),
+      );
+      // pHash drops the DC (brightness) term and the palettes are both grey, so
+      // a brightness shift leaves the pair clearly similar.
+      expect(imageSimilarity(base, bright), greaterThan(0.9));
+    });
+
+    test('a missing signature contributes neutral agreement', () {
+      const bare = HashedFile(
+        path: '/x.jpg',
+        width: 10,
+        height: 10,
+        fileSize: 1,
+        basename: 'x',
+        isRaw: false,
+      );
+      // No pHash and no colorSig → both components neutral → similarity 0.
+      expect(imageSimilarity(bare, hf('/y.jpg')), closeTo(0, 1e-9));
     });
   });
 
   group('hashImageBytes', () {
-    test('hashes decodable PNG bytes', () {
+    test('hashes decodable PNG bytes into a 256-bit pHash', () {
       final png = Uint8List.fromList(img.encodePng(_stripes(16, 16)));
-      expect(hashImageBytes('/x.png', png), isNotNull);
+      final hash = hashImageBytes('/x.png', png);
+      expect(hash, isNotNull);
+      expect(hash, hasLength(4));
     });
 
     test('returns null for empty bytes', () {
@@ -242,55 +383,52 @@ void main() {
   });
 
   group('groupDuplicates', () {
-    test('groups identical hashes', () {
+    test('groups identical signatures', () {
       final groups = groupDuplicates([
-        hf('/a.jpg', 0xFF),
-        hf('/b.jpg', 0xFF),
-      ], threshold: 0);
+        hf('/a.jpg'),
+        hf('/b.jpg'),
+      ], minSimilarity: 1.0);
       expect(groups, hasLength(1));
       expect(groups.single.size, 2);
     });
 
-    test('groups near hashes within the threshold but not beyond', () {
-      // 0xF0 vs 0xF1 differ by 1 bit.
+    test('groups near signatures above the cutoff but not below', () {
+      // bits:8 differ → similarity ≈ 1 - 0.7*8/256 ≈ 0.978.
       final near = groupDuplicates([
-        hf('/a.jpg', 0xF0),
-        hf('/b.jpg', 0xF1),
-      ], threshold: 1);
+        hf('/a.jpg', bits: 0),
+        hf('/b.jpg', bits: 8),
+      ], minSimilarity: 0.97);
       expect(near, hasLength(1));
 
       final beyond = groupDuplicates([
-        hf('/a.jpg', 0xF0),
-        hf('/b.jpg', 0xF1),
-      ], threshold: 0);
+        hf('/a.jpg', bits: 0),
+        hf('/b.jpg', bits: 8),
+      ], minSimilarity: 0.99);
       expect(beyond, isEmpty);
     });
 
     test('drops singletons', () {
       final groups = groupDuplicates([
-        hf('/a.jpg', 0x1),
-        hf('/b.jpg', 0xFFFF),
-      ], threshold: 0);
+        hf('/a.jpg', bits: 0),
+        hf('/b.jpg', bits: 200, colorSig: _oneHot(5)),
+      ], minSimilarity: 0.9);
       expect(groups, isEmpty);
     });
 
     test('never groups a RAW with its same-name JPG companion', () {
-      // Same basename, same hash, but one is RAW → companions, not duplicates.
       final groups = groupDuplicates([
-        hf('/DSCF1.RAF', 0xAA, isRaw: true, basename: 'dscf1'),
-        hf('/DSCF1.JPG', 0xAA, isRaw: false, basename: 'dscf1'),
-      ], threshold: 0);
+        hf('/DSCF1.RAF', isRaw: true, basename: 'dscf1'),
+        hf('/DSCF1.JPG', isRaw: false, basename: 'dscf1'),
+      ], minSimilarity: 1.0);
       expect(groups, isEmpty);
     });
 
     test('a JPG never joins a group seeded by a near-twin of its own RAW', () {
-      // RAF seeds; a different JPG matches it AND the companion JPG also matches
-      // — the companion must still be excluded from the RAF's group.
       final groups = groupDuplicates([
-        hf('/DSCF1.RAF', 0xAA, isRaw: true, basename: 'dscf1'),
-        hf('/OTHER.JPG', 0xAA, isRaw: false, basename: 'other'),
-        hf('/DSCF1.JPG', 0xAA, isRaw: false, basename: 'dscf1'),
-      ], threshold: 0);
+        hf('/DSCF1.RAF', isRaw: true, basename: 'dscf1'),
+        hf('/OTHER.JPG', isRaw: false, basename: 'other'),
+        hf('/DSCF1.JPG', isRaw: false, basename: 'dscf1'),
+      ], minSimilarity: 1.0);
       expect(groups, hasLength(1));
       final paths = [
         groups.single.best.path,
@@ -301,87 +439,77 @@ void main() {
 
     test('two RAWs with the same basename DO group (not companions)', () {
       final groups = groupDuplicates([
-        hf('/x/DSCF1.RAF', 0xAA, isRaw: true, basename: 'dscf1'),
-        hf('/y/DSCF1.RAF', 0xAA, isRaw: true, basename: 'dscf1'),
-      ], threshold: 0);
+        hf('/x/DSCF1.RAF', isRaw: true, basename: 'dscf1'),
+        hf('/y/DSCF1.RAF', isRaw: true, basename: 'dscf1'),
+      ], minSimilarity: 1.0);
       expect(groups, hasLength(1));
     });
 
     test('best picks highest resolution', () {
       final groups = groupDuplicates([
-        hf('/small.jpg', 0xAA, width: 10, height: 10),
-        hf('/big.jpg', 0xAA, width: 100, height: 100),
-      ], threshold: 0);
+        hf('/small.jpg', width: 10, height: 10),
+        hf('/big.jpg', width: 100, height: 100),
+      ], minSimilarity: 1.0);
       expect(groups.single.best.path, '/big.jpg');
     });
 
     test('best tie-breaks on file size then path', () {
       final bySize = groupDuplicates([
-        hf('/a.jpg', 0xAA, width: 10, height: 10, fileSize: 100),
-        hf('/b.jpg', 0xAA, width: 10, height: 10, fileSize: 999),
-      ], threshold: 0);
+        hf('/a.jpg', width: 10, height: 10, fileSize: 100),
+        hf('/b.jpg', width: 10, height: 10, fileSize: 999),
+      ], minSimilarity: 1.0);
       expect(bySize.single.best.path, '/b.jpg');
 
       final byPath = groupDuplicates([
-        hf('/z.jpg', 0xAA, width: 10, height: 10, fileSize: 100),
-        hf('/a.jpg', 0xAA, width: 10, height: 10, fileSize: 100),
-      ], threshold: 0);
+        hf('/z.jpg', width: 10, height: 10, fileSize: 100),
+        hf('/a.jpg', width: 10, height: 10, fileSize: 100),
+      ], minSimilarity: 1.0);
       expect(byPath.single.best.path, '/a.jpg');
     });
 
-    test('threshold monotonicity: looser never groups fewer files', () {
+    test('monotonicity: a lower cutoff never groups fewer files', () {
       final records = [
-        hf('/a.jpg', 0x00),
-        hf('/b.jpg', 0x01), // 1 bit
-        hf('/c.jpg', 0x03), // 2 bits from a
+        hf('/a.jpg', bits: 0),
+        hf('/b.jpg', bits: 8), // ~0.978 vs a
+        hf('/c.jpg', bits: 16), // ~0.956 vs a
       ];
-      final tight = _grouped(groupDuplicates(records, threshold: 1));
-      final loose = _grouped(groupDuplicates(records, threshold: 2));
+      final tight = _grouped(groupDuplicates(records, minSimilarity: 0.97));
+      final loose = _grouped(groupDuplicates(records, minSimilarity: 0.95));
       expect(tight, lessThanOrEqualTo(loose));
       expect(loose, 3);
     });
 
     test('preserves order and handles an empty input', () {
-      expect(groupDuplicates(const [], threshold: 5), isEmpty);
-    });
-
-    test('best is chosen via the keep pipeline (resolution clear winner)', () {
-      // Same hash; the big file has a clear resolution win so it's kept even
-      // though the small one has higher quality.
-      final groups = groupDuplicates([
-        hf('/small.jpg', 0xAA, width: 100, height: 100),
-        hf('/big.jpg', 0xAA, width: 300, height: 300),
-      ], threshold: 0);
-      expect(groups.single.best.path, '/big.jpg');
+      expect(groupDuplicates(const [], minSimilarity: 0.5), isEmpty);
     });
 
     test('a custom pipeline changes which member is kept', () {
-      // Equal resolution; quality differs. With quality enabled the crisp file
-      // wins; with only a (disabled) resolution rule it falls to the tie-break.
-      const crisp = HashedFile(
+      final crisp = HashedFile(
         path: '/crisp.jpg',
-        hash: 0xAA,
+        pHash: _pHashWithBits(0),
+        colorSig: _flatColorSig(),
         width: 100,
         height: 100,
         fileSize: 100,
         basename: 'crisp',
         isRaw: false,
-        quality: ImageQuality(
+        quality: const ImageQuality(
           sharpness: 0.9,
           contrast: 0.9,
           colorfulness: 0.9,
           composite: 0.9,
         ),
       );
-      const dull = HashedFile(
+      final dull = HashedFile(
         path: '/dull.jpg',
-        hash: 0xAA,
+        pHash: _pHashWithBits(0),
+        colorSig: _flatColorSig(),
         width: 100,
         height: 100,
         fileSize: 999,
         basename: 'dull',
         isRaw: false,
-        quality: ImageQuality(
+        quality: const ImageQuality(
           sharpness: 0.1,
           contrast: 0.1,
           colorfulness: 0.1,
@@ -390,15 +518,14 @@ void main() {
       );
       final byQuality = groupDuplicates(
         [dull, crisp],
-        threshold: 0,
+        minSimilarity: 1.0,
         pipeline: const KeepPipeline([KeepStep(KeepRule.quality)]),
       );
       expect(byQuality.single.best.path, '/crisp.jpg');
 
-      // No enabled rule → final tie-break keeps the larger file (dull).
       final byTieBreak = groupDuplicates(
         [crisp, dull],
-        threshold: 0,
+        minSimilarity: 1.0,
         pipeline: const KeepPipeline([
           KeepStep(KeepRule.quality, enabled: false),
         ]),
@@ -408,15 +535,17 @@ void main() {
   });
 
   group('HashedFile.toJson', () {
-    test('serializes dimensions, size, RAW-ness, and quality', () {
+    test('serializes signatures, dimensions, size, RAW-ness, and quality', () {
       final json = hf(
         '/a.jpg',
-        0xAB,
+        bits: 4,
         width: 40,
         height: 30,
         fileSize: 50,
       ).toJson();
       expect(json['path'], '/a.jpg');
+      expect(json['pHash'], isA<List<int>>());
+      expect(json['colorSig'], isA<List<double>>());
       expect(json['width'], 40);
       expect(json['height'], 30);
       expect(json['fileSize'], 50);
@@ -445,7 +574,9 @@ void main() {
       expect(hashed.fileSize, greaterThan(0));
       expect(hashed.isRaw, isFalse);
       expect(hashed.basename, 'a');
-      // Quality is scored from the decoded image (striped → non-zero).
+      // Both signatures are computed from the decoded image.
+      expect(hashed.pHash, hasLength(4));
+      expect(hashed.colorSig, hasLength(colorSignatureLength));
       expect(hashed.quality.composite, greaterThan(0));
     });
 
@@ -459,7 +590,6 @@ void main() {
       );
       expect(hashed, isNotNull);
       expect(hashed!.isRaw, isTrue);
-      // Dimensions come from the 32×32 preview, not the opaque RAW container.
       expect(hashed.width, 32);
     });
 
@@ -504,7 +634,6 @@ void main() {
       );
       expect(args, containsAll(['-b', '-m', '-W', '/tmp/out/%f_%t.%s']));
       expect(args, contains('-ThumbnailImage'));
-      // Both sources ride on the same call (one spawn for the whole chunk).
       expect(args.where((a) => !a.startsWith('-')), [
         '/tmp/out/%f_%t.%s',
         '/a/x.raf',
@@ -566,8 +695,6 @@ void main() {
         );
 
         expect(out, hasLength(3));
-        // Batching: exactly ONE thumbnail extract for the 3 files (not 3), one
-        // dimension read, and ZERO preview extracts (all had thumbnails).
         expect(runner.extractCallsFor('ThumbnailImage'), hasLength(1));
         expect(runner.extractCallsFor('PreviewImage'), isEmpty);
         expect(runner.dimensionCalls, hasLength(1));
@@ -587,7 +714,6 @@ void main() {
           runner: runner,
           tmpDir: p.join(tmp.path, 'work'),
         );
-        // The thumb is 16×16 but the recorded resolution is the original 6000×4000.
         expect(out.single.width, 6000);
         expect(out.single.height, 4000);
         expect(out.single.fileSize, greaterThan(0));
@@ -610,7 +736,6 @@ void main() {
           tmpDir: p.join(tmp.path, 'work'),
         );
         expect(out.map((h) => h.path), unorderedEquals(paths));
-        // The preview pass ran exactly once, over ONLY the thumb-less file.
         final previewCalls = runner.extractCallsFor('PreviewImage');
         expect(previewCalls, hasLength(1));
         expect(previewCalls.single, contains(paths[1]));
@@ -621,7 +746,6 @@ void main() {
     test(
       'falls back to decoding the source when no embedded image exists',
       () async {
-        // A real decodable JPEG on disk, but exiftool extracts nothing for it.
         final path = p.join(tmp.path, 'plain.jpg');
         File(path).writeAsBytesSync(img.encodeJpg(_stripes(40, 24)));
         final runner = _BatchRunner(dims: {path: (40, 24)});
@@ -631,9 +755,9 @@ void main() {
           runner: runner,
           tmpDir: p.join(tmp.path, 'work'),
         );
-        // Hashed from the source bytes themselves (the slow fallback path).
         expect(out, hasLength(1));
         expect(out.single.width, 40);
+        expect(out.single.pHash, hasLength(4));
       },
     );
 
@@ -652,7 +776,6 @@ void main() {
           onFileDone: () => ticks.add(1),
         );
         expect(out, isEmpty);
-        // Still ticked once for the skipped file so progress reaches the total.
         expect(ticks, hasLength(1));
       },
     );
@@ -675,12 +798,12 @@ void main() {
           tmpDir: p.join(tmp.path, 'work'),
           onFileDone: () => ticks++,
         );
-        expect(out.map((h) => h.path), paths); // mapped back to each source
-        expect(ticks, 2); // one tick per input file
+        expect(out.map((h) => h.path), paths);
+        expect(ticks, 2);
       },
     );
 
-    test('scores quality from the decoded thumbnail', () async {
+    test('scores quality + a colour signature from the thumbnail', () async {
       final paths = writeSources(['a.raf']);
       final runner = _BatchRunner(
         thumbs: {'a.raf': img.encodeJpg(_stripes(32, 32))},
@@ -691,8 +814,8 @@ void main() {
         runner: runner,
         tmpDir: p.join(tmp.path, 'work'),
       );
-      // The striped thumbnail is sharp + high-contrast → a non-zero composite.
       expect(out.single.quality.composite, greaterThan(0));
+      expect(out.single.colorSig, hasLength(colorSignatureLength));
     });
 
     test('empty input does nothing and returns empty', () async {
@@ -712,14 +835,12 @@ void main() {
         final paths = writeSources(['a.raf']);
         final runner = _BatchRunner(
           thumbs: {'a.raf': img.encodeJpg(_stripes(48, 36))},
-          // No dims entry for the path → JSON omits it.
         );
         final out = await hashFilesBatch(
           paths,
           runner: runner,
           tmpDir: p.join(tmp.path, 'work'),
         );
-        // Width/height come from the decoded thumbnail itself.
         expect(out.single.width, 48);
         expect(out.single.height, 36);
       },
@@ -741,7 +862,6 @@ void main() {
 
     test('parses non-int width/height (num and string) from JSON', () async {
       final paths = writeSources(['a.raf']);
-      // ImageWidth as a JSON number (double) and ImageHeight as a string.
       final runner = _BatchRunner(
         thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
         dimensionStdout: jsonEncode([
@@ -770,8 +890,7 @@ void main() {
         },
         dims: {for (final pth in paths) pth: (100, 100)},
         peopleTags: {
-          paths[0]: {'RegionName': 'Alice'}, // a face region → 1.0
-          // scenery has no people metadata → 0.0
+          paths[0]: {'RegionName': 'Alice'},
         },
       );
       final out = await hashFilesBatch(
@@ -786,7 +905,6 @@ void main() {
 
     test('records a people score even when JSON lacks dimensions', () async {
       final paths = writeSources(['a.raf']);
-      // Provide a JSON entry with people tags but NO width/height keys.
       final runner = _BatchRunner(
         thumbs: {'a.raf': img.encodeJpg(_stripes(28, 28))},
         dimensionStdout: jsonEncode([
@@ -798,7 +916,6 @@ void main() {
         runner: runner,
         tmpDir: p.join(tmp.path, 'work'),
       );
-      // Dimensions fall back to the decoded thumbnail; the people score survives.
       expect(out.single.width, 28);
       expect(out.single.peopleScore, 1.0);
     });
@@ -811,7 +928,6 @@ void main() {
           final runner = _BatchRunner(
             thumbs: {'a.raf': img.encodeJpg(_stripes(20, 20))},
             dims: {paths.first: (100, 100)},
-            // no people tags → Tier-1 score is 0
           );
           final out = await hashFilesBatch(
             paths,
@@ -829,7 +945,7 @@ void main() {
           thumbs: {'face.raf': img.encodeJpg(_stripes(20, 20))},
           dims: {paths.first: (100, 100)},
           peopleTags: {
-            paths[0]: {'RegionName': 'Alice'}, // Tier-1 → 1.0
+            paths[0]: {'RegionName': 'Alice'},
           },
         );
         final out = await hashFilesBatch(
@@ -838,7 +954,6 @@ void main() {
           tmpDir: p.join(tmp.path, 'work'),
           detector: _FakeDetector(0.2),
         );
-        // Tier-1 wins; the detector is not consulted.
         expect(out.single.peopleScore, 1.0);
       });
 
@@ -872,7 +987,7 @@ void main() {
             paths,
             runner: runner,
             tmpDir: p.join(tmp.path, 'work'),
-            detector: _FakeDetector(null), // can't decide
+            detector: _FakeDetector(null),
           );
           for (final h in out) {
             expect(h.peopleScore, 0.0);
@@ -915,19 +1030,43 @@ class _FakeDetector implements PeopleDetector {
   Future<double?> scoreDecoded(img.Image image) async => _score;
 }
 
+/// A [HashedFile] whose signatures are computed from a real decoded [image].
+HashedFile _hashedImage(String path, img.Image image) => HashedFile(
+  path: path,
+  pHash: pHash(image),
+  colorSig: colorSignature(image),
+  width: image.width,
+  height: image.height,
+  fileSize: 1,
+  basename: basenameKey(path),
+  isRaw: false,
+);
+
+/// A one-hot normalised colour signature with all mass in [bin], so two such
+/// signatures with different bins are maximally distant (palette-disjoint).
+List<double> _oneHot(int bin) => [
+  for (var i = 0; i < colorSignatureLength; i++) i == bin ? 1.0 : 0.0,
+];
+
 /// Total number of files that ended up in any group.
 int _grouped(List<DuplicateGroup> groups) =>
     groups.fold(0, (sum, g) => sum + g.size);
 
 /// A vertical-stripe pattern (alternating bright/dark columns) so neighbouring
-/// pixels differ — exercising real horizontal-comparison bits in the dHash.
-/// [phase] shifts the stripes horizontally.
-img.Image _stripes(int w, int h, {int phase = 0}) {
+/// pixels differ — exercising real structure in the pHash. [phase] shifts the
+/// stripes horizontally; [low]/[high] set the dark/bright levels (raise both to
+/// simulate a brightness shift).
+img.Image _stripes(
+  int w,
+  int h, {
+  int phase = 0,
+  int low = 20,
+  int high = 230,
+}) {
   final image = img.Image(width: w, height: h);
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
-      // 8-pixel period: bright for half, dark for half.
-      final v = (((x + phase) ~/ 8) % 2 == 0) ? 230 : 20;
+      final v = (((x + phase) ~/ 8) % 2 == 0) ? high : low;
       image.setPixelRgb(x, y, v, v, v);
     }
   }

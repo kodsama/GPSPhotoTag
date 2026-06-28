@@ -152,7 +152,7 @@
   "dup_intro": "Dra mot Lös för att även fånga lätt redigerade nästan-dubbletter. Inget tas bort förrän du granskat och bekräftat.",
   "dup_find": "Hitta dubbletter",
   "dup_similarity": "Likhet",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "Exakt",
   "dup_loose": "Lös",
   "dup_none_found": "Inga dubbletter hittades.",

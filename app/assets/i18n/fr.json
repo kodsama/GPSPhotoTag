@@ -152,7 +152,7 @@
   "dup_intro": "Glissez vers Large pour aussi détecter les quasi-doublons légèrement retouchés. Rien n’est supprimé tant que vous n’avez pas vérifié et confirmé.",
   "dup_find": "Trouver les doublons",
   "dup_similarity": "Similarité",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "Exact",
   "dup_loose": "Large",
   "dup_none_found": "Aucun doublon trouvé.",

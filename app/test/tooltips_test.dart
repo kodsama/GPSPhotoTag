@@ -23,7 +23,6 @@ import 'support/fakes.dart';
 
 HashedFile _hf(String path) => HashedFile(
   path: path,
-  hash: 0,
   width: 100,
   height: 100,
   fileSize: 2048,

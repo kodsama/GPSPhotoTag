@@ -152,7 +152,7 @@
   "dup_intro": "向“宽松”拖动以同时捕捉经过轻微编辑的近似重复项。在你审核并确认之前不会删除任何内容。",
   "dup_find": "查找重复项",
   "dup_similarity": "相似度",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "完全相同",
   "dup_loose": "宽松",
   "dup_none_found": "未找到重复项。",

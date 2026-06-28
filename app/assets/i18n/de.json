@@ -152,7 +152,7 @@
   "dup_intro": "Ziehe Richtung Locker, um auch leicht bearbeitete Beinahe-Duplikate zu erfassen. Es wird nichts entfernt, bis du geprüft und bestätigt hast.",
   "dup_find": "Duplikate finden",
   "dup_similarity": "Ähnlichkeit",
-  "dup_similarity_value": "{label} · {step}/{total}",
+  "dup_similarity_value": "{label} · {percent}%",
   "dup_exact": "Exakt",
   "dup_loose": "Locker",
   "dup_none_found": "Keine Duplikate gefunden.",

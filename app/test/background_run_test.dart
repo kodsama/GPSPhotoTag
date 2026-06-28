@@ -12,7 +12,6 @@ import 'support/fakes.dart';
 
 HashedFile _hf(String path) => HashedFile(
   path: path,
-  hash: 0,
   width: 10,
   height: 10,
   fileSize: 1,

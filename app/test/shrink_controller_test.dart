@@ -18,7 +18,6 @@ HashedFile _hf(
   double quality = 0.9,
 }) => HashedFile(
   path: path,
-  hash: 0,
   width: 10,
   height: 10,
   fileSize: size,
@@ -44,7 +43,6 @@ HashedFile _hfQ(
   double exposure = 0.9,
 }) => HashedFile(
   path: path,
-  hash: 0,
   width: 10,
   height: 10,
   fileSize: size,

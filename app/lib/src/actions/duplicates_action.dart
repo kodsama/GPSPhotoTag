@@ -121,12 +121,11 @@ class _SimilaritySlider extends StatelessWidget {
             Text(context.tr('dup_similarity'), style: text.titleSmall),
             const Spacer(),
             // The currently-picked setting, always visible (not just the drag
-            // tooltip): the level's plain-language name + its step.
+            // tooltip): the level's plain-language name + its looseness percent.
             Text(
               context.tr('dup_similarity_value', {
                 'label': selected,
-                'step': controller.similarity,
-                'total': similaritySteps,
+                'percent': controller.similarity,
               }),
               style: text.labelLarge?.copyWith(
                 color: scheme.primary,
@@ -143,8 +142,8 @@ class _SimilaritySlider extends StatelessWidget {
                 message: context.tr('tt_dup_similarity'),
                 child: Slider(
                   value: controller.similarity.toDouble(),
-                  min: 0,
-                  max: similaritySteps.toDouble(),
+                  min: similarityMinPercent.toDouble(),
+                  max: similarityMaxPercent.toDouble(),
                   divisions: similaritySteps,
                   label: selected,
                   onChanged: controller.findingDuplicates

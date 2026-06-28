@@ -11,7 +11,6 @@ HashedFile hf(
   double peopleScore = 0,
 }) => HashedFile(
   path: path,
-  hash: 0,
   width: width,
   height: height,
   fileSize: fileSize,

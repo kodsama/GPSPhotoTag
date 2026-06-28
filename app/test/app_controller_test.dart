@@ -509,6 +509,35 @@ void main() {
       await expectLater(prefs.save(), completes);
     });
 
+    test('the similarity slider loads, snaps, persists, and round-trips', () {
+      // A loaded value snaps to a slider stop on the controller.
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json')
+        ..similarityPercent = 47;
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.similarity, 50);
+
+      // Setting it writes the snapped percent back into the shared bag.
+      c.setSimilarity(83);
+      expect(c.similarity, 80);
+      expect(prefs.similarityPercent, 80);
+    });
+
+    test(
+      'similarityPercent round-trips through a file and clamps on load',
+      () async {
+        final prefs = await AppPrefs.load(dir.path)
+          ..similarityPercent = 70;
+        await prefs.save();
+        expect((await AppPrefs.load(dir.path)).similarityPercent, 70);
+
+        // An out-of-range stored value is clamped into 0..100 on load.
+        File(
+          '${dir.path}/preferences.json',
+        ).writeAsStringSync('{"similarityPercent": 250}');
+        expect((await AppPrefs.load(dir.path)).similarityPercent, 100);
+      },
+    );
+
     test('setDefaultRawMode rejects embed without exiftool', () {
       final c = AppController(runner: FakeEngineRunner(), prefs: AppPrefs());
       c.setDefaultRawMode(RawMode.embed);
