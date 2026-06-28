@@ -81,8 +81,11 @@ vendor_windows_exe() {
   zip="$workdir/et-win.zip"
   local urls=()
   if [ -n "$ver" ]; then
+    # exiftool.org only hosts the CURRENT version's Windows zip (older 404s) and
+    # GitHub ships no Windows .exe — SourceForge archives every version, so it's
+    # the reliable source.
     urls+=("https://exiftool.org/exiftool-${ver}_64.zip")
-    urls+=("https://github.com/exiftool/exiftool/releases/download/${ver}/exiftool-${ver}_64.zip")
+    urls+=("https://downloads.sourceforge.net/project/exiftool/exiftool-${ver}_64.zip")
   fi
   got=""
   for u in "${urls[@]}"; do
@@ -97,11 +100,18 @@ vendor_windows_exe() {
     echo "ERROR: exiftool_files/ not found in the Windows zip" >&2; return 1; }
   exe="$(find "$src" -maxdepth 1 -iname 'exiftool*.exe' -type f | head -1)"
   [ -n "$exe" ] || { echo "ERROR: exiftool exe not found in the Windows zip" >&2; return 1; }
-  rm -rf "$WIN_DEST"
+  # The Windows zip's Perl lib is read-only; make any prior copy writable so the
+  # re-vendor rm can't fail (idempotent local runs; fresh on CI).
+  chmod -R u+w "$WIN_DEST" 2>/dev/null || true
+  rm -rf "$WIN_DEST" 2>/dev/null || true
   mkdir -p "$WIN_DEST"
   cp "$exe" "$WIN_DEST/exiftool.exe"
   cp -R "$src/exiftool_files/." "$WIN_DEST/exiftool_files/"
-  rm -rf "$workdir"
+  # Make the copied tree writable (so future cleanups/git ops don't trip).
+  chmod -R u+w "$WIN_DEST" 2>/dev/null || true
+  # Best-effort temp cleanup: never let a failed rm abort the script (set -e).
+  chmod -R u+w "$workdir" 2>/dev/null || true
+  rm -rf "$workdir" 2>/dev/null || true
   echo "vendored Windows exiftool at $WIN_DEST"
   return 0
 }
