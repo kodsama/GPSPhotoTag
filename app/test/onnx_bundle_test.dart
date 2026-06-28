@@ -48,4 +48,12 @@ void main() {
       expect(onnxPlatformSubdir('fuchsia'), isNull);
     });
   });
+
+  group('prepareMobileOnnxBundle', () {
+    test('returns null on desktop (the test host is not mobile)', () async {
+      // On Android/iOS this copies the models from assets to real files; the
+      // test host is desktop, so the early-return path applies.
+      expect(await prepareMobileOnnxBundle('/tmp/whatever'), isNull);
+    });
+  });
 }

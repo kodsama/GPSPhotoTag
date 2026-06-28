@@ -109,7 +109,10 @@ void main() {
       );
       expect(ortLibraryFileName(operatingSystem: 'linux'), 'libonnxruntime.so');
       expect(ortLibraryFileName(operatingSystem: 'windows'), 'onnxruntime.dll');
-      expect(ortLibraryFileName(operatingSystem: 'android'), 'libonnxruntime.so');
+      expect(
+        ortLibraryFileName(operatingSystem: 'android'),
+        'libonnxruntime.so',
+      );
       expect(
         ortLibraryFileName(operatingSystem: 'ios'),
         'onnxruntime.framework/onnxruntime',
@@ -153,16 +156,22 @@ void main() {
       expect(bundle.isComplete, isFalse);
     });
 
-    test('mobile isComplete needs only the model (loader provides the lib)', () {
-      final dir = Directory.systemTemp.createTempSync('stunda_onnx_test');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final android = resolveOnnxBundle(dir.path, operatingSystem: 'android')!;
-      // No model yet → incomplete even though the lib is loader-resolved.
-      expect(android.isComplete, isFalse);
-      File(android.modelPath).writeAsBytesSync([0]);
-      // Model present + loader-resolved lib (file absent) → complete.
-      expect(android.isComplete, isTrue);
-    });
+    test(
+      'mobile isComplete needs only the model (loader provides the lib)',
+      () {
+        final dir = Directory.systemTemp.createTempSync('stunda_onnx_test');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final android = resolveOnnxBundle(
+          dir.path,
+          operatingSystem: 'android',
+        )!;
+        // No model yet → incomplete even though the lib is loader-resolved.
+        expect(android.isComplete, isFalse);
+        File(android.modelPath).writeAsBytesSync([0]);
+        // Model present + loader-resolved lib (file absent) → complete.
+        expect(android.isComplete, isTrue);
+      },
+    );
   });
 
   group('OrtPeopleDetector (no bundle → unavailable, total)', () {
