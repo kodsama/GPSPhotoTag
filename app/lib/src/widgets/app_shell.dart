@@ -14,6 +14,7 @@ import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
 import 'app_background.dart';
 import 'glass.dart';
+import 'help.dart';
 import 'licenses.dart';
 import 'settings_dialog.dart';
 import 'warning_banner.dart';
@@ -153,6 +154,8 @@ class _SettingsMenu extends StatelessWidget {
             controller.setDark(!isDark);
           case 'settings':
             showSettingsDialog(context, controller);
+          case 'help':
+            showHelp(context);
           case 'licenses':
             showAppLicenses(context);
           case 'about':
@@ -180,6 +183,15 @@ class _SettingsMenu extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.tune),
             title: Text(context.tr('menu_settings')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'help',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.help_outline),
+            title: Text(context.tr('menu_help')),
           ),
         ),
         PopupMenuItem(

@@ -31,13 +31,17 @@ GPS); when you don't, your Google location history covers you. Stunda writes
 accurate GPS EXIF into your photos by matching each photo's capture time against
 the first source that has a fix — GPX first (most precise), then Google.
 
-It also: renders a **density heatmap** of where photos were taken, **prunes**
-RAW files that have no JPG/HEIC companion, and **fixes dates** between EXIF and
-the filesystem.
+From there it helps you **see** and **tidy** the whole library: explore your
+geotagged photos on an interactive map, find visually-similar duplicates, match
+images to their RAWs, compare any two shots side by side, and run a guided
+"shrink" wizard that reclaims space. Everything is **review-first** — nothing is
+changed or deleted until you confirm, and deletions go to the Trash.
 
 Two front-ends, one engine:
 
-- **Desktop app** (macOS / Linux / Windows) — a guided, stepped walkthrough.
+- **Desktop app** (macOS / Linux / Windows) — a guided GUI, localized into
+  **9 languages** (English, Français, Svenska, 中文, 日本語, Deutsch, Português,
+  Español, Dansk), with an in-app **Help** section.
 - **CLI** — scriptable, with a JSON event stream and a self-describing `schema`
   command for agents.
 
@@ -57,22 +61,37 @@ always works with no external tools.
 
 ## The desktop app
 
-A stepped, collapsible walkthrough — one step open at a time, auto-advancing,
-completed steps collapse with a check and stay tappable:
+Open a photo library — pick a folder, or **drag and drop** several folders
+and/or individual photos and GPS files onto the window — and Stunda scans them
+into one library, then shows a Review summary of what it found. From the
+workspace you choose an action:
 
-1. **Toolkit** — checks exiftool / libheif / your package manager, with Install
-   buttons; never claims "ready" when it isn't.
-2. **Photos** — native folder picker, plus an **Add folder** affordance and
-   **drag-and-drop**: combine several folders and/or individual photos and GPS
-   files into one library, then review the parsed summary over the whole set.
-3. **Review** — per-format include/exclude checklist.
-4. **Options** — every option, smart defaults pre-selected.
-5. **Output** — in place, or copy to a destination folder.
-6. **Run** — global + per-item progress; errors surfaced in the UI.
-7. **Result** — summary, plus one-click **heatmap**, **prune RAW**, **fix dates**.
+- **Tag with GPS** — write location from GPX / Google Timeline / KML; sidecar or
+  embed for RAW, optional timezone, in place or copy. Existing coordinates are
+  never overwritten unless you allow it; a dry run previews without writing.
+- **Explore on map** — pan/zoom your geotagged photos, with clusters that open
+  into pins. Switch between **Numbers / Heatmap / Both**, filter by a
+  **Timeline** date range, **Fit to photos**, and **Save the view as PNG**. Map
+  tiles are cached for offline and repeat viewing.
+- **Match Images to RAW** — remove orphan RAWs, or orphan images (both
+  directions), after reviewing the list.
+- **Find duplicates** — a similarity slider (Exact ↔ Loose) with a live example,
+  and a **Keep priority** pipeline (Resolution → Quality → People & animals,
+  reorderable and toggleable). Review pairs, swap, or deselect; nothing is
+  deleted until you confirm.
+- **Comparison viewer** — open any image full-screen, with a vertical/horizontal
+  curtain or side-by-side synced zoom, plus an info line (name, resolution,
+  size, time, GPS, EXIF).
+- **Shrink picture library** — a staged wizard (Duplicates → Orphans →
+  RAW + photo pairs → Low quality) building one cumulative trash list, with
+  selectable low-quality criteria (blurriness / histogram / colour / exposure)
+  and a final review showing the space to free.
 
-A floating activity-log button (bottom-right) opens a panel with the full event
-log. Heavy work runs in **worker isolates**, so the UI stays responsive.
+**Settings** cover language, light/dark, a custom background image with
+intensity, and the live MCP server status. A **Help** entry in the settings menu
+opens an in-app, localized guide to every feature. An activity-log button opens
+the full event log, and heavy work runs in **worker isolates** so the UI stays
+responsive.
 
 ```bash
 cd app

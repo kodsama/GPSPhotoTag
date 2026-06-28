@@ -18,8 +18,70 @@ const Map<String, String> kEnglishStrings = {
   'menu_appearance_light': 'Appearance: Light',
   'menu_appearance_dark': 'Appearance: Dark',
   'menu_settings': 'Settings…',
+  'menu_help': 'Help',
   'menu_licenses': 'Licenses',
   'menu_about': 'About',
+  'help_title': 'Help',
+  'help_intro':
+      'Stunda places your photos on the map using the GPS tracks and location history you already have, and helps you tidy your library. Everything below is review-first — nothing is changed or deleted until you confirm.',
+  'help_getting_started_title': 'Getting started',
+  'help_getting_started_b1':
+      'Choose a photo library to begin, or drag and drop folders or individual photos straight onto the window. You can add several folders, in any layout — Stunda finds the photos, GPX/KML tracks, and Google Timeline exports anywhere inside.',
+  'help_getting_started_b2':
+      'After a scan, the Review summary shows what was found: folders, photos, GPS tracks, Timeline data, and anything unsupported.',
+  'help_getting_started_b3':
+      'Pick an action from the workspace when you are ready — tag, explore, match, find duplicates, or shrink.',
+  'help_tag_title': 'Tag with GPS',
+  'help_tag_b1':
+      'Writes location into your photos from GPX tracks, Google Timeline, or KML, matching each photo to the nearest point in time. Set a maximum time difference so only close matches are used.',
+  'help_tag_b2':
+      'RAW files can be handled as a sidecar (a small companion file, the default) or, with ExifTool present, embedded into the file itself. Set a timezone when your photos have no offset of their own, e.g. Europe/Paris.',
+  'help_tag_b3':
+      'Tag your originals in place, or copy tagged versions to a new folder. Existing coordinates are never overwritten unless you turn that on, and a dry run lets you preview without writing anything.',
+  'help_explore_title': 'Explore on map',
+  'help_explore_b1':
+      'Browse your geotagged photos on a live, zoomable map. Pan and zoom freely; nearby photos group into clusters that open into individual pins as you zoom in.',
+  'help_explore_b2':
+      'Switch between Numbers, Heatmap, or Both, and use the Timeline to filter by a date range. Fit to photos frames everything at once.',
+  'help_explore_b3':
+      'Save the current view as a PNG image to share. Map tiles are cached, so areas you have viewed load quickly again and work offline.',
+  'help_match_title': 'Match Images to RAW',
+  'help_match_b1':
+      'Find files that have lost their partner: remove orphan RAW files with no matching photo, or — the other direction — photos with no matching RAW.',
+  'help_match_b2':
+      'You review the full list and choose what to include before anything is moved to the Trash.',
+  'help_duplicates_title': 'Find duplicates',
+  'help_duplicates_b1':
+      'Spots visually-similar photos. The similarity slider ranges from Exact to Loose — drag toward Loose to also catch lightly-edited near-duplicates, with a live example preview of how strict each setting is.',
+  'help_duplicates_b2':
+      'A Keep priority pipeline decides which copy to keep: Resolution, Quality, and People & animals. Reorder the rules and toggle them on or off; the first rule that clearly decides wins.',
+  'help_duplicates_b3':
+      'Review each pair, swap which side is kept, or deselect to keep both. Nothing is deleted until you confirm.',
+  'help_compare_title': 'Comparison viewer',
+  'help_compare_b1':
+      'Open any image full-screen. Compare two photos with a vertical or horizontal curtain, or side by side with synced zoom and a reset button.',
+  'help_compare_b2':
+      'An info line shows each photo\'s name, resolution, file size, capture time, GPS, and key EXIF details.',
+  'help_shrink_title': 'Shrink picture library',
+  'help_shrink_b1':
+      'A staged wizard that reclaims space: work through Duplicates, Orphans, RAW + photo pairs, and Low quality in turn. Everything you pick goes onto one cumulative trash list — a file added in an earlier stage is never counted twice.',
+  'help_shrink_b2':
+      'For low quality, choose which aspects matter — blurriness, histogram, colour, exposure — and a strictness threshold; photos scoring below it are flagged. Each stage has its own Clear if you change your mind.',
+  'help_shrink_b3':
+      'A final review shows everything staged and the total space to free before you empty it.',
+  'help_settings_title': 'Settings',
+  'help_settings_b1':
+      'Choose the app language, switch between light and dark, and set a custom background image with an adjustable intensity.',
+  'help_settings_b2':
+      'Settings also shows the live status of the built-in MCP server and the defaults that new tag runs start from.',
+  'help_safety_title': 'Safety & privacy',
+  'help_safety_b1':
+      'Every action is review-first: you see exactly what will change before it happens, and deletions go to your system Trash, where they can be restored. Confirming a deletion asks you to type a random word, so nothing is removed by accident.',
+  'help_safety_b2':
+      'Processing happens on your device. The optional people & animal detection uses a small model that also runs entirely on-device — your photos are never uploaded.',
+  'help_power_title': 'For power users',
+  'help_power_b1':
+      'Stunda also ships a scriptable command-line tool and an MCP server for automation. See the repository and its AGENTS.md for details.',
   'activity_log_tooltip': 'Activity log',
   'badge_overflow': '99+',
   'welcome_value_prop':
