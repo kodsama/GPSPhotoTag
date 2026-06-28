@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
+import '../engine/mobile_library.dart';
 import '../explore/explore_model.dart';
 import 'action_run_state.dart';
 import 'app_prefs.dart';
@@ -42,7 +43,17 @@ class AppController extends ChangeNotifier {
     String? exiftoolBundleDir,
     String? onnxBundleDir,
     AppPrefs? prefs,
-  }) : // A public param name mapping to a private field can't be an
+    PhotoLibrary? photoLibrary,
+    Future<bool> Function()? requestPhotoAccess,
+    Future<List<String>> Function()? pickTrackFiles,
+  }) : _pickTrackFiles = pickTrackFiles ?? _defaultPickTrackFiles,
+       // Public params mapping to private fields can't be initializing formals
+       // (that would expose the private names as the param names).
+       // ignore: prefer_initializing_formals
+       _photoLibrary = photoLibrary,
+       // ignore: prefer_initializing_formals
+       _requestPhotoAccess = requestPhotoAccess,
+       // A public param name mapping to a private field can't be an
        // initializing formal (that would expose `_onnxBundleDir` as the param).
        // ignore: prefer_initializing_formals
        _onnxBundleDir = onnxBundleDir,
@@ -91,6 +102,31 @@ class AppController extends ChangeNotifier {
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
   /// only spawns its isolate when [McpService.start] is called from `main`.
   final McpService mcp;
+
+  /// The device photo library on mobile (iOS Photos / Android MediaStore), or
+  /// null on desktop. Its presence flips the controller into [isMobile] mode:
+  /// the library is enumerated + exported to proxy files for the engine, and
+  /// trash + GPS-write route through it instead of touching the filesystem.
+  final PhotoLibrary? _photoLibrary;
+
+  /// Requests photo-library access on mobile (granted → true). Defaults to a
+  /// no-op denying access; `main` wires it to the device library's permission
+  /// prompt, and tests inject a canned grant/deny.
+  final Future<bool> Function()? _requestPhotoAccess;
+
+  /// Opens a file picker for GPS track / Google-history files on mobile,
+  /// returning the chosen paths (empty when cancelled). Defaults to a
+  /// file_selector picker; tests inject canned paths.
+  final Future<List<String>> Function() _pickTrackFiles;
+
+  /// The mobile proxy↔asset mapping built by the last [scanLibrary]; null on
+  /// desktop or before the first mobile scan.
+  MobileLibrary? _mobileLibrary;
+
+  /// Whether the app is running against a device photo library (mobile) rather
+  /// than the desktop filesystem. Every mobile-only code path is guarded by
+  /// this; when false the existing desktop logic runs exactly as before.
+  bool get isMobile => _photoLibrary != null;
 
   /// Whether a bundled exiftool is present on disk.
   bool get hasBundledExiftool => _exiftoolBundleDir != null;
@@ -542,6 +578,70 @@ class AppController extends ChangeNotifier {
           },
         );
     return completer.future;
+  }
+
+  // --- Mobile library scan (proxy export) ----------------------------------
+
+  /// Longest-edge pixel size of the downscaled JPEG proxies the engine hashes.
+  static const int _proxyMaxEdge = 1024;
+
+  bool _photoPermissionDenied = false;
+
+  /// Whether the user denied photo-library access on the last [scanLibrary]
+  /// attempt, so the welcome screen can show a clear "grant access" message.
+  bool get photoPermissionDenied => _photoPermissionDenied;
+
+  /// Scans the device photo library on mobile: requests access, enumerates
+  /// assets, exports a downscaled proxy JPEG per asset, and lands on the
+  /// workspace with a synthesized [FolderScanResult] whose `photos` are the
+  /// proxy paths — so every existing desktop runner works unchanged.
+  ///
+  /// A no-op on desktop (where [isMobile] is false). On denied access it sets
+  /// [photoPermissionDenied] and returns to the welcome screen.
+  Future<void> scanLibrary() async {
+    final library = _photoLibrary;
+    if (library == null) return;
+    _photoPermissionDenied = false;
+    final granted = await (_requestPhotoAccess?.call() ?? Future.value(false));
+    if (!granted) {
+      _photoPermissionDenied = true;
+      _log('Photo-library access denied', level: LogLevel.warning);
+      _screen = AppScreen.welcome;
+      notifyListeners();
+      return;
+    }
+
+    _scan = null;
+    _scanProgress = const ScanProgress();
+    _screen = AppScreen.scanning;
+    _log('Scanning photo library…');
+    notifyListeners();
+
+    final assets = await library.enumerate();
+    final proxyPaths = <String>[];
+    var exported = 0;
+    for (final asset in assets) {
+      try {
+        proxyPaths.add(await library.exportProxy(asset.id, _proxyMaxEdge));
+      } on Object catch (e) {
+        // A single un-exportable asset is dropped from the scan, not fatal.
+        proxyPaths.add('');
+        _log('Could not export ${asset.filename}: $e', level: LogLevel.debug);
+      }
+      exported++;
+      _scanProgress = ScanProgress(files: exported, photos: exported, dirs: 1);
+      notifyListeners();
+    }
+
+    _mobileLibrary = MobileLibrary.fromExports(assets, proxyPaths);
+    _scan = synthesizeScan(assets, proxyPaths);
+    _scanProgress = null;
+    _roots
+      ..clear()
+      ..add('photo-library');
+    _screen = AppScreen.workspace;
+    _log('Photo library: ${_scan!.photoCount} photo(s)');
+    notifyListeners();
   }
 
   void _handleScanEvent(ScanEvent event) {
@@ -1055,6 +1155,13 @@ class AppController extends ChangeNotifier {
   void _loadExploreCoordinates() {
     final scan = _scan;
     if (scan == null) return;
+    // On mobile every asset's GPS + date are already known from enumeration, so
+    // build the map points directly — no proxy read, no engine round-trip. The
+    // marker/detail images load from each asset's already-exported proxy JPEG.
+    if (isMobile) {
+      _loadExploreFromAssets();
+      return;
+    }
     final photos = _included(scan.photos);
     _explorePhotos.clear();
     _exploreLoaded = 0;
@@ -1105,6 +1212,45 @@ class AppController extends ChangeNotifier {
         );
   }
 
+  /// Builds the Explore map points directly from the mobile library's geotagged
+  /// assets (synchronously — coordinates and dates come from enumeration). Each
+  /// point's image is its already-exported proxy JPEG, so the desktop map +
+  /// detail panel render it unchanged.
+  void _loadExploreFromAssets() {
+    final mobile = _mobileLibrary;
+    _explorePhotos.clear();
+    if (mobile == null) {
+      _exploreLoaded = 0;
+      _exploreTotal = 0;
+      _exploreLoading = false;
+      notifyListeners();
+      return;
+    }
+    final geotagged = mobile.exploreFromAssets;
+    for (final photo in geotagged) {
+      final path = photo.proxyPath;
+      if (path == null) continue;
+      _explorePhotos.add(
+        ExplorePhoto(
+          path: path,
+          latitude: photo.latitude,
+          longitude: photo.longitude,
+          meta: FileMeta(
+            path: path,
+            hasGps: true,
+            latitude: photo.latitude,
+            longitude: photo.longitude,
+            date: photo.date,
+          ),
+        ),
+      );
+    }
+    _exploreLoaded = _explorePhotos.length;
+    _exploreTotal = _explorePhotos.length;
+    _exploreLoading = false;
+    notifyListeners();
+  }
+
   // --- Operations ----------------------------------------------------------
 
   /// Number of photos the tag run will process (after exclusions).
@@ -1131,6 +1277,151 @@ class AppController extends ChangeNotifier {
       reviewOnDone: true,
     );
   }
+
+  // --- Mobile tag (pick tracks → resolve app-side → writeGps) --------------
+
+  final List<String> _mobileTrackFiles = [];
+
+  /// GPS track / Google-history files the user picked for a mobile tag run.
+  List<String> get mobileTrackFiles => List.unmodifiable(_mobileTrackFiles);
+
+  /// Opens the file picker (mobile) and adds the chosen GPS track / Google
+  /// files to the mobile tag set, deduping. A no-op when cancelled.
+  Future<void> pickMobileTrackFiles() async {
+    final picked = await _pickTrackFiles();
+    var changed = false;
+    for (final path in picked) {
+      if (!_mobileTrackFiles.contains(path)) {
+        _mobileTrackFiles.add(path);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// Clears the picked mobile track files.
+  void clearMobileTrackFiles() {
+    if (_mobileTrackFiles.isEmpty) return;
+    _mobileTrackFiles.clear();
+    notifyListeners();
+  }
+
+  /// Tags the mobile library's geotagged-from-tracks photos.
+  ///
+  /// The engine's exiftool writer is absent on mobile, so the resolution runs
+  /// app-side: it pools the picked track files into a [SourcePool], resolves
+  /// each asset's coordinates from its capture date via the pure [Locator]
+  /// ([resolveAssetLocations]), then writes each fix back through the photo
+  /// library's native GPS write. Assets that already carry GPS are skipped
+  /// unless [replace] is on. Streams synthesized events so the existing run-
+  /// state UI works. A no-op on desktop or with no tracks picked.
+  Future<void> runTagMobile() {
+    final mobile = _mobileLibrary;
+    final library = _photoLibrary;
+    if (mobile == null || library == null) return Future.value();
+    final assets = mobile.assetsById.values.toList(growable: false);
+    return _consume(
+      _tagMobileStream(assets, library),
+      owner: LibraryAction.tag,
+      startMessage: 'Tagging ${assets.length} photo(s) from tracks…',
+      total: assets.length,
+      reviewOnDone: true,
+    );
+  }
+
+  Stream<EngineEvent> _tagMobileStream(
+    List<LibraryAsset> assets,
+    PhotoLibrary library,
+  ) async* {
+    final pool = poolSources(
+      gpxFiles: [
+        for (final p in _mobileTrackFiles)
+          if (_isGpx(p)) p,
+      ],
+      kmlFiles: [
+        for (final p in _mobileTrackFiles)
+          if (_isKml(p)) p,
+      ],
+      googleJsonFiles: [
+        for (final p in _mobileTrackFiles)
+          if (_isJson(p)) p,
+      ],
+    );
+    final photos = [
+      for (final a in assets)
+        MobileTagPhoto(assetId: a.id, date: a.createdAt, hasGps: a.hasGps),
+    ];
+    final located = resolveAssetLocations(
+      photos,
+      pool,
+      maxTimeDiff: Duration(seconds: _maxTimeDiffSeconds),
+    );
+    final byId = {for (final a in assets) a.id: a};
+    final summary = <String, int>{};
+    void tally(PhotoStatus s) =>
+        summary.update(s.wire, (n) => n + 1, ifAbsent: () => 1);
+
+    var done = 0;
+    for (final fix in located) {
+      final asset = byId[fix.assetId];
+      if (asset == null) continue;
+      // Honour the existing-GPS guard exactly like the desktop tagger.
+      if (asset.hasGps && !_replace) {
+        tally(PhotoStatus.alreadyTagged);
+        yield ItemEvent(
+          PhotoRow(path: asset.filename, status: PhotoStatus.alreadyTagged),
+        );
+        done++;
+        yield ProgressEvent(done: done, total: located.length);
+        continue;
+      }
+      try {
+        if (!_dryRun) {
+          await library.writeGps(
+            asset.id,
+            fix.location.latitude,
+            fix.location.longitude,
+          );
+        }
+        final status = _dryRun ? PhotoStatus.dryRun : PhotoStatus.tagged;
+        tally(status);
+        yield ItemEvent(
+          PhotoRow(
+            path: asset.filename,
+            status: status,
+            location: fix.location,
+          ),
+        );
+      } on Object catch (e) {
+        tally(PhotoStatus.error);
+        yield ItemEvent(
+          PhotoRow(path: asset.filename, status: PhotoStatus.error, note: '$e'),
+        );
+      }
+      done++;
+      yield ProgressEvent(done: done, total: located.length);
+    }
+    yield DoneEvent(summary);
+  }
+
+  /// The real GPS-track / Google-history file picker (mobile), behind the
+  /// injectable [_pickTrackFiles] seam. Returns chosen paths, [] when cancelled.
+  // coverage:ignore-start
+  // file_selector's openFiles is plugin-backed and cannot run under
+  // `flutter test`; tests inject a canned picker via the constructor seam.
+  static Future<List<String>> _defaultPickTrackFiles() async {
+    const group = XTypeGroup(
+      label: 'GPS tracks',
+      extensions: ['gpx', 'kml', 'json'],
+    );
+    final files = await openFiles(acceptedTypeGroups: const [group]);
+    return [for (final f in files) f.path];
+  }
+  // coverage:ignore-end
+
+  static bool _isGpx(String path) => path.toLowerCase().endsWith('.gpx');
+  static bool _isKml(String path) => path.toLowerCase().endsWith('.kml');
+  static bool _isJson(String path) => path.toLowerCase().endsWith('.json');
 
   // --- Prune review (preview → select → confirm → execute) -----------------
 
@@ -1264,7 +1555,7 @@ class AppController extends ChangeNotifier {
     if (_selected.isEmpty) return Future.value();
     final paths = _selected.toList(growable: false);
     return _consume(
-      _engine.trashPaths(paths),
+      _trashPaths(paths),
       owner: LibraryAction.pruneRaw,
       startMessage: 'Moving ${paths.length} file(s) to Trash…',
       total: paths.length,
@@ -1462,9 +1753,15 @@ class AppController extends ChangeNotifier {
       );
       // A run the user cancelled mid-flight discards its result entirely.
       if (_duplicatesCancelled) return;
+      // On mobile the engine hashed downscaled proxies; substitute each member's
+      // original resolution/size back so keeper selection + display reflect the
+      // real asset, then re-choose the keeper under the pipeline.
+      final resolved = isMobile
+          ? _mobileLibrary!.withOriginalGroups(groups, _keepPipeline)
+          : groups;
       // The keeper (left side) follows the user's keep-priority pipeline, not
       // just the engine's default resolution-first choice.
-      _duplicatePairs = pairsFromGroups(groups, pipeline: _keepPipeline);
+      _duplicatePairs = pairsFromGroups(resolved, pipeline: _keepPipeline);
       _log('Found ${groups.length} duplicate group(s)');
       _findingDuplicates = false;
       _hashProgress = HashProgress();
@@ -1515,7 +1812,7 @@ class AppController extends ChangeNotifier {
     final paths = duplicateRemovalPaths;
     if (paths.isEmpty) return Future.value();
     return _consume(
-      _engine.trashPaths(paths),
+      _trashPaths(paths),
       owner: LibraryAction.duplicates,
       startMessage: 'Moving ${paths.length} duplicate(s) to Trash…',
       total: paths.length,
@@ -2076,7 +2373,11 @@ class AppController extends ChangeNotifier {
         },
       );
       if (_duplicatesCancelled) return;
-      _shrinkLowQHashed = hashed;
+      // On mobile the hashes came from downscaled proxies; substitute originals
+      // back so the low-quality review's size column reflects the real asset.
+      _shrinkLowQHashed = isMobile
+          ? _mobileLibrary!.withOriginalDimensions(hashed)
+          : hashed;
       _shrinkLowQReviewed = true;
       _shrinkLowQSelected
         ..clear()
@@ -2102,7 +2403,7 @@ class AppController extends ChangeNotifier {
     final paths = _staged.selectedPaths;
     if (paths.isEmpty) return Future.value();
     return _consume(
-      _engine.trashPaths(paths),
+      _trashPaths(paths),
       owner: LibraryAction.shrink,
       startMessage: 'Moving ${paths.length} file(s) to Trash…',
       total: paths.length,
@@ -2136,6 +2437,67 @@ class AppController extends ChangeNotifier {
     _findingDuplicates = true;
     _hashProgress = HashProgress(done: done, total: total);
     notifyListeners();
+  }
+
+  /// Routes a trash request for the given engine-facing [proxyPaths] to the
+  /// right backend: on desktop the worker-isolate Pruner+SystemTrash; on mobile
+  /// the photo library's native delete (mapping proxies → asset ids), yielding
+  /// synthesized events so the existing run-state UI works either way.
+  Stream<EngineEvent> _trashPaths(List<String> proxyPaths) {
+    if (!isMobile) return _engine.trashPaths(proxyPaths);
+    return _trashAssets(proxyPaths);
+  }
+
+  /// Deletes the assets behind [proxyPaths] through the photo library, emitting
+  /// one [ItemEvent] per deleted asset plus a [DoneEvent] so [_consume] folds it
+  /// into run-state exactly like a desktop trash run. After a successful delete
+  /// the trashed assets are dropped from the mobile mapping and the synthesized
+  /// scan so the UI stops referencing them.
+  Stream<EngineEvent> _trashAssets(List<String> proxyPaths) async* {
+    final library = _photoLibrary!;
+    final mobile = _mobileLibrary;
+    final ids = mobile?.assetIdsForProxies(proxyPaths) ?? const <String>[];
+    if (ids.isEmpty) {
+      yield const DoneEvent({});
+      return;
+    }
+    try {
+      await library.delete(ids);
+    } on Object catch (e) {
+      yield ErrorEvent('$e');
+      return;
+    }
+    mobile!.removeAssets(ids);
+    _pruneScanPhotos(proxyPaths);
+    for (final path in proxyPaths) {
+      yield ItemEvent(PhotoRow(path: path, status: PhotoStatus.prunedTrashed));
+    }
+    yield DoneEvent({PhotoStatus.prunedTrashed.wire: ids.length});
+  }
+
+  /// Removes [proxyPaths] from the synthesized mobile scan after a delete, so
+  /// re-running an action no longer sees the trashed proxies.
+  void _pruneScanPhotos(List<String> proxyPaths) {
+    final scan = _scan;
+    if (scan == null) return;
+    final gone = proxyPaths.toSet();
+    final kept = [
+      for (final path in scan.photos)
+        if (!gone.contains(path)) path,
+    ];
+    _scan = FolderScanResult(
+      files: kept.length,
+      dirs: scan.dirs,
+      byExtension: scan.byExtension,
+      photos: kept,
+      gpxFiles: scan.gpxFiles,
+      kmlFiles: scan.kmlFiles,
+      googleFiles: scan.googleFiles,
+      unsupported: scan.unsupported,
+      unsupportedByExtension: scan.unsupportedByExtension,
+      unsupportedByCategory: scan.unsupportedByCategory,
+      unsupportedTotal: scan.unsupportedCount,
+    );
   }
 
   void _resetRun() {

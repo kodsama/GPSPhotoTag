@@ -1,3 +1,9 @@
+// coverage:ignore-file
+// Plugin- and platform-channel-backed: every method goes through photo_manager
+// (iOS Photos / Android MediaStore) or the native `stunda/photo` channel, none
+// of which run under `flutter test`. The pure orchestration that consumes this
+// (see mobile_library.dart + app_controller's mobile paths) is unit-tested with
+// a fake PhotoLibrary instead.
 import 'dart:io';
 
 import 'package:flutter/services.dart';

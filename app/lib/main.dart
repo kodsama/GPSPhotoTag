@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import 'src/engine/device_photo_library.dart';
 import 'src/engine/exiftool_bundle.dart';
 import 'src/engine/onnx_bundle.dart';
 import 'src/i18n/app_localizations.dart';
@@ -40,12 +41,18 @@ Future<void> main() async {
   final tileCache = TileCache(client: http.Client(), root: cacheRoot);
   unawaited(seedLowZoomTiles(tileCache));
 
+  // On mobile the app drives the device photo library directly (enumerate +
+  // export proxies + native trash/GPS-write); on desktop there is none and the
+  // controller stays in its filesystem mode.
+  final photoLibrary = isMobile ? DevicePhotoLibrary() : null;
+
   runApp(
     StundaApp(
       exiftoolBundleDir: isMobile ? null : locateBundledExiftool(),
       onnxBundleDir: onnxBundleDir,
       prefs: prefs,
       tileProvider: CachingTileProvider(cache: tileCache),
+      photoLibrary: photoLibrary,
     ),
   );
 }
@@ -65,6 +72,7 @@ class StundaApp extends StatefulWidget {
     this.onnxBundleDir,
     this.prefs,
     this.tileProvider,
+    this.photoLibrary,
   });
 
   /// The controller to use; a fresh one is created when null.
@@ -86,6 +94,11 @@ class StundaApp extends StatefulWidget {
   /// Explore screen; when null, Explore uses a plain network provider.
   final TileProvider? tileProvider;
 
+  /// The device photo library on mobile (null on desktop), forwarded into a
+  /// freshly built controller so it scans the library instead of a folder
+  /// (ignored when [controller] is injected).
+  final DevicePhotoLibrary? photoLibrary;
+
   @override
   State<StundaApp> createState() => _StundaAppState();
 }
@@ -97,6 +110,8 @@ class _StundaAppState extends State<StundaApp> {
         exiftoolBundleDir: widget.exiftoolBundleDir,
         onnxBundleDir: widget.onnxBundleDir,
         prefs: widget.prefs,
+        photoLibrary: widget.photoLibrary,
+        requestPhotoAccess: widget.photoLibrary?.requestAccess,
       );
 
   /// Drives the close-while-running guard's warning SnackBar (the [AppShell]
