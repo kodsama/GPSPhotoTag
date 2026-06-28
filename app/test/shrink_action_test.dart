@@ -400,7 +400,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     // The plain-language explanation of what "quality" means.
     expect(
-      find.textContaining('blends sharpness, contrast, and color'),
+      find.textContaining('which aspects count as low quality'),
       findsOneWidget,
     );
     // The kept-vs-flagged example renders, with both tile labels.
@@ -409,6 +409,86 @@ void main() {
     expect(find.text('Flagged'), findsOneWidget);
     // No hashing bar while configuring (the slider and bar never coexist).
     expect(find.textContaining('Hashing'), findsNothing);
+  });
+
+  testWidgets('the criteria toggles render, all selected by default', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+      ..openAction(LibraryAction.shrink)
+      ..openShrinkStage(ShrinkStage.lowQuality);
+    await tester.pumpWidget(_host(c));
+
+    final chips = tester.widgetList<FilterChip>(find.byType(FilterChip));
+    expect(chips.length, 4);
+    expect(chips.every((chip) => chip.selected), isTrue);
+    expect(find.text('Blurriness'), findsOneWidget);
+    expect(find.text('Histogram'), findsOneWidget);
+    expect(find.text('Color'), findsOneWidget);
+    expect(find.text('Exposure'), findsOneWidget);
+  });
+
+  testWidgets(
+    'toggling a criterion re-filters the candidates without re-hashing',
+    (tester) async {
+      // A photo that is fine overall but bad on sharpness alone.
+      final soft = HashedFile(
+        path: '/library/soft.jpg',
+        hash: 0,
+        width: 10,
+        height: 10,
+        fileSize: 1234,
+        basename: 'soft.jpg',
+        isRaw: false,
+        quality: const ImageQuality(
+          sharpness: 0.05,
+          contrast: 0.9,
+          colorfulness: 0.9,
+          exposure: 0.9,
+          composite: 0.6,
+        ),
+      );
+      final fake = FakeEngineRunner()..hashedFiles = [soft];
+      final c = AppController(runner: fake)
+        ..debugSetScan(fakeScan(photos: const ['/library/soft.jpg']))
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.lowQuality);
+      c.setShrinkQualityThreshold(0.35);
+      await c.runShrinkLowQualityHash();
+      final hashCalls = fake.calls.where((e) => e == 'hashFiles').length;
+      await tester.pumpWidget(_host(c));
+
+      // All params on → the soft photo's mean score is above threshold → none.
+      expect(c.shrinkLowQCandidates, isEmpty);
+
+      // Untick Histogram, Color, and Exposure so only Blurriness remains.
+      for (final label in ['Histogram', 'Color', 'Exposure']) {
+        await tester.ensureVisible(find.text(label));
+        await tester.tap(find.text(label));
+        await tester.pump();
+      }
+      // Now scored on sharpness alone (0.05) → flagged. No extra hash call.
+      expect(c.shrinkLowQCandidates.map((h) => h.path), ['/library/soft.jpg']);
+      expect(fake.calls.where((e) => e == 'hashFiles').length, hashCalls);
+    },
+  );
+
+  testWidgets('turning every criterion off shows the all-off hint', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']))
+      ..openAction(LibraryAction.shrink)
+      ..openShrinkStage(ShrinkStage.lowQuality);
+    for (final p in QualityParam.values) {
+      c.setLowQParamEnabled(p, false);
+    }
+    await tester.pumpWidget(_host(c));
+    expect(
+      find.text('Turn on at least one aspect to flag low-quality photos.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('moving the threshold updates the picked label + caption', (

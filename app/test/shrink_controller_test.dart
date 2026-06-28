@@ -28,7 +28,34 @@ HashedFile _hf(
     sharpness: quality,
     contrast: quality,
     colorfulness: quality,
+    exposure: quality,
     composite: quality,
+  ),
+);
+
+/// A hashed file with EXPLICIT per-component quality, for exercising the
+/// per-parameter low-quality filter (where the components must differ).
+HashedFile _hfQ(
+  String path, {
+  int size = 1000,
+  double sharpness = 0.9,
+  double contrast = 0.9,
+  double color = 0.9,
+  double exposure = 0.9,
+}) => HashedFile(
+  path: path,
+  hash: 0,
+  width: 10,
+  height: 10,
+  fileSize: size,
+  basename: path,
+  isRaw: false,
+  quality: ImageQuality(
+    sharpness: sharpness,
+    contrast: contrast,
+    colorfulness: color,
+    exposure: exposure,
+    composite: (sharpness + contrast + color) / 3,
   ),
 );
 
@@ -263,6 +290,79 @@ void main() {
       c.addActiveStageToShrinkList();
       expect(c.shrinkStaged, isEmpty);
     });
+
+    test(
+      'toggling a quality parameter re-filters candidates WITHOUT re-hashing',
+      () async {
+        // soft.jpg is sharp-bad only; the rest are fine on every component.
+        final fake = FakeEngineRunner()
+          ..hashedFiles = [
+            _hfQ('/library/soft.jpg', sharpness: 0.05),
+            _hfQ('/library/good.jpg'),
+          ];
+        final c = AppController(runner: fake)
+          ..debugSetScan(
+            fakeScan(photos: const ['/library/soft.jpg', '/library/good.jpg']),
+          )
+          ..openAction(LibraryAction.shrink);
+        c.openShrinkStage(ShrinkStage.lowQuality);
+        c.setShrinkQualityThreshold(0.35);
+        await c.runShrinkLowQualityHash();
+        final hashCalls = fake.calls.where((e) => e == 'hashFiles').length;
+        expect(hashCalls, 1);
+
+        // With all params on, the soft photo scores ~ (0.05+0.9+0.9+0.9)/4 ≈ 0.69
+        // → above threshold → NOT flagged.
+        expect(c.shrinkLowQCandidates, isEmpty);
+
+        // Turn OFF every param except sharpness: now the soft photo is scored on
+        // sharpness alone (0.05) → below threshold → flagged. No re-hash.
+        c.setLowQParamEnabled(QualityParam.contrast, false);
+        c.setLowQParamEnabled(QualityParam.color, false);
+        c.setLowQParamEnabled(QualityParam.exposure, false);
+        expect(c.shrinkLowQCandidates.map((h) => h.path), [
+          '/library/soft.jpg',
+        ]);
+        // The selection re-syncs to the new candidate set.
+        expect(c.isShrinkLowQSelected('/library/soft.jpg'), isTrue);
+        // Critically: still only one hash call.
+        expect(fake.calls.where((e) => e == 'hashFiles').length, hashCalls);
+      },
+    );
+
+    test('enabling/disabling reflects in lowQParams + isLowQParamEnabled', () {
+      final c = AppController(runner: FakeEngineRunner());
+      expect(c.lowQParams, QualityParam.values.toSet());
+      expect(c.isLowQParamEnabled(QualityParam.exposure), isTrue);
+      c.setLowQParamEnabled(QualityParam.exposure, false);
+      expect(c.isLowQParamEnabled(QualityParam.exposure), isFalse);
+      expect(c.lowQParams.contains(QualityParam.exposure), isFalse);
+      // A redundant toggle is a no-op (already disabled).
+      c.setLowQParamEnabled(QualityParam.exposure, false);
+      expect(c.isLowQParamEnabled(QualityParam.exposure), isFalse);
+      // Re-enabling it adds it back.
+      c.setLowQParamEnabled(QualityParam.exposure, true);
+      expect(c.isLowQParamEnabled(QualityParam.exposure), isTrue);
+    });
+
+    test(
+      'with every parameter off nothing is flagged (safe default)',
+      () async {
+        final fake = FakeEngineRunner()
+          ..hashedFiles = [_hfQ('/library/bad.jpg', sharpness: 0, contrast: 0)];
+        final c = AppController(runner: fake)
+          ..debugSetScan(fakeScan(photos: const ['/library/bad.jpg']))
+          ..openAction(LibraryAction.shrink);
+        c.openShrinkStage(ShrinkStage.lowQuality);
+        await c.runShrinkLowQualityHash();
+        for (final p in QualityParam.values) {
+          c.setLowQParamEnabled(p, false);
+        }
+        expect(c.lowQParams, isEmpty);
+        // compositeFrom returns 1.0 for the empty set → above any threshold.
+        expect(c.shrinkLowQCandidates, isEmpty);
+      },
+    );
   });
 
   test('cross-stage dedup: a path added earlier is not re-added', () async {

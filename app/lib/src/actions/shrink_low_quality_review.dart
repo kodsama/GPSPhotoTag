@@ -50,8 +50,11 @@ class ShrinkLowQualityReview extends StatelessWidget {
         // the threshold control can never be confused with the progress bar.
         if (controller.shrinkBusy)
           _HashingBar(progress: controller.hashProgress)
-        // Mode 3 — results: the below-threshold candidate list.
+        // Mode 3 — results: the criteria toggles (so the found set can be
+        // re-filtered WITHOUT re-hashing) above the below-threshold candidates.
         else if (controller.shrinkLowQReviewed) ...[
+          _CriteriaToggles(controller: controller),
+          const SizedBox(height: 16),
           if (candidates.isEmpty)
             Text(context.tr('shrink_low_quality_none'), style: text.titleMedium)
           else ...[
@@ -77,6 +80,8 @@ class ShrinkLowQualityReview extends StatelessWidget {
         else ...[
           Text(context.tr('shrink_quality_explainer'), style: text.bodySmall),
           const SizedBox(height: 12),
+          _CriteriaToggles(controller: controller),
+          const SizedBox(height: 16),
           _QualitySlider(controller: controller),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -149,6 +154,69 @@ class _QualitySlider extends StatelessWidget {
           flaggedLabel: context.tr('lowq_flagged'),
           caption: caption,
         ),
+      ],
+    );
+  }
+}
+
+/// The compact set of quality-criteria toggles deciding what counts as "low
+/// quality": Blurriness (sharpness), Histogram (contrast), Color, Exposure.
+///
+/// Default ALL ON. Toggling one RE-FILTERS the already-hashed candidates without
+/// re-hashing (the controller recomputes the candidate set from the stored
+/// per-component scores). Each chip carries a tooltip explaining what it flags.
+class _CriteriaToggles extends StatelessWidget {
+  const _CriteriaToggles({required this.controller});
+
+  final AppController controller;
+
+  static const _labelKeys = {
+    QualityParam.sharpness: 'lowq_param_sharpness',
+    QualityParam.contrast: 'lowq_param_contrast',
+    QualityParam.color: 'lowq_param_color',
+    QualityParam.exposure: 'lowq_param_exposure',
+  };
+
+  static const _tooltipKeys = {
+    QualityParam.sharpness: 'tt_lowq_sharpness',
+    QualityParam.contrast: 'tt_lowq_contrast',
+    QualityParam.color: 'tt_lowq_color',
+    QualityParam.exposure: 'tt_lowq_exposure',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final allOff = controller.lowQParams.isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.tr('lowq_criteria_title'), style: text.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final param in QualityParam.values)
+              Tooltip(
+                message: context.tr(_tooltipKeys[param]!),
+                child: FilterChip(
+                  label: Text(context.tr(_labelKeys[param]!)),
+                  selected: controller.isLowQParamEnabled(param),
+                  onSelected: (on) => controller.setLowQParamEnabled(param, on),
+                ),
+              ),
+          ],
+        ),
+        if (allOff) ...[
+          const SizedBox(height: 8),
+          Text(
+            context.tr('lowq_criteria_all_off'),
+            style: text.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
       ],
     );
   }

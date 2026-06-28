@@ -65,6 +65,8 @@ class AppController extends ChangeNotifier {
       _maxTimeDiffSeconds = prefs.defaultMaxTimeDiffSeconds;
       _keepPipeline = prefs.keepPipeline;
       _localeCode = prefs.localeCode;
+      _lowQParams = Set<QualityParam>.of(prefs.lowQParams);
+      _shrinkQualityThreshold = prefs.lowQThreshold;
     }
   }
 
@@ -171,6 +173,8 @@ class AppController extends ChangeNotifier {
     prefs.themeMode = _themeMode;
     prefs.keepPipeline = _keepPipeline;
     prefs.localeCode = _localeCode;
+    prefs.lowQParams = Set<QualityParam>.of(_lowQParams);
+    prefs.lowQThreshold = _shrinkQualityThreshold;
     prefs.save();
   }
 
@@ -1446,6 +1450,8 @@ class AppController extends ChangeNotifier {
   PairDropSide _shrinkPairDrop = PairDropSide.dropRaw;
   // Low-quality stage threshold (0..1 composite quality).
   double _shrinkQualityThreshold = 0.35;
+  // The quality components the low-quality stage scores on (default: all four).
+  Set<QualityParam> _lowQParams = QualityParam.values.toSet();
   bool _shrinkBusy = false;
 
   /// The stage whose REAL review page is currently open inside the wizard, or
@@ -1605,12 +1611,46 @@ class AppController extends ChangeNotifier {
   /// Whether the low-quality review has hashed the library at least once.
   bool get shrinkLowQReviewed => _shrinkLowQReviewed;
 
-  /// The hashed files scoring strictly below the current quality threshold, in
-  /// hash order — the low-quality review's selectable candidates.
+  /// The quality components the low-quality stage treats as defining low
+  /// quality. The candidate filter scores each already-hashed file on ONLY these
+  /// (via [compositeFrom]), so toggling a parameter re-filters without re-hashing.
+  Set<QualityParam> get lowQParams => Set.unmodifiable(_lowQParams);
+
+  /// Whether [param] is currently one of the low-quality criteria.
+  bool isLowQParamEnabled(QualityParam param) => _lowQParams.contains(param);
+
+  /// The hashed files scoring strictly below the current quality threshold when
+  /// scored on only the enabled [lowQParams], in hash order — the low-quality
+  /// review's selectable candidates. Recomputed from the ALREADY-HASHED
+  /// per-component scores, so a toggle change never triggers a re-hash.
   List<HashedFile> get shrinkLowQCandidates => [
     for (final h in _shrinkLowQHashed)
-      if (h.quality.composite < _shrinkQualityThreshold) h,
+      if (compositeFrom(h.quality, _lowQParams) < _shrinkQualityThreshold) h,
   ];
+
+  /// Enables or disables a low-quality [param], recomputing the candidate set
+  /// from the already-hashed components (no re-hash) and re-syncing the working
+  /// selection to the new candidate set. Persisted so the choice survives
+  /// restarts.
+  void setLowQParamEnabled(QualityParam param, bool enabled) {
+    final changed = enabled
+        ? _lowQParams.add(param)
+        : _lowQParams.remove(param);
+    if (!changed) return;
+    _syncLowQSelectionToCandidates();
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Re-selects every current candidate, dropping any prior selection that is no
+  /// longer a candidate. Keeps the "all candidates selected" invariant the
+  /// review starts from after the filter set changes.
+  void _syncLowQSelectionToCandidates() {
+    final paths = {for (final h in shrinkLowQCandidates) h.path};
+    _shrinkLowQSelected
+      ..clear()
+      ..addAll(paths);
+  }
 
   /// Whether the low-quality review has [path] selected to add.
   bool isShrinkLowQSelected(String path) => _shrinkLowQSelected.contains(path);
@@ -1823,7 +1863,8 @@ class AppController extends ChangeNotifier {
         ];
       case ShrinkStage.lowQuality:
         final scores = {
-          for (final h in shrinkLowQCandidates) h.path: h.quality.composite,
+          for (final h in shrinkLowQCandidates)
+            h.path: compositeFrom(h.quality, _lowQParams),
         };
         final sizes = {
           for (final h in shrinkLowQCandidates) h.path: h.fileSize,
@@ -1882,9 +1923,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sets the low-quality threshold (clamped 0..1).
+  /// Sets the low-quality threshold (clamped 0..1), re-syncing the working
+  /// selection to the recomputed candidate set and persisting the choice.
   void setShrinkQualityThreshold(double value) {
     _shrinkQualityThreshold = value.clamp(0.0, 1.0);
+    if (_shrinkLowQReviewed) _syncLowQSelectionToCandidates();
+    _persistPrefs();
     notifyListeners();
   }
 

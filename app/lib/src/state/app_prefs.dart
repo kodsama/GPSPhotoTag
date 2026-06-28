@@ -28,7 +28,9 @@ class AppPrefs {
     this.backgroundVeil = 0.85,
     this.keepPipeline = KeepPipeline.standard,
     this.localeCode,
-  });
+    Set<QualityParam>? lowQParams,
+    this.lowQThreshold = 0.35,
+  }) : lowQParams = lowQParams ?? QualityParam.values.toSet();
 
   /// The backing JSON file path, or null when persistence is disabled.
   final String? file;
@@ -57,6 +59,14 @@ class AppPrefs {
   /// the system locale.
   String? localeCode;
 
+  /// The quality components the Shrink "low quality" stage treats as defining
+  /// low quality (default: all four). The candidate filter scores each photo on
+  /// only these via [compositeFrom].
+  Set<QualityParam> lowQParams;
+
+  /// The Shrink "low quality" stage's quality threshold in 0..1 (default 0.35).
+  double lowQThreshold;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -78,6 +88,10 @@ class AppPrefs {
       }
       final code = map['localeCode'];
       if (code is String && code.isNotEmpty) prefs.localeCode = code;
+      final params = map['lowQParams'];
+      if (params is List) prefs.lowQParams = _parseLowQParams(params);
+      final lowQT = map['lowQThreshold'];
+      if (lowQT is num) prefs.lowQThreshold = lowQT.toDouble().clamp(0.0, 1.0);
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -98,6 +112,8 @@ class AppPrefs {
           'backgroundVeil': backgroundVeil,
           'keepPipeline': keepPipeline.toJson(),
           'localeCode': localeCode,
+          'lowQParams': [for (final p in lowQParams) p.name],
+          'lowQThreshold': lowQThreshold,
         }),
       );
     } on Object {
@@ -116,4 +132,15 @@ class AppPrefs {
     'embed' => RawMode.embed,
     _ => RawMode.auto,
   };
+
+  /// Parses a persisted list of [QualityParam] names, ignoring any unknown
+  /// entries. An empty/all-unknown list is honoured as the empty set (the user
+  /// had every toggle off).
+  static Set<QualityParam> _parseLowQParams(List<dynamic> raw) {
+    final byName = {for (final p in QualityParam.values) p.name: p};
+    return {
+      for (final entry in raw)
+        if (entry is String && byName.containsKey(entry)) byName[entry]!,
+    };
+  }
 }

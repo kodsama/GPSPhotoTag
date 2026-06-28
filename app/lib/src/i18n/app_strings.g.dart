@@ -344,8 +344,21 @@ const Map<String, String> kEnglishStrings = {
   'shrink_low_quality_intro':
       'Set how strict to be, find the photos that score below it, then tick the ones to add.',
   'shrink_quality_explainer':
-      'Quality blends sharpness, contrast, and color. This flags photos that score below your threshold — likely blurry or flat.',
+      'Pick which aspects count as low quality, then set how strict to be. Photos scoring below your threshold on the chosen aspects are flagged.',
   'shrink_quality_title': 'Quality threshold',
+  'lowq_criteria_title': 'What counts as low quality',
+  'lowq_param_sharpness': 'Blurriness',
+  'lowq_param_contrast': 'Histogram',
+  'lowq_param_color': 'Color',
+  'lowq_param_exposure': 'Exposure',
+  'tt_lowq_sharpness': 'Flag soft or out-of-focus photos (low sharpness).',
+  'tt_lowq_contrast':
+      'Flag flat photos with a narrow tonal range (low contrast).',
+  'tt_lowq_color': 'Flag dull, washed-out photos (low colourfulness).',
+  'tt_lowq_exposure':
+      'Flag under- or over-exposed photos (crushed shadows or blown highlights).',
+  'lowq_criteria_all_off':
+      'Turn on at least one aspect to flag low-quality photos.',
   'lowq_lenient': 'Lenient',
   'lowq_strict_end': 'Strict',
   'lowq_threshold_value': 'Lenient ↔ Strict · {percent}%',

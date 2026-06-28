@@ -19,6 +19,19 @@ img.Image _stripes(int w, int h) {
   return image;
 }
 
+/// A mid-grey image with a small spread of values around 128 so it isn't
+/// clipped and sits near the ideal exposure (no crushed/blown pixels).
+img.Image _midToned(int w, int h) {
+  final image = img.Image(width: w, height: h);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      final v = 110 + ((x + y) % 40);
+      image.setPixelRgb(x, y, v, v, v);
+    }
+  }
+  return image;
+}
+
 /// A vivid colour gradient: large opponent-channel spread, low luma edges.
 img.Image _colorful(int w, int h) {
   final image = img.Image(width: w, height: h);
@@ -128,6 +141,105 @@ void main() {
       expect(ImageQuality.zero.sharpness, 0);
       expect(ImageQuality.zero.contrast, 0);
       expect(ImageQuality.zero.colorfulness, 0);
+      expect(ImageQuality.zero.exposure, 0);
+    });
+
+    test(
+      'scores and stores an exposure component (mid-grey is well-exposed)',
+      () {
+        final q = qualityScore(_midToned(32, 32));
+        expect(q.exposure, greaterThan(0.8));
+        expect(q.toJson().keys, contains('exposure'));
+      },
+    );
+
+    test('composite stays a three-component score (excludes exposure)', () {
+      // A perfectly mid-grey flat image: blurry/flat/grey but well-exposed.
+      final q = qualityScore(_flat(32, 32));
+      expect(q.exposure, greaterThan(0.9));
+      // Composite is sharpness/contrast/colour only, so it stays 0.
+      expect(q.composite, 0);
+    });
+  });
+
+  group('exposureOf', () {
+    test('a well-spread mid-grey image scores high', () {
+      expect(exposureOf(_midToned(32, 32)), greaterThan(0.8));
+    });
+
+    test('an all-black image scores ~0 (crushed shadows + too dark)', () {
+      expect(exposureOf(_flat(16, 16, 0)), lessThan(0.05));
+    });
+
+    test('an all-white image scores ~0 (blown highlights + too bright)', () {
+      expect(exposureOf(_flat(16, 16, 255)), lessThan(0.05));
+    });
+
+    test('a heavily-clipped split scores below a clean mid-grey', () {
+      // Half pure black, half pure white: every pixel is clipped.
+      final image = img.Image(width: 16, height: 16);
+      for (var y = 0; y < 16; y++) {
+        for (var x = 0; x < 16; x++) {
+          final v = x < 8 ? 0 : 255;
+          image.setPixelRgb(x, y, v, v, v);
+        }
+      }
+      expect(exposureOf(image), lessThan(exposureOf(_midToned(16, 16))));
+    });
+
+    test('an empty image is zero (never throws)', () {
+      expect(exposureOf(img.Image(width: 0, height: 0)), 0);
+    });
+
+    test('stays within 0..1', () {
+      expect(exposureOf(_midToned(16, 16)), inInclusiveRange(0, 1));
+    });
+  });
+
+  group('compositeFrom', () {
+    const q = ImageQuality(
+      sharpness: 0.2,
+      contrast: 0.4,
+      colorfulness: 0.6,
+      exposure: 0.8,
+      composite: 0,
+    );
+
+    test('one enabled param returns that component', () {
+      expect(compositeFrom(q, {QualityParam.sharpness}), 0.2);
+      expect(compositeFrom(q, {QualityParam.contrast}), 0.4);
+      expect(compositeFrom(q, {QualityParam.color}), 0.6);
+      expect(compositeFrom(q, {QualityParam.exposure}), 0.8);
+    });
+
+    test('a subset is the mean of the chosen components', () {
+      expect(
+        compositeFrom(q, {QualityParam.sharpness, QualityParam.contrast}),
+        closeTo(0.3, 1e-9),
+      );
+      expect(
+        compositeFrom(q, {
+          QualityParam.contrast,
+          QualityParam.color,
+          QualityParam.exposure,
+        }),
+        closeTo(0.6, 1e-9),
+      );
+    });
+
+    test('all four enabled is the mean of all four', () {
+      expect(compositeFrom(q, QualityParam.values.toSet()), closeTo(0.5, 1e-9));
+    });
+
+    test('the empty set returns 1.0 (nothing is flagged)', () {
+      expect(compositeFrom(q, const {}), 1);
+    });
+
+    test('component reads each stored score by param', () {
+      expect(q.component(QualityParam.sharpness), 0.2);
+      expect(q.component(QualityParam.contrast), 0.4);
+      expect(q.component(QualityParam.color), 0.6);
+      expect(q.component(QualityParam.exposure), 0.8);
     });
   });
 }

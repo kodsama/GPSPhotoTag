@@ -584,6 +584,62 @@ void main() {
       expect(reloaded.keepPipeline.steps[1].enabled, isFalse);
     });
 
+    test('low-quality params default to all four and round-trip', () async {
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.lowQParams, QualityParam.values.toSet());
+      expect(prefs.lowQThreshold, 0.35);
+
+      prefs.lowQParams = {QualityParam.sharpness, QualityParam.exposure};
+      prefs.lowQThreshold = 0.6;
+      await prefs.save();
+
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.lowQParams, {
+        QualityParam.sharpness,
+        QualityParam.exposure,
+      });
+      expect(reloaded.lowQThreshold, 0.6);
+    });
+
+    test('an empty saved param set round-trips as empty', () async {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json')
+        ..lowQParams = <QualityParam>{};
+      await prefs.save();
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.lowQParams, isEmpty);
+    });
+
+    test('load ignores unknown param names and clamps the threshold', () async {
+      File('${dir.path}/preferences.json').writeAsStringSync(
+        '{"lowQParams": ["sharpness", "bogus"], "lowQThreshold": 9.0}',
+      );
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.lowQParams, {QualityParam.sharpness});
+      expect(prefs.lowQThreshold, 1.0);
+    });
+
+    test('controller persists param toggle + threshold to the store', () {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      c.setLowQParamEnabled(QualityParam.color, false);
+      expect(prefs.lowQParams.contains(QualityParam.color), isFalse);
+      c.setShrinkQualityThreshold(0.7);
+      expect(prefs.lowQThreshold, 0.7);
+    });
+
+    test(
+      'controller loads the persisted params + threshold on construction',
+      () {
+        final prefs = AppPrefs(
+          lowQParams: {QualityParam.contrast},
+          lowQThreshold: 0.5,
+        );
+        final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+        expect(c.lowQParams, {QualityParam.contrast});
+        expect(c.shrinkQualityThreshold, 0.5);
+      },
+    );
+
     test('controller persists pipeline reorder/toggle to the store', () {
       final prefs = AppPrefs(file: '${dir.path}/preferences.json');
       final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
