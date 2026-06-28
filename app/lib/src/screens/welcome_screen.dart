@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../branding/logo_mark.dart';
 import '../i18n/app_localizations.dart';
+import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../widgets/drop_zone.dart';
 
@@ -17,6 +18,12 @@ class WelcomeScreen extends StatelessWidget {
     final controller = ControllerScope.of(context);
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    // On mobile the way in is the device photo library, not a folder pick or a
+    // drag-and-drop zone (neither exists): a single "Scan photo library" button
+    // that requests permission and scans.
+    if (controller.isMobile) {
+      return _MobileWelcome(controller: controller);
+    }
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
@@ -96,6 +103,61 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The mobile no-library hero: logo, name, value prop, a single "Scan photo
+/// library" button (requests permission + scans), and a clear message when
+/// access was denied.
+class _MobileWelcome extends StatelessWidget {
+  const _MobileWelcome({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const LogoMark(size: 88),
+              const SizedBox(height: 24),
+              Text(
+                context.tr('app_name'),
+                style: text.displaySmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                context.tr('welcome_value_prop'),
+                style: text.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: controller.scanLibrary,
+                icon: const Icon(Icons.photo_library_outlined),
+                label: Text(context.tr('welcome_scan_library')),
+              ),
+              if (controller.photoPermissionDenied) ...[
+                const SizedBox(height: 16),
+                Text(
+                  context.tr('welcome_permission_denied'),
+                  style: text.bodySmall?.copyWith(color: scheme.error),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
           ),
         ),
       ),

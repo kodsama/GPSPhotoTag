@@ -96,6 +96,9 @@ const Map<String, String> kEnglishStrings = {
   'welcome_drop_hint': 'Drop folders or photos here',
   'welcome_drop_explainer':
       'Point it at any folder, or combine several. Photos, GPX/KML tracks, and Google Timeline exports anywhere inside — in any layout — are all found.',
+  'welcome_scan_library': 'Scan photo library',
+  'welcome_permission_denied':
+      'Photo access is needed to scan your library. Grant it in Settings, then try again.',
   'scanning_title': 'Scanning your library…',
   'scan_tile_files': 'Files',
   'scan_tile_folders': 'Folders',
@@ -173,11 +176,18 @@ const Map<String, String> kEnglishStrings = {
   'tag_auto_detect': 'Auto-detect',
   'tag_dry_run': 'Dry run',
   'tag_dry_run_help': 'Locate and report only — write nothing.',
+  'tag_mobile_tracks_title': 'GPS tracks & location history',
+  'tag_mobile_tracks_help':
+      'Pick GPX/KML tracks or Google Timeline exports; coordinates are matched to each photo\'s time and written back to your library.',
+  'tag_mobile_pick_tracks': 'Pick GPS track files',
+  'tag_mobile_clear_tracks': 'Clear track files',
   'tag_choose_destination': 'Choose destination folder',
   'tag_change': 'Change',
   'tag_pick_folder': 'Pick a folder to continue.',
   'done_back_to_library': 'Done — back to library',
   'prune_no_library': 'No library scanned.',
+  'prune_mobile_unavailable':
+      'Matching images to RAW isn\'t available on mobile yet — the photo library doesn\'t expose RAW files as separate items.',
   'prune_review_intro':
       'Nothing is removed until you review the list below and confirm. {description}',
   'prune_summary':

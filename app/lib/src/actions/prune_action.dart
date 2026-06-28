@@ -26,6 +26,16 @@ class PruneAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
 
+    // RAW/JPEG pairing relies on real file extensions, but mobile proxies are
+    // all `.jpg` (the photo library does not expose RAW companions as separate
+    // assets here), so this action is not available on mobile yet.
+    if (controller.isMobile) {
+      return Text(
+        context.tr('prune_mobile_unavailable'),
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+
     if (controller.lastSummary != null && !controller.running) {
       return _Done(controller: controller);
     }
