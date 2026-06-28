@@ -11,6 +11,7 @@ import '../state/duplicates_model.dart';
 import '../state/library_action.dart' show Translator;
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import '../widgets/help.dart';
 import '../widgets/image_compare_viewer.dart';
 import '../widgets/run_view.dart';
 import 'example_scene.dart';
@@ -79,11 +80,20 @@ class _Review extends StatelessWidget {
         ],
         Text(context.tr('dup_intro'), style: text.bodyMedium),
         const SizedBox(height: 16),
-        _MetricSelector(controller: controller),
+        HelpTarget(
+          topic: HelpTopic.duplicates,
+          child: _MetricSelector(controller: controller),
+        ),
         const SizedBox(height: 20),
-        _SimilaritySlider(controller: controller),
+        HelpTarget(
+          topic: HelpTopic.duplicates,
+          child: _SimilaritySlider(controller: controller),
+        ),
         const SizedBox(height: 20),
-        _KeepPipelinePanel(controller: controller),
+        HelpTarget(
+          topic: HelpTopic.duplicates,
+          child: _KeepPipelinePanel(controller: controller),
+        ),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: controller.findingDuplicates

@@ -24,6 +24,7 @@ import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import '../widgets/help.dart';
 
 /// The [CameraFit] that frames ALL [points] with sensible padding, or null when
 /// there are no points (so callers can no-op / disable a "fit" action).
@@ -355,28 +356,31 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Timeline is offered only when something is datable; with no
-                  // dated photos there's no span to filter, so it's hidden.
-                  if (span != null) ...[
-                    _TimelineButton(
-                      active: _timelineOpen,
-                      onPressed: _toggleTimeline,
+              HelpTarget(
+                topic: HelpTopic.explore,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Timeline is offered only when something is datable; with no
+                    // dated photos there's no span to filter, so it's hidden.
+                    if (span != null) ...[
+                      _TimelineButton(
+                        active: _timelineOpen,
+                        onPressed: _toggleTimeline,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    _ResetButton(
+                      onPressed: points.isEmpty
+                          ? null
+                          : () => _fitToPoints(points),
                     ),
                     const SizedBox(width: 8),
+                    _SaveButton(onPressed: points.isEmpty ? null : _saveView),
+                    const SizedBox(width: 8),
+                    _ModeButton(mode: _mode, onPressed: _cycleMode),
                   ],
-                  _ResetButton(
-                    onPressed: points.isEmpty
-                        ? null
-                        : () => _fitToPoints(points),
-                  ),
-                  const SizedBox(width: 8),
-                  _SaveButton(onPressed: points.isEmpty ? null : _saveView),
-                  const SizedBox(width: 8),
-                  _ModeButton(mode: _mode, onPressed: _cycleMode),
-                ],
+                ),
               ),
               if (controller.exploreLoading) ...[
                 const SizedBox(height: 8),

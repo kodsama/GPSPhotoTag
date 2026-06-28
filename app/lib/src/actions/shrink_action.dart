@@ -11,6 +11,7 @@ import '../state/duplicates_model.dart' show pickSillyWord, sillyWordMatches;
 import '../state/library_action.dart' show Translator;
 import '../state/shrink_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/help.dart';
 import '../widgets/run_view.dart';
 import 'duplicates_action.dart' show DuplicatesAction, formatBytes;
 import 'prune_action.dart' show PruneAction;
@@ -115,7 +116,10 @@ class _Wizard extends StatelessWidget {
         Text(context.tr('shrink_intro'), style: text.bodyMedium),
         const SizedBox(height: 16),
         for (final stage in ShrinkStage.values) ...[
-          _StageCard(controller: controller, stage: stage),
+          HelpTarget(
+            topic: HelpTopic.shrink,
+            child: _StageCard(controller: controller, stage: stage),
+          ),
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 4),

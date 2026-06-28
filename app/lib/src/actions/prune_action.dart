@@ -6,6 +6,7 @@ import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/prune_direction.dart';
+import '../widgets/help.dart';
 import '../widgets/run_view.dart';
 import 'shrink_action.dart' show ShrinkAddButton;
 
@@ -72,7 +73,10 @@ class _Review extends StatelessWidget {
           ErrorBanner(message: controller.errorMessage!),
           const SizedBox(height: 14),
         ],
-        _DirectionToggle(controller: controller),
+        HelpTarget(
+          topic: HelpTopic.match,
+          child: _DirectionToggle(controller: controller),
+        ),
         const SizedBox(height: 12),
         Text(
           context.tr('prune_review_intro', {

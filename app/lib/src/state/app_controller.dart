@@ -102,6 +102,29 @@ class AppController extends ChangeNotifier {
     onnxBundleDir: _onnxBundleDir,
   );
 
+  // --- Contextual help mode ("What's this?") -------------------------------
+
+  bool _helpMode = false;
+
+  /// Whether the contextual "What's this?" help mode is active: the next click
+  /// on a tagged control opens the Help page at that control's section instead
+  /// of performing the control's action. Exited on Done, Esc, or after one use.
+  bool get helpMode => _helpMode;
+
+  /// Enters contextual help mode (idempotent).
+  void enterHelpMode() {
+    if (_helpMode) return;
+    _helpMode = true;
+    notifyListeners();
+  }
+
+  /// Exits contextual help mode (idempotent).
+  void exitHelpMode() {
+    if (!_helpMode) return;
+    _helpMode = false;
+    notifyListeners();
+  }
+
   // --- Theme ---------------------------------------------------------------
 
   ThemeMode _themeMode = ThemeMode.system;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../branding/logo_mark.dart';
 import '../screens/action_screen.dart';
@@ -46,6 +47,34 @@ class _AppShellState extends State<AppShell> {
     final showHeader =
         controller.screen == AppScreen.welcome ||
         controller.screen == AppScreen.workspace;
+    final helpMode = controller.helpMode;
+    // While contextual help mode is on, the whole body shows a help cursor and a
+    // dismissible banner makes it obvious + exitable; Esc also exits.
+    Widget body = Column(
+      children: [
+        if (showHeader) _Header(onToggleLog: _toggleLog),
+        const WarningBanner(),
+        if (helpMode) _HelpModeBanner(onDone: controller.exitHelpMode),
+        const Expanded(child: _ScreenBody()),
+      ],
+    );
+    if (helpMode) {
+      body = MouseRegion(
+        cursor: SystemMouseCursors.help,
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              controller.exitHelpMode();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: body,
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -54,13 +83,7 @@ class _AppShellState extends State<AppShell> {
             imagePath: controller.backgroundImagePath,
             veil: controller.backgroundVeil,
           ),
-          Column(
-            children: [
-              if (showHeader) _Header(onToggleLog: _toggleLog),
-              const WarningBanner(),
-              const Expanded(child: _ScreenBody()),
-            ],
-          ),
+          body,
           ActivityLogPanel(
             visible: _logOpen,
             onClose: () => setState(() => _logOpen = false),
@@ -128,8 +151,95 @@ class _Header extends StatelessWidget {
             ),
           ),
           _LogButton(unread: controller.unreadCount, onPressed: onToggleLog),
+          _HelpMenu(controller: controller),
           _SettingsMenu(controller: controller),
         ],
+      ),
+    );
+  }
+}
+
+/// The header "?" button: a small popup menu offering the full Documentation
+/// (the Help page) and the contextual "What's this?" help mode.
+class _HelpMenu extends StatelessWidget {
+  const _HelpMenu({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: context.tr('tt_help'),
+      icon: const Icon(Icons.help_outline),
+      position: PopupMenuPosition.under,
+      onSelected: (v) {
+        switch (v) {
+          case 'docs':
+            showHelp(context);
+          case 'contextual':
+            controller.enterHelpMode();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'docs',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.menu_book_outlined),
+            title: Text(context.tr('help_menu_documentation')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'contextual',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.touch_app_outlined),
+            title: Text(context.tr('help_menu_contextual')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The dismissible banner shown while contextual help mode is on: it explains
+/// the mode and offers a Done button to exit.
+class _HelpModeBanner extends StatelessWidget {
+  const _HelpModeBanner({required this.onDone});
+
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              Icons.help_outline,
+              size: 18,
+              color: scheme.onPrimaryContainer,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                context.tr('help_mode_banner'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onDone,
+              child: Text(context.tr('help_mode_done')),
+            ),
+          ],
+        ),
       ),
     );
   }

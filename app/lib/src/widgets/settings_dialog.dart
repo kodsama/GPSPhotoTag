@@ -13,6 +13,7 @@ import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/library_action.dart' show Translator;
 import '../theme/app_colors.dart';
+import 'help.dart';
 
 /// Opens the Settings dialog for [controller].
 void showSettingsDialog(BuildContext context, AppController controller) {
@@ -79,111 +80,116 @@ class SettingsDialog extends StatelessWidget {
         width: 460,
         child: ListenableBuilder(
           listenable: controller,
-          builder: (context, _) => SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.tr('settings_appearance'),
-                  style: text.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Tooltip(
-                  message: context.tr('tt_settings_theme'),
-                  child: SegmentedButton<ThemeMode>(
+          builder: (context, _) => HelpTarget(
+            topic: HelpTopic.settings,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.tr('settings_appearance'),
+                    style: text.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Tooltip(
+                    message: context.tr('tt_settings_theme'),
+                    child: SegmentedButton<ThemeMode>(
+                      segments: [
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          label: Text(context.tr('settings_light')),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          label: Text(context.tr('settings_dark')),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          label: Text(context.tr('settings_auto')),
+                        ),
+                      ],
+                      selected: {controller.themeMode},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (s) =>
+                          controller.setThemeMode(s.first),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _LanguageSection(controller: controller),
+                  const SizedBox(height: 20),
+                  _BackgroundSection(
+                    controller: controller,
+                    onPick: () =>
+                        _pickImage(context.tr('settings_images_picker')),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    context.tr('settings_tagging_defaults'),
+                    style: text.titleMedium,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    context.tr('settings_tagging_defaults_desc'),
+                    style: text.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    context.tr('settings_default_raw'),
+                    style: text.bodyMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  SegmentedButton<RawMode>(
                     segments: [
                       ButtonSegment(
-                        value: ThemeMode.light,
-                        label: Text(context.tr('settings_light')),
+                        value: RawMode.auto,
+                        label: Text(context.tr('settings_raw_auto')),
                       ),
                       ButtonSegment(
-                        value: ThemeMode.dark,
-                        label: Text(context.tr('settings_dark')),
+                        value: RawMode.sidecar,
+                        label: Text(context.tr('settings_raw_sidecar')),
                       ),
                       ButtonSegment(
-                        value: ThemeMode.system,
-                        label: Text(context.tr('settings_auto')),
+                        value: RawMode.embed,
+                        label: Text(context.tr('settings_raw_embed')),
+                        enabled: controller.exiftoolAvailable,
                       ),
                     ],
-                    selected: {controller.themeMode},
+                    selected: {controller.defaultRawMode},
                     showSelectedIcon: false,
-                    onSelectionChanged: (s) => controller.setThemeMode(s.first),
+                    onSelectionChanged: (s) =>
+                        controller.setDefaultRawMode(s.first),
                   ),
-                ),
-                const SizedBox(height: 20),
-                _LanguageSection(controller: controller),
-                const SizedBox(height: 20),
-                _BackgroundSection(
-                  controller: controller,
-                  onPick: () =>
-                      _pickImage(context.tr('settings_images_picker')),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  context.tr('settings_tagging_defaults'),
-                  style: text.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  context.tr('settings_tagging_defaults_desc'),
-                  style: text.bodySmall,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  context.tr('settings_default_raw'),
-                  style: text.bodyMedium,
-                ),
-                const SizedBox(height: 6),
-                SegmentedButton<RawMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: RawMode.auto,
-                      label: Text(context.tr('settings_raw_auto')),
-                    ),
-                    ButtonSegment(
-                      value: RawMode.sidecar,
-                      label: Text(context.tr('settings_raw_sidecar')),
-                    ),
-                    ButtonSegment(
-                      value: RawMode.embed,
-                      label: Text(context.tr('settings_raw_embed')),
-                      enabled: controller.exiftoolAvailable,
-                    ),
-                  ],
-                  selected: {controller.defaultRawMode},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) =>
-                      controller.setDefaultRawMode(s.first),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        context.tr('settings_default_max_diff'),
-                        style: text.bodyMedium,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 110,
-                      child: TextFormField(
-                        key: const Key('settings-max-time-diff'),
-                        initialValue: '${controller.defaultMaxTimeDiffSeconds}',
-                        keyboardType: TextInputType.number,
-                        onChanged: (v) => controller.setDefaultMaxTimeDiff(
-                          int.tryParse(v) ?? 300,
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          context.tr('settings_default_max_diff'),
+                          style: text.bodyMedium,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _HomeActionsSection(controller: controller),
-                const SizedBox(height: 20),
-                _McpStatusRow(mcp: controller.mcp),
-              ],
+                      SizedBox(
+                        width: 110,
+                        child: TextFormField(
+                          key: const Key('settings-max-time-diff'),
+                          initialValue:
+                              '${controller.defaultMaxTimeDiffSeconds}',
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => controller.setDefaultMaxTimeDiff(
+                            int.tryParse(v) ?? 300,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _HomeActionsSection(controller: controller),
+                  const SizedBox(height: 20),
+                  _McpStatusRow(mcp: controller.mcp),
+                ],
+              ),
             ),
           ),
         ),

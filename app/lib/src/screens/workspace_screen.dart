@@ -5,6 +5,7 @@ import '../state/controller_scope.dart';
 import '../widgets/action_card.dart';
 import '../widgets/content_panel.dart';
 import '../widgets/drop_zone.dart';
+import '../widgets/help.dart';
 import '../widgets/library_bar.dart';
 
 /// The hub: a library bar, an expandable content breakdown, and the responsive
@@ -59,11 +60,14 @@ class WorkspaceScreen extends StatelessWidget {
                           SizedBox(
                             width: w,
                             height: 196,
-                            child: ActionCard(
-                              action: action,
-                              readiness: action.readiness(scan),
-                              runState: controller.runStateFor(action),
-                              onOpen: () => controller.openAction(action),
+                            child: HelpTarget(
+                              topic: topicForAction(action),
+                              child: ActionCard(
+                                action: action,
+                                readiness: action.readiness(scan),
+                                runState: controller.runStateFor(action),
+                                onOpen: () => controller.openAction(action),
+                              ),
                             ),
                           ),
                       ],
