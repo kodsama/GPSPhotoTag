@@ -108,7 +108,7 @@ void main() {
       // Driving the controller to Loose updates the caption live.
       c.setSimilarity(similaritySteps);
       await tester.pump();
-      expect(find.text('Loosely similar scenes'), findsOneWidget);
+      expect(find.text('Vaguely similar / same kind of scene'), findsOneWidget);
       expect(find.text('Identical copies'), findsNothing);
     },
   );
@@ -235,7 +235,7 @@ void main() {
     expect(find.text('Resolution'), findsOneWidget);
     expect(find.text('Quality'), findsOneWidget);
     // The People rule is now reorderable/toggleable like the others.
-    expect(find.text('People'), findsOneWidget);
+    expect(find.text('People & animals'), findsOneWidget);
     expect(find.byType(Switch), findsNWidgets(3));
   });
 
@@ -248,8 +248,7 @@ void main() {
 
     expect(
       find.byTooltip(
-        'Prefer the photo with people or pets. Uses people/pet tags already '
-        'in your photos (face regions, names, keywords).',
+        'Among similar photos, keep the one containing people or pets.',
       ),
       findsOneWidget,
     );
@@ -339,7 +338,7 @@ void main() {
   testWidgets('keepRuleLabel names every keep rule', (tester) async {
     expect(keepRuleLabel(KeepRule.resolution, enTr), 'Resolution');
     expect(keepRuleLabel(KeepRule.quality, enTr), 'Quality');
-    expect(keepRuleLabel(KeepRule.people, enTr), 'People');
+    expect(keepRuleLabel(KeepRule.people, enTr), 'People & animals');
   });
 
   testWidgets('keepRuleTooltip only the people rule has one', (tester) async {

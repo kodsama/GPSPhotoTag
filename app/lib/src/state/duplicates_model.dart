@@ -11,10 +11,10 @@ import 'library_action.dart' show Translator;
 
 /// The number of discrete similarity steps the slider offers (0..[similaritySteps]).
 ///
-/// Raised from 10 to 14 so the loosest settings reach a higher Hamming distance
-/// ("Similar scenes"), catching photos that are only *kind of* the same — a
-/// looser tier than the old near-duplicate maximum.
-const int similaritySteps = 14;
+/// Raised from 14 to 20 so the loosest settings reach an even higher Hamming
+/// distance ("Vaguely similar / same kind of scene"), catching photos that are
+/// only *vaguely* the same — a looser tier than the old near-duplicate maximum.
+const int similaritySteps = 20;
 
 /// Maps a similarity slider value (0 = Exact, [similaritySteps] = Loose) to a
 /// Hamming-distance threshold for [groupDuplicates].
@@ -36,18 +36,20 @@ double sceneVariance(int slider) =>
 /// The localization KEY for a short, human descriptor of what the current
 /// similarity [slider] level catches, shown as the example-pair caption.
 ///
-/// Buckets the slider into five bands: Exact (0) → identical copies; low → light
-/// re-encodes; mid → small edits; high → the same scene shot differently; and
-/// the loosest band → only loosely-similar scenes ("kind of the same"). Out-of-
-/// range inputs are clamped. Pure so the bucket boundaries are testable; the
-/// widget layer resolves the key through `context.tr`.
+/// Buckets the slider into six bands: Exact (0) → identical copies; low → light
+/// re-encodes; mid → small edits; high → the same scene shot differently;
+/// looser → only loosely-similar scenes ("kind of the same"); and the loosest
+/// band → merely vaguely-similar / same kind of scene. Out-of-range inputs are
+/// clamped. Pure so the bucket boundaries are testable; the widget layer
+/// resolves the key through `context.tr`.
 String similarityExampleKey(int slider) {
   final value = slider.clamp(0, similaritySteps);
   if (value == 0) return 'sim_identical';
   if (value <= 3) return 'sim_resaved';
   if (value <= 7) return 'sim_minor';
-  if (value <= 10) return 'sim_same_scene';
-  return 'sim_loose';
+  if (value <= 11) return 'sim_same_scene';
+  if (value <= 15) return 'sim_loose';
+  return 'sim_vague';
 }
 
 /// Pure helpers behind the Shrink "Low quality" stage: the quality-threshold ↔

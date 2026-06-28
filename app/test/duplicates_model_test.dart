@@ -35,9 +35,16 @@ class _FixedRandom implements Random {
 
 void main() {
   group('similarityToThreshold', () {
+    test('offers the widened 0..20 looseness range', () {
+      // Raised to 20 so the loosest setting reaches a higher Hamming distance.
+      expect(similaritySteps, 20);
+    });
+
     test('maps Exact (0) to threshold 0 and Loose to the max steps', () {
       expect(similarityToThreshold(0), 0);
       expect(similarityToThreshold(similaritySteps), similaritySteps);
+      // The loosest setting now groups previews up to 20 bits apart.
+      expect(similarityToThreshold(similaritySteps), 20);
     });
 
     test('is monotonic and clamps out-of-range', () {
@@ -84,17 +91,22 @@ void main() {
 
     test('the high band reads as a different shot of the same scene', () {
       expect(label(8), 'Same scene, a different shot');
-      expect(label(10), 'Same scene, a different shot');
+      expect(label(11), 'Same scene, a different shot');
     });
 
-    test('the loosest band reads as loosely-similar scenes', () {
-      expect(label(11), 'Loosely similar scenes');
-      expect(label(similaritySteps), 'Loosely similar scenes');
+    test('the loose band reads as loosely-similar scenes', () {
+      expect(label(12), 'Loosely similar scenes');
+      expect(label(15), 'Loosely similar scenes');
+    });
+
+    test('the loosest band reads as vaguely-similar scenes', () {
+      expect(label(16), 'Vaguely similar / same kind of scene');
+      expect(label(similaritySteps), 'Vaguely similar / same kind of scene');
     });
 
     test('clamps out-of-range inputs to the end buckets', () {
       expect(label(-1), 'Identical copies');
-      expect(label(999), 'Loosely similar scenes');
+      expect(label(999), 'Vaguely similar / same kind of scene');
     });
   });
 
