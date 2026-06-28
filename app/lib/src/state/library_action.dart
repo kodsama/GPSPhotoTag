@@ -117,8 +117,15 @@ enum LibraryAction {
   /// The localized card description via [tr].
   String description(Translator tr) => tr(descKey);
 
-  /// Every action, in display order. Add a new action here and it appears.
-  static const List<LibraryAction> all = values;
+  /// Every action, in display order (Explore first). Add a new action here and
+  /// it appears.
+  static const List<LibraryAction> all = [
+    LibraryAction.explore,
+    LibraryAction.tag,
+    LibraryAction.pruneRaw,
+    LibraryAction.duplicates,
+    LibraryAction.shrink,
+  ];
 
   /// Computes whether this action can run against [scan].
   ActionReadiness readiness(FolderScanResult scan) => switch (this) {
