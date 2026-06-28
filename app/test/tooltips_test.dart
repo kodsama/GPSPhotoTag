@@ -37,6 +37,14 @@ Widget _host(AppController c, Widget child) => ControllerScope(
   ),
 );
 
+/// Hosts a self-scrolling surface (e.g. the [SettingsDialog], an AlertDialog
+/// with its own scroll view) WITHOUT an outer [SingleChildScrollView], so an
+/// inner [ReorderableListView]'s viewport is never asked for intrinsics.
+Widget _hostNoScroll(AppController c, Widget child) => ControllerScope(
+  controller: c,
+  child: MaterialApp(home: Scaffold(body: child)),
+);
+
 void _bigView(WidgetTester tester) {
   tester.view.physicalSize = const Size(1400, 2800);
   tester.view.devicePixelRatio = 1.0;
@@ -193,7 +201,7 @@ void main() {
     final c = AppController(runner: FakeEngineRunner(), prefs: AppPrefs())
       // A background image so the reset affordance (and its tooltip) renders.
       ..setBackgroundImagePath('/bg.jpg');
-    await tester.pumpWidget(_host(c, SettingsDialog(controller: c)));
+    await tester.pumpWidget(_hostNoScroll(c, SettingsDialog(controller: c)));
     await tester.pump();
 
     expect(find.byTooltip('Choose the app language'), findsOneWidget);
@@ -207,6 +215,9 @@ void main() {
       find.byTooltip('How strongly the background is veiled'),
       findsOneWidget,
     );
+    // The Home actions section: a drag handle + a show/hide toggle per action.
+    expect(find.byTooltip('Drag to reorder the action cards'), findsWidgets);
+    expect(find.byTooltip('Show or hide this action card'), findsWidgets);
   });
 
   testWidgets('file list: select-all/none and filename-preview tooltips', (

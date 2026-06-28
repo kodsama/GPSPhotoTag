@@ -69,6 +69,7 @@ class AppController extends ChangeNotifier {
       _shrinkQualityThreshold = prefs.lowQThreshold;
       _similarity = snapSimilarityPercent(prefs.similarityPercent);
       _similarityMetric = prefs.similarityMetric;
+      _homeActions = prefs.homeActions;
     }
   }
 
@@ -179,7 +180,38 @@ class AppController extends ChangeNotifier {
     prefs.lowQThreshold = _shrinkQualityThreshold;
     prefs.similarityPercent = _similarity;
     prefs.similarityMetric = _similarityMetric;
+    prefs.homeActions = _homeActions;
     prefs.save();
+  }
+
+  // --- Home actions (order + visibility, persisted) ------------------------
+
+  HomeActionsConfig _homeActions = HomeActionsConfig.standard;
+
+  /// The full home-action configuration (order + hidden set) — what the Settings
+  /// editor lists, every action in its current order.
+  HomeActionsConfig get homeActions => _homeActions;
+
+  /// The ordered, visible-only actions the workspace grid renders. Empty when
+  /// the user has hidden every action.
+  List<LibraryAction> get visibleActionsInOrder => _homeActions.visibleInOrder;
+
+  /// Moves the home action at [oldIndex] to [newIndex] (drag-to-reorder),
+  /// persisting the new order so the workspace reflects it live.
+  void reorderHomeAction(int oldIndex, int newIndex) {
+    final next = _homeActions.reorder(oldIndex, newIndex);
+    if (identical(next, _homeActions)) return;
+    _homeActions = next;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Shows ([visible] true) or hides [action] on the workspace, persisting it.
+  void setHomeActionVisible(LibraryAction action, bool visible) {
+    if (_homeActions.isVisible(action) == visible) return;
+    _homeActions = _homeActions.withVisibility(action, visible);
+    _persistPrefs();
+    notifyListeners();
   }
 
   // --- Background (persisted) ----------------------------------------------

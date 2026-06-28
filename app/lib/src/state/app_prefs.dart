@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
+import 'library_action.dart';
+
 /// A small, persisted bag of user preferences.
 ///
 /// Construct directly with explicit values (tests), or via [load] which reads
@@ -32,6 +34,7 @@ class AppPrefs {
     this.lowQThreshold = 0.35,
     this.similarityPercent = 0,
     this.similarityMetric = SimilarityMetric.fast,
+    this.homeActions = HomeActionsConfig.standard,
   }) : lowQParams = lowQParams ?? QualityParam.values.toSet();
 
   /// The backing JSON file path, or null when persistence is disabled.
@@ -77,6 +80,10 @@ class AppPrefs {
   /// (on-device embedding). Defaults to Fast.
   SimilarityMetric similarityMetric;
 
+  /// The home-screen action configuration: which action cards show and in what
+  /// order. Defaults to the canonical order (Explore first), all visible.
+  HomeActionsConfig homeActions;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -109,6 +116,9 @@ class AppPrefs {
       prefs.similarityMetric = _parseSimilarityMetric(
         map['similarityMetric'] as String?,
       );
+      if (map.containsKey('homeActions')) {
+        prefs.homeActions = HomeActionsConfig.fromJson(map['homeActions']);
+      }
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -133,6 +143,7 @@ class AppPrefs {
           'lowQThreshold': lowQThreshold,
           'similarityPercent': similarityPercent,
           'similarityMetric': similarityMetric.name,
+          'homeActions': homeActions.toJson(),
         }),
       );
     } on Object {

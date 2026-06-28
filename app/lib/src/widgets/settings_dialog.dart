@@ -180,6 +180,8 @@ class SettingsDialog extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
+                _HomeActionsSection(controller: controller),
+                const SizedBox(height: 20),
                 _McpStatusRow(mcp: controller.mcp),
               ],
             ),
@@ -311,6 +313,78 @@ class _BackgroundSection extends StatelessWidget {
             divisions: 20,
             onChanged: controller.setBackgroundVeil,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The "Home actions" section: a reorderable list of every action card with a
+/// show/hide [Switch] each. Dragging the handle reorders; toggling shows/hides.
+/// Both persist and notify, so the workspace grid reflects changes live. Mirrors
+/// the duplicate-finder keep-pipeline panel's style.
+class _HomeActionsSection extends StatelessWidget {
+  const _HomeActionsSection({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final order = controller.homeActions.order;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.tr('settings_home_actions'), style: text.titleMedium),
+        const SizedBox(height: 2),
+        Text(context.tr('settings_home_actions_desc'), style: text.bodySmall),
+        const SizedBox(height: 8),
+        // The list is short (one row per action) so it sizes to its content
+        // inside the surrounding scroll view.
+        ReorderableListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          onReorderItem: controller.reorderHomeAction,
+          children: [
+            for (var i = 0; i < order.length; i++)
+              Container(
+                key: ValueKey(order[i]),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: scheme.outline),
+                ),
+                child: Row(
+                  children: [
+                    ReorderableDragStartListener(
+                      index: i,
+                      child: Tooltip(
+                        message: context.tr('tt_settings_home_drag'),
+                        child: const Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Icon(Icons.drag_handle, size: 20),
+                        ),
+                      ),
+                    ),
+                    Icon(order[i].icon, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(context.tr(order[i].titleKey))),
+                    Tooltip(
+                      message: context.tr('tt_settings_home_toggle'),
+                      child: Switch(
+                        value: controller.homeActions.isVisible(order[i]),
+                        onChanged: (v) =>
+                            controller.setHomeActionVisible(order[i], v),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ],
     );

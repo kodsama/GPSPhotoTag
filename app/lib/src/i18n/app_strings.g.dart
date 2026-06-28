@@ -99,6 +99,8 @@ const Map<String, String> kEnglishStrings = {
   'scan_tile_timeline': 'Timeline',
   'scan_tile_unsupported': 'Unsupported',
   'workspace_actions': 'Actions',
+  'workspace_all_actions_hidden':
+      'All actions are hidden — enable some in Settings.',
   'library_default_name': 'Library',
   'library_locations': '{count} locations',
   'library_add_folder': 'Add folder',
@@ -301,6 +303,11 @@ const Map<String, String> kEnglishStrings = {
   'lic_role_archive': 'Takeout zip',
   'lic_role_files': 'File picking, links, app storage',
   'settings_title': 'Settings',
+  'settings_home_actions': 'Home actions',
+  'settings_home_actions_desc':
+      'Choose which action cards show on the home screen and in what order.',
+  'tt_settings_home_drag': 'Drag to reorder the action cards',
+  'tt_settings_home_toggle': 'Show or hide this action card',
   'settings_appearance': 'Appearance',
   'settings_light': 'Light',
   'settings_dark': 'Dark',

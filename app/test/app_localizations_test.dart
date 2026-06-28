@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda/src/i18n/app_localizations.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/controller_scope.dart';
+import 'package:stunda/src/state/library_action.dart';
 import 'package:stunda/src/widgets/settings_dialog.dart';
 
 import 'support/fakes.dart';
@@ -183,6 +184,58 @@ void main() {
       // …and a visible string switched to French.
       expect(find.text('Terminé'), findsOneWidget);
       expect(find.text('Done'), findsNothing);
+    });
+  });
+
+  group('Settings — Home actions section', () {
+    Future<void> pumpSettings(
+      WidgetTester tester,
+      AppController controller,
+    ) async {
+      tester.view.physicalSize = const Size(1400, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ControllerScope(
+          controller: controller,
+          child: MaterialApp(
+            home: Scaffold(body: SettingsDialog(controller: controller)),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('lists every action with a show/hide toggle', (tester) async {
+      final controller = AppController(runner: FakeEngineRunner());
+      await pumpSettings(tester, controller);
+
+      // The section header and one labelled row per action.
+      expect(find.text('Home actions'), findsOneWidget);
+      expect(find.text('Tag with GPS'), findsOneWidget);
+      expect(find.text('Explore on map'), findsOneWidget);
+      expect(find.text('Shrink picture library'), findsOneWidget);
+      // A drag handle + a switch per action in the section.
+      expect(find.byTooltip('Show or hide this action card'), findsNWidgets(5));
+      expect(
+        find.byTooltip('Drag to reorder the action cards'),
+        findsNWidgets(5),
+      );
+    });
+
+    testWidgets('toggling a switch hides the action on the controller', (
+      tester,
+    ) async {
+      final controller = AppController(runner: FakeEngineRunner());
+      await pumpSettings(tester, controller);
+
+      expect(controller.homeActions.isVisible(LibraryAction.explore), isTrue);
+      // The first row is Explore (default order). Tap its switch.
+      await tester.tap(find.byType(Switch).first);
+      await tester.pump();
+
+      expect(controller.homeActions.isVisible(LibraryAction.explore), isFalse);
     });
   });
 }

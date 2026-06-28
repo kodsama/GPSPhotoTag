@@ -76,6 +76,64 @@ void main() {
       expect(find.textContaining('Images (1)'), findsOneWidget);
     });
 
+    testWidgets('hiding an action removes its card from the workspace', (
+      tester,
+    ) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      await _pump(tester, controller);
+
+      expect(find.text('Tag with GPS'), findsOneWidget);
+      controller.setHomeActionVisible(LibraryAction.tag, false);
+      await tester.pump();
+
+      // One fewer card, and the hidden action's title is gone.
+      expect(
+        find.byType(ActionCard),
+        findsNWidgets(LibraryAction.all.length - 1),
+      );
+      expect(find.text('Tag with GPS'), findsNothing);
+    });
+
+    testWidgets('reordering changes the order of the workspace cards', (
+      tester,
+    ) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      await _pump(tester, controller);
+
+      // Explore is first by default.
+      expect(controller.visibleActionsInOrder.first, LibraryAction.explore);
+      // Move it to the end; the workspace reflects the new order live.
+      controller.reorderHomeAction(0, LibraryAction.all.length - 1);
+      await tester.pump();
+
+      expect(controller.visibleActionsInOrder.last, LibraryAction.explore);
+      // All cards still render, just reordered.
+      expect(find.byType(ActionCard), findsNWidgets(LibraryAction.all.length));
+    });
+
+    testWidgets('hiding every action shows the all-hidden hint, not a blank '
+        'page', (tester) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')])
+        ..debugSetScan(fakeScan(photos: const ['/library/a.jpg']));
+      await _pump(tester, controller);
+
+      for (final action in LibraryAction.all) {
+        controller.setHomeActionVisible(action, false);
+      }
+      await tester.pump();
+
+      expect(find.byType(ActionCard), findsNothing);
+      expect(
+        find.text('All actions are hidden — enable some in Settings.'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('the action grid reflows to fewer columns when narrow', (
       tester,
     ) async {

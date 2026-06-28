@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
-import '../state/library_action.dart';
 import '../widgets/action_card.dart';
 import '../widgets/content_panel.dart';
 import '../widgets/drop_zone.dart';
@@ -35,36 +34,42 @@ class WorkspaceScreen extends StatelessWidget {
               const SizedBox(height: 24),
               Text(context.tr('workspace_actions'), style: text.titleMedium),
               const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, c) {
-                  const gap = 16.0;
-                  // Up to 3 across; reflow to 2 / 1 as the window narrows. Cards
-                  // share the width equally so there's never a dead gap.
-                  final cols = c.maxWidth >= 760
-                      ? 3
-                      : c.maxWidth >= 480
-                      ? 2
-                      : 1;
-                  final w = (c.maxWidth - gap * (cols - 1)) / cols;
-                  return Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      for (final action in LibraryAction.all)
-                        SizedBox(
-                          width: w,
-                          height: 196,
-                          child: ActionCard(
-                            action: action,
-                            readiness: action.readiness(scan),
-                            runState: controller.runStateFor(action),
-                            onOpen: () => controller.openAction(action),
+              if (controller.visibleActionsInOrder.isEmpty)
+                Text(
+                  context.tr('workspace_all_actions_hidden'),
+                  style: text.bodyMedium,
+                )
+              else
+                LayoutBuilder(
+                  builder: (context, c) {
+                    const gap = 16.0;
+                    // Up to 3 across; reflow to 2 / 1 as the window narrows.
+                    // Cards share the width equally so there's never a dead gap.
+                    final cols = c.maxWidth >= 760
+                        ? 3
+                        : c.maxWidth >= 480
+                        ? 2
+                        : 1;
+                    final w = (c.maxWidth - gap * (cols - 1)) / cols;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (final action in controller.visibleActionsInOrder)
+                          SizedBox(
+                            width: w,
+                            height: 196,
+                            child: ActionCard(
+                              action: action,
+                              readiness: action.readiness(scan),
+                              runState: controller.runStateFor(action),
+                              onOpen: () => controller.openAction(action),
+                            ),
                           ),
-                        ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    );
+                  },
+                ),
             ],
           ),
         ),

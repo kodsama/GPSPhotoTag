@@ -180,3 +180,109 @@ enum LibraryAction {
     return n;
   }
 }
+
+/// The user's home-screen action configuration: an ORDER (a permutation of the
+/// [LibraryAction] values) plus a hidden flag per action. Pure and immutable so
+/// the ordering/visibility logic and its (de)serialization are unit-testable
+/// without Flutter; mirrors the `KeepPipeline` pattern.
+///
+/// The default is [LibraryAction.all]'s order (Explore first) with everything
+/// visible. (De)serialization is tolerant: unknown action ids are dropped, and
+/// any action missing from a saved order is appended VISIBLE in its canonical
+/// order — so adding a new [LibraryAction] later still shows for existing users.
+@immutable
+class HomeActionsConfig {
+  /// Creates a config from an explicit [order] and [hidden] set. Callers should
+  /// prefer [HomeActionsConfig.normalized] (or [fromJson]) so the order is
+  /// guaranteed to be a complete, deduped permutation of every action.
+  const HomeActionsConfig({required this.order, required this.hidden});
+
+  /// The default: the canonical order (Explore first), all visible.
+  static const HomeActionsConfig standard = HomeActionsConfig(
+    order: LibraryAction.all,
+    hidden: <LibraryAction>{},
+  );
+
+  /// The actions in display order (a permutation of every [LibraryAction]).
+  final List<LibraryAction> order;
+
+  /// The actions the user has hidden from the workspace grid.
+  final Set<LibraryAction> hidden;
+
+  /// Builds a config from any [order] (possibly partial / with duplicates) and
+  /// [hidden] set: duplicates are dropped, and any action absent from [order] is
+  /// appended in its canonical [LibraryAction.all] order, so the result always
+  /// covers every action exactly once.
+  factory HomeActionsConfig.normalized({
+    required Iterable<LibraryAction> order,
+    required Iterable<LibraryAction> hidden,
+  }) {
+    final seen = <LibraryAction>{};
+    final result = <LibraryAction>[];
+    for (final action in order) {
+      if (seen.add(action)) result.add(action);
+    }
+    for (final action in LibraryAction.all) {
+      if (seen.add(action)) result.add(action);
+    }
+    return HomeActionsConfig(
+      order: List.unmodifiable(result),
+      hidden: Set.unmodifiable(hidden.where(LibraryAction.all.contains)),
+    );
+  }
+
+  /// Whether [action] is currently visible (not hidden).
+  bool isVisible(LibraryAction action) => !hidden.contains(action);
+
+  /// The ordered, visible-only actions — what the workspace grid renders.
+  List<LibraryAction> get visibleInOrder => [
+    for (final action in order)
+      if (!hidden.contains(action)) action,
+  ];
+
+  /// This config with the action at [oldIndex] moved to [newIndex] (drag-to-
+  /// reorder), clamped to valid slots. Visibility is unchanged.
+  HomeActionsConfig reorder(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= order.length) return this;
+    final target = newIndex.clamp(0, order.length - 1);
+    if (target == oldIndex) return this;
+    final next = List<LibraryAction>.of(order);
+    next.insert(target, next.removeAt(oldIndex));
+    return HomeActionsConfig(order: List.unmodifiable(next), hidden: hidden);
+  }
+
+  /// This config with [action] shown ([visible] true) or hidden. Order is
+  /// unchanged.
+  HomeActionsConfig withVisibility(LibraryAction action, bool visible) {
+    final next = Set<LibraryAction>.of(hidden);
+    if (visible) {
+      next.remove(action);
+    } else {
+      next.add(action);
+    }
+    return HomeActionsConfig(order: order, hidden: Set.unmodifiable(next));
+  }
+
+  /// JSON view (`{"order": [...ids], "hidden": [...ids]}`), for persistence.
+  Map<String, Object> toJson() => {
+    'order': [for (final a in order) a.id],
+    'hidden': [for (final a in hidden) a.id],
+  };
+
+  /// Rebuilds a config from [json] produced by [toJson]. Unknown ids are
+  /// dropped; any action missing from the saved order is appended VISIBLE in its
+  /// canonical order. Null/garbage input yields [standard].
+  static HomeActionsConfig fromJson(Object? json) {
+    if (json is! Map) return standard;
+    final byId = {for (final a in LibraryAction.all) a.id: a};
+    List<LibraryAction> parse(Object? raw) => [
+      if (raw is List)
+        for (final entry in raw)
+          if (entry is String && byId.containsKey(entry)) byId[entry]!,
+    ];
+    return HomeActionsConfig.normalized(
+      order: parse(json['order']),
+      hidden: parse(json['hidden']),
+    );
+  }
+}
