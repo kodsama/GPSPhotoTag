@@ -407,6 +407,30 @@ class HashedFile {
     peopleScore: peopleScore,
   );
 
+  /// A copy of this record with its original [width]/[height]/[fileSize] (and
+  /// [basename]) restored. Used on mobile, where the engine hashes a downscaled
+  /// *proxy* of a photo-library asset: the proxy's pixels drive the hash and
+  /// quality score, but the keeper choice and display must reflect the original
+  /// asset's resolution and size, which the app substitutes back here.
+  HashedFile withOriginal({
+    required int width,
+    required int height,
+    required int fileSize,
+    String? basename,
+  }) => HashedFile(
+    path: path,
+    pHash: pHash,
+    colorSig: colorSig,
+    embedding: embedding,
+    width: width,
+    height: height,
+    fileSize: fileSize,
+    basename: basename ?? this.basename,
+    isRaw: isRaw,
+    quality: quality,
+    peopleScore: peopleScore,
+  );
+
   /// A copy of this record with its Smart-metric [embedding] replaced — used by
   /// the hashing pipeline to fold an embedder's vector onto the freshly-hashed
   /// record.

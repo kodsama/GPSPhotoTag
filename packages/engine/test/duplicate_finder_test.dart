@@ -445,6 +445,37 @@ void main() {
     });
   });
 
+  group('HashedFile.withOriginal', () {
+    test('restores original dimensions/size, preserving hash + quality', () {
+      final proxy = hf('/proxy.jpg', bits: 3);
+      final out = proxy.withOriginal(
+        width: 4032,
+        height: 3024,
+        fileSize: 5000000,
+        basename: 'img_0042',
+      );
+      // Substituted originals.
+      expect(out.width, 4032);
+      expect(out.height, 3024);
+      expect(out.resolution, 4032 * 3024);
+      expect(out.fileSize, 5000000);
+      expect(out.basename, 'img_0042');
+      // Everything pixel-derived is preserved.
+      expect(out.path, proxy.path);
+      expect(out.pHash, proxy.pHash);
+      expect(out.colorSig, proxy.colorSig);
+      expect(out.embedding, proxy.embedding);
+      expect(out.quality, proxy.quality);
+      expect(out.peopleScore, proxy.peopleScore);
+    });
+
+    test('keeps the existing basename when none is given', () {
+      final proxy = hf('/proxy.jpg', bits: 3);
+      final out = proxy.withOriginal(width: 1, height: 2, fileSize: 3);
+      expect(out.basename, proxy.basename);
+    });
+  });
+
   group('hashImageBytes', () {
     test('hashes decodable PNG bytes into a 256-bit pHash', () {
       final png = Uint8List.fromList(img.encodePng(_stripes(16, 16)));
