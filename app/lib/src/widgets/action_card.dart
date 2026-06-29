@@ -43,8 +43,30 @@ class ActionCard extends StatefulWidget {
   State<ActionCard> createState() => _ActionCardState();
 }
 
-class _ActionCardState extends State<ActionCard> {
+class _ActionCardState extends State<ActionCard>
+    with SingleTickerProviderStateMixin {
   bool _hover = false;
+
+  // A one-shot highlight that fires when the card enters the needs-review state
+  // (a background run just finished), to pull the user back to see the results.
+  late final AnimationController _flash = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+
+  @override
+  void didUpdateWidget(ActionCard old) {
+    super.didUpdateWidget(old);
+    if (!old.runState.needsReview && widget.runState.needsReview) {
+      _flash.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _flash.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,22 +76,8 @@ class _ActionCardState extends State<ActionCard> {
     // A running or to-be-reviewed action is always tappable (to return to it),
     // even if its idle readiness would block a fresh run.
     final enabled = widget.readiness.enabled || run.running || run.needsReview;
+    final review = run.needsReview;
     final radius = BorderRadius.circular(AppTheme.radius);
-    // Frosted fill, with a faint primary wash on hover for tactility.
-    final decoration = glassDecoration(scheme, radius).copyWith(
-      color: enabled && _hover
-          ? Color.alphaBlend(
-              scheme.primary.withValues(alpha: 0.10),
-              scheme.surface.withValues(alpha: 0.62),
-            )
-          : scheme.surface.withValues(alpha: 0.62),
-      border: Border.all(
-        color: enabled && _hover
-            ? scheme.primary
-            : scheme.outline.withValues(alpha: 0.6),
-        width: enabled && _hover ? 1.4 : 1,
-      ),
-    );
 
     return Tooltip(
       message: context.tr('tt_action_card', {
@@ -85,10 +93,46 @@ class _ActionCardState extends State<ActionCard> {
             borderRadius: radius,
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: double.infinity,
-                decoration: decoration,
+              child: AnimatedBuilder(
+                animation: _flash,
+                builder: (context, child) {
+                  // One-shot attention flash when results just became ready.
+                  final flashA = _flash.isAnimating
+                      ? (1 - _flash.value) * 0.45
+                      : 0.0;
+                  // A finished-and-waiting card carries a persistent accent
+                  // border so it stands out among idle cards; running/hover keep
+                  // the tactile primary treatment.
+                  final borderColor = review
+                      ? AppColors.warning
+                      : (enabled && _hover
+                            ? scheme.primary
+                            : scheme.outline.withValues(alpha: 0.6));
+                  final base = enabled && _hover
+                      ? Color.alphaBlend(
+                          scheme.primary.withValues(alpha: 0.10),
+                          scheme.surface.withValues(alpha: 0.62),
+                        )
+                      : scheme.surface.withValues(alpha: 0.62);
+                  final fill = flashA > 0
+                      ? Color.alphaBlend(
+                          AppColors.warning.withValues(alpha: flashA),
+                          base,
+                        )
+                      : base;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    width: double.infinity,
+                    decoration: glassDecoration(scheme, radius).copyWith(
+                      color: fill,
+                      border: Border.all(
+                        color: borderColor,
+                        width: review || (enabled && _hover) ? 1.6 : 1,
+                      ),
+                    ),
+                    child: child,
+                  );
+                },
                 child: Material(
                   type: MaterialType.transparency,
                   child: InkWell(
@@ -123,7 +167,16 @@ class _ActionCardState extends State<ActionCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const Spacer(),
-                          _ReadinessChip(readiness: widget.readiness),
+                          // While a background run is in flight, a progress bar
+                          // makes "processing" unmistakable; a finished run shows
+                          // a tappable "results ready" chip; otherwise the normal
+                          // readiness chip.
+                          if (run.running)
+                            _ProgressStrip(progress: run.progress)
+                          else if (review && run.summary != null)
+                            _ReviewChip(summary: run.summary!)
+                          else
+                            _ReadinessChip(readiness: widget.readiness),
                         ],
                       ),
                     ),
@@ -133,6 +186,81 @@ class _ActionCardState extends State<ActionCard> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A thin determinate/indeterminate bar shown on the card while its background
+/// run is in flight — an unmistakable "processing" affordance.
+class _ProgressStrip extends StatelessWidget {
+  const _ProgressStrip({required this.progress});
+
+  final double? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: scheme.primary.withValues(alpha: 0.15),
+              color: scheme.primary,
+            ),
+          ),
+        ),
+        if (progress != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            '${(progress! * 100).round()}%',
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A finished-run chip echoing the result summary, in the attention accent, with
+/// a chevron inviting the user to open the action and review.
+class _ReviewChip extends StatelessWidget {
+  const _ReviewChip({required this.summary});
+
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = AppColors.warning;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, size: 13, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              summary,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const Icon(Icons.chevron_right, size: 15, color: color),
+        ],
       ),
     );
   }

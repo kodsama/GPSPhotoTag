@@ -87,7 +87,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   final GlobalKey _captureKey = GlobalKey();
   bool _focusHandled = false;
   bool _initialFitDone = false;
-  MapDisplayMode _mode = MapDisplayMode.numbers;
+  // Default to showing both layers at once (heatmap + numbered clusters) so the
+  // density and the per-area counts are visible together on first open.
+  MapDisplayMode _mode = MapDisplayMode.both;
   Timer? _prefetchDebounce;
 
   /// Whether the Timeline range selector is shown.

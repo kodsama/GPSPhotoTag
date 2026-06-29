@@ -263,7 +263,7 @@ void main() {
     expect(fetches, greaterThan(0));
   });
 
-  testWidgets('the mode button cycles Numbers -> Heatmap -> Both -> Numbers', (
+  testWidgets('the mode button cycles Both -> Numbers -> Heatmap -> Both', (
     tester,
   ) async {
     final c = AppController(runner: FakeEngineRunner())
@@ -275,7 +275,14 @@ void main() {
     await _pump(tester, c);
     await tester.pump(const Duration(milliseconds: 50));
 
-    // Numbers (default): cluster markers shown, no heat overlay.
+    // Both (default): heat overlay AND number markers shown together.
+    expect(find.text('Both'), findsOneWidget);
+    expect(find.byType(HeatmapLayer), findsOneWidget);
+    expect(find.byType(MarkerClusterLayerWidget), findsOneWidget);
+
+    // -> Numbers: cluster markers shown, no heat overlay.
+    await tester.tap(find.text('Both'));
+    await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Numbers'), findsOneWidget);
     expect(find.byType(MarkerClusterLayerWidget), findsOneWidget);
     expect(find.byType(HeatmapLayer), findsNothing);
@@ -287,18 +294,12 @@ void main() {
     expect(find.byType(HeatmapLayer), findsOneWidget);
     expect(find.byType(MarkerClusterLayerWidget), findsNothing);
 
-    // -> Both: heat overlay AND number markers.
+    // -> back to Both.
     await tester.tap(find.text('Heatmap'));
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Both'), findsOneWidget);
     expect(find.byType(HeatmapLayer), findsOneWidget);
     expect(find.byType(MarkerClusterLayerWidget), findsOneWidget);
-
-    // -> back to Numbers.
-    await tester.tap(find.text('Both'));
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.text('Numbers'), findsOneWidget);
-    expect(find.byType(HeatmapLayer), findsNothing);
   });
 
   testWidgets('the fit-to-photos button sits left of the mode button', (
@@ -311,7 +312,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     final fit = find.byIcon(Icons.fit_screen);
-    final mode = find.byIcon(Icons.tag); // Numbers mode icon
+    final mode = find.byIcon(Icons.layers); // Both mode icon (default)
     expect(fit, findsOneWidget);
     expect(mode, findsOneWidget);
     // The fit button is positioned to the LEFT of the mode button.
@@ -352,7 +353,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     final save = find.byIcon(Icons.save_alt);
-    final mode = find.byIcon(Icons.tag); // Numbers mode icon
+    final mode = find.byIcon(Icons.layers); // Both mode icon (default)
     expect(save, findsOneWidget);
     expect(find.byTooltip('Save view as PNG'), findsOneWidget);
     // The save button sits left of the mode button (between fit and mode).
@@ -553,12 +554,7 @@ void main() {
       await _pump(tester, c);
       await tester.pump(const Duration(milliseconds: 50));
 
-      // Switch to "Both" so the heatmap receives the filtered photo list too.
-      await tester.tap(find.text('Numbers'));
-      await tester.pump();
-      await tester.tap(find.text('Heatmap'));
-      await tester.pump(const Duration(milliseconds: 50));
-
+      // The default "Both" mode already feeds the heatmap the filtered list.
       // All three photos feed the heatmap before any filtering.
       expect(_heatmapPhotos(tester), hasLength(3));
 
@@ -591,10 +587,7 @@ void main() {
       ]);
     await _pump(tester, c);
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.text('Numbers'));
-    await tester.pump();
-    await tester.tap(find.text('Heatmap'));
-    await tester.pump(const Duration(milliseconds: 50));
+    // Default "Both" mode already shows the heatmap.
 
     await tester.tap(find.text('Timeline'));
     await tester.pump();
