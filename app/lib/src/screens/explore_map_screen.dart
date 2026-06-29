@@ -357,7 +357,10 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
         Positioned(
           top: 12 + topInset,
           left: 12,
-          child: _BackButton(onPressed: controller.closeExplore),
+          child: _BackButton(
+            onPressed: controller.closeExplore,
+            compact: isMobile,
+          ),
         ),
         // Top-right controls: a "fit to photos" reset button sits immediately
         // left of the mode button; the loading chip stacks just below the row
@@ -909,9 +912,13 @@ class _DateLabel extends StatelessWidget {
 
 /// The "← Map" / back-to-library affordance overlaid on the map.
 class _BackButton extends StatelessWidget {
-  const _BackButton({required this.onPressed});
+  const _BackButton({required this.onPressed, this.compact = false});
 
   final VoidCallback onPressed;
+
+  /// Icon-only (no label) — used on mobile, where the labelled button is too
+  /// wide for a phone and would overlap the right-hand toolbar.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -925,13 +932,18 @@ class _BackButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppTheme.radius),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 10 : 14,
+              vertical: 10,
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.arrow_back, size: 18),
-                const SizedBox(width: 8),
-                Text(context.tr('explore_back')),
+                if (!compact) ...[
+                  const SizedBox(width: 8),
+                  Text(context.tr('explore_back')),
+                ],
               ],
             ),
           ),

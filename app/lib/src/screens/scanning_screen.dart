@@ -48,35 +48,46 @@ class ScanningScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               alignment: WrapAlignment.center,
-              children: [
-                _Tile(
-                  label: context.tr('scan_tile_files'),
-                  value: progress.files,
-                ),
-                _Tile(
-                  label: context.tr('scan_tile_folders'),
-                  value: progress.dirs,
-                ),
-                _Tile(
-                  label: context.tr('scan_tile_photos'),
-                  value: progress.photos,
-                  accent: AppColors.terracotta,
-                ),
-                _Tile(
-                  label: context.tr('scan_tile_tracks'),
-                  value: progress.tracks,
-                  accent: AppColors.contour,
-                ),
-                _Tile(
-                  label: context.tr('scan_tile_timeline'),
-                  value: progress.google,
-                  accent: AppColors.contour,
-                ),
-                _Tile(
-                  label: context.tr('scan_tile_unsupported'),
-                  value: progress.unsupported,
-                ),
-              ],
+              // On mobile the library is photos only — folders, GPS tracks,
+              // Timeline and "unsupported" don't apply, so show just the photo
+              // count. Desktop keeps the full per-category tally.
+              children: controller.isMobile
+                  ? [
+                      _Tile(
+                        label: context.tr('scan_tile_photos'),
+                        value: progress.photos,
+                        accent: AppColors.terracotta,
+                      ),
+                    ]
+                  : [
+                      _Tile(
+                        label: context.tr('scan_tile_files'),
+                        value: progress.files,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_folders'),
+                        value: progress.dirs,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_photos'),
+                        value: progress.photos,
+                        accent: AppColors.terracotta,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_tracks'),
+                        value: progress.tracks,
+                        accent: AppColors.contour,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_timeline'),
+                        value: progress.google,
+                        accent: AppColors.contour,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_unsupported'),
+                        value: progress.unsupported,
+                      ),
+                    ],
             ),
           ],
         ),
