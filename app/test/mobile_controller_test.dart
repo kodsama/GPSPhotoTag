@@ -6,6 +6,7 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/duplicates_model.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/state/shrink_model.dart';
 
 import 'support/fakes.dart';
 
@@ -278,6 +279,67 @@ void main() {
       expect(c.lastSummary, isNull);
     });
 
+    test('reports an outcome for EVERY asset, not just located ones', () async {
+      final dir = Directory.systemTemp.createTempSync('stunda_tag_all');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final t = DateTime.utc(2021, 6, 1, 12);
+      // Track point at t, exact match for asset a; nothing near asset c's time.
+      final gpx = writeGpx(dir, 'track.gpx', t, lat: 51, lon: 7);
+
+      final lib = FakePhotoLibrary([
+        _asset('a', createdAt: t), // → tagged (exact)
+        _asset('b', createdAt: null), // → no_timestamp
+        _asset('c', createdAt: DateTime.utc(2000)), // → no_gps (out of range)
+        _asset(
+          'd',
+          createdAt: t,
+          lat: 1,
+          lng: 2,
+        ), // already GPS → already_tagged
+      ]);
+      final c = _mobile(lib, pickTracks: () async => [gpx]);
+      await c.scanLibrary();
+      await c.pickMobileTrackFiles();
+      await c.runTagMobile();
+
+      final summary = c.lastSummary!;
+      expect(summary['tagged'], 1);
+      expect(summary['no_timestamp'], 1);
+      expect(summary['no_gps'], 1);
+      expect(summary['already_tagged'], 1);
+      // The total processed (sum of every outcome) equals the eligible set.
+      expect(summary.values.fold<int>(0, (a, b) => a + b), 4);
+      // Only the located, un-tagged asset was actually written.
+      expect(lib.gpsWrites.map((w) => w.$1), ['a']);
+    });
+
+    test('interpolated fix is tallied as interpolated, not tagged', () async {
+      final dir = Directory.systemTemp.createTempSync('stunda_tag_interp');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      // Two bracketing points (a minute either side) so the photo's time
+      // interpolates between them rather than matching one exactly.
+      final path = '${dir.path}/track.gpx';
+      File(path).writeAsStringSync('''
+<?xml version="1.0"?>
+<gpx version="1.1" creator="test">
+  <trk><trkseg>
+    <trkpt lat="50" lon="6"><time>2021-06-01T11:59:00Z</time></trkpt>
+    <trkpt lat="52" lon="8"><time>2021-06-01T12:01:00Z</time></trkpt>
+  </trkseg></trk>
+</gpx>
+''');
+      final lib = FakePhotoLibrary([
+        _asset('a', createdAt: DateTime.utc(2021, 6, 1, 12)),
+      ]);
+      final c = _mobile(lib, pickTracks: () async => [path]);
+      await c.scanLibrary();
+      await c.pickMobileTrackFiles();
+      await c.runTagMobile();
+      expect(c.lastSummary!['interpolated'], 1);
+      expect(c.lastSummary!.containsKey('tagged'), isFalse);
+      expect(lib.gpsWrites.length, 1);
+    });
+
     test('a native writeGps failure is reported as an error row', () async {
       final dir = Directory.systemTemp.createTempSync('stunda_tag_err');
       addTearDown(() => dir.deleteSync(recursive: true));
@@ -360,5 +422,178 @@ void main() {
         expect(c.pruneCandidates, isEmpty);
       },
     );
+
+    test('a colliding filename is listed once and maps to one asset', () async {
+      // Two distinct assets share the filename IMG_9.DNG (a real-world
+      // MediaStore collision). The orphan-RAW review must show it once.
+      final lib = FakePhotoLibrary([
+        _asset('rawA', filename: 'IMG_9.DNG'),
+        _asset('rawB', filename: 'IMG_9.DNG'),
+      ]);
+      final c = _mobile(lib, rawPruning: true);
+      await c.scanLibrary();
+      c.openAction(LibraryAction.pruneRaw);
+      expect(c.pruneCandidates, ['IMG_9.DNG']);
+    });
+  });
+
+  group('Shrink redundant-pairs stage on mobile', () {
+    test('Android pairs by original filename and trashes via assets', () async {
+      // IMG_1 has a RAW+JPEG pair (the JPEG is the redundant copy when dropping
+      // the JPEG side); IMG_2 is an orphan RAW (not a pair).
+      final lib = FakePhotoLibrary([
+        _asset('raw1', filename: 'IMG_1.DNG'),
+        _asset('jpg1', filename: 'IMG_1.JPG'),
+        _asset('raw2', filename: 'IMG_2.DNG'),
+      ]);
+      final c = _mobile(lib, rawPruning: true);
+      await c.scanLibrary();
+      c.openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.pairs);
+
+      // The default drop side is the RAW of the pair → IMG_1.DNG (filename-keyed).
+      expect(c.shrinkPairCandidates.map((f) => f.path), ['IMG_1.DNG']);
+      c.addActiveStageToShrinkList();
+      expect(c.shrinkSelectedCount, 1);
+
+      // Also stage a duplicates candidate, whose path is a PROXY path (not a
+      // filename) — so the trash routing must normalise BOTH kinds of staged
+      // entry to proxy paths.
+      c.openShrinkStage(ShrinkStage.duplicates);
+      c.debugSetDuplicatePairs([
+        DuplicatePair(
+          kept: _hashed(FakePhotoLibrary.proxyPathFor('raw2')),
+          other: _hashed(FakePhotoLibrary.proxyPathFor('jpg1')),
+        ),
+      ]);
+      c.addActiveStageToShrinkList();
+      expect(c.shrinkSelectedCount, 2);
+
+      await c.runTrashShrink();
+      // Both the pair RAW (via filename) and the duplicate (via proxy path)
+      // reach the native delete by asset id.
+      expect(lib.deletedIds, containsAll(<String>['raw1', 'jpg1']));
+      expect(
+        c.scan!.photos,
+        isNot(contains(FakePhotoLibrary.proxyPathFor('raw1'))),
+      );
+    });
+
+    test('iOS leaves the pairs stage empty (no crash, no rows)', () async {
+      final lib = FakePhotoLibrary([
+        _asset('raw1', filename: 'IMG_1.DNG'),
+        _asset('jpg1', filename: 'IMG_1.JPG'),
+      ]);
+      final c = _mobile(lib, rawPruning: false);
+      await c.scanLibrary();
+      c.openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.pairs);
+      expect(c.shrinkPairCandidates, isEmpty);
+    });
+  });
+
+  group('original-asset resolution for the viewer/info line', () {
+    test('assetForProxyPath resolves a proxy path to its asset', () async {
+      final lib = FakePhotoLibrary([_asset('a', filename: 'orig.heic')]);
+      final c = _mobile(lib);
+      await c.scanLibrary();
+      final asset = c.assetForProxyPath(FakePhotoLibrary.proxyPathFor('a'));
+      expect(asset!.filename, 'orig.heic');
+      expect(c.assetForProxyPath('/nope.jpg'), isNull);
+    });
+
+    test(
+      'mobileInfoForProxyPath reports the ORIGINAL filename/size/dims',
+      () async {
+        final lib = FakePhotoLibrary([
+          _asset(
+            'a',
+            filename: 'DSC_0001.NEF',
+            width: 6000,
+            height: 4000,
+            byteSize: 24000000,
+            createdAt: DateTime.utc(2022, 3, 4),
+            lat: 12,
+            lng: 34,
+          ),
+        ]);
+        final c = _mobile(lib);
+        await c.scanLibrary();
+        final info = c.mobileInfoForProxyPath(
+          FakePhotoLibrary.proxyPathFor('a'),
+        )!;
+        expect(info.filename, 'DSC_0001.NEF');
+        expect(info.fileSize, 24000000);
+        expect(info.meta.width, 6000);
+        expect(info.meta.height, 4000);
+        expect(info.meta.hasGps, isTrue);
+        // Desktop returns null so the proxy path/meta is used unchanged.
+        expect(AppController().mobileInfoForProxyPath('/x.jpg'), isNull);
+      },
+    );
+
+    test(
+      'fullBytesForProxyPath loads the original bytes via the library',
+      () async {
+        final lib = FakePhotoLibrary([_asset('a')]);
+        final c = _mobile(lib);
+        await c.scanLibrary();
+        expect(
+          c.fullBytesForProxyPath(FakePhotoLibrary.proxyPathFor('a')),
+          isNotNull,
+        );
+        expect(c.fullBytesForProxyPath('/nope.jpg'), isNull);
+        // Desktop has no library → always null.
+        expect(AppController().fullBytesForProxyPath('/x.jpg'), isNull);
+      },
+    );
+
+    test(
+      'shrinkSizeOf returns the original asset byte size on mobile',
+      () async {
+        final lib = FakePhotoLibrary([_asset('a', byteSize: 7777777)]);
+        final c = _mobile(lib);
+        await c.scanLibrary();
+        expect(c.shrinkSizeOf(FakePhotoLibrary.proxyPathFor('a')), 7777777);
+      },
+    );
+
+    test(
+      'displayFilename shows the original name on mobile, basename on desktop',
+      () async {
+        final lib = FakePhotoLibrary([_asset('a', filename: 'holiday.heic')]);
+        final c = _mobile(lib);
+        await c.scanLibrary();
+        expect(
+          c.displayFilename(FakePhotoLibrary.proxyPathFor('a')),
+          'holiday.heic',
+        );
+        // Desktop / unresolved → plain basename of the path.
+        expect(AppController().displayFilename('/lib/photo.jpg'), 'photo.jpg');
+        expect(c.displayFilename('/proxies/unknown.jpg'), 'unknown.jpg');
+      },
+    );
+
+    test('loadCuratedExif is a no-op on mobile (no exiftool)', () async {
+      final lib = FakePhotoLibrary([_asset('a')]);
+      final runner = FakeEngineRunner();
+      final c = _mobile(lib, runner: runner);
+      await c.scanLibrary();
+      await c.loadCuratedExif([FakePhotoLibrary.proxyPathFor('a')]);
+      expect(runner.calls, isNot(contains('readCuratedExif')));
+      expect(c.curatedExif(FakePhotoLibrary.proxyPathFor('a')), isNull);
+    });
+
+    test('explore detail carries original dimensions on mobile', () async {
+      final lib = FakePhotoLibrary([
+        _asset('a', lat: 10, lng: 20, width: 5000, height: 3000),
+      ]);
+      final c = _mobile(lib);
+      await c.scanLibrary();
+      c.openExplore();
+      final meta = c.explorePhotos.single.meta!;
+      expect(meta.width, 5000);
+      expect(meta.height, 3000);
+    });
   });
 }

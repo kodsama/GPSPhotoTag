@@ -1056,6 +1056,10 @@ class AppController extends ChangeNotifier {
   /// or in flight, streaming results in off the UI isolate and notifying as each
   /// arrives so the viewer's info line fills in progressively.
   Future<void> loadCuratedExif(List<String> paths) async {
+    // On mobile there is no exiftool to shell out to, and the viewer's info line
+    // is sourced from the asset metadata we already hold (see [assetForProxy]),
+    // so skip the (broken) curated-EXIF read entirely.
+    if (isMobile) return;
     final pending = [
       for (final path in paths)
         if (!_curatedExif.containsKey(path) && !_curatedLoading.contains(path))
@@ -1254,6 +1258,10 @@ class AppController extends ChangeNotifier {
             latitude: photo.latitude,
             longitude: photo.longitude,
             date: photo.date,
+            // Surface the ORIGINAL asset dimensions in the detail panel (the
+            // proxy is downscaled, so we can't read these from the file).
+            width: photo.width > 0 ? photo.width : null,
+            height: photo.height > 0 ? photo.height : null,
           ),
         ),
       );
@@ -1364,46 +1372,45 @@ class AppController extends ChangeNotifier {
       for (final a in assets)
         MobileTagPhoto(assetId: a.id, date: a.createdAt, hasGps: a.hasGps),
     ];
-    final located = resolveAssetLocations(
+    // Classify EVERY asset the way desktop's TagService does, so the summary
+    // tallies noTimestamp / alreadyTagged / noGps alongside tagged /
+    // interpolated — not just the assets that resolved to a fix.
+    final outcomes = classifyTagOutcomes(
       photos,
       pool,
       maxTimeDiff: Duration(seconds: _maxTimeDiffSeconds),
+      replace: _replace,
     );
     final byId = {for (final a in assets) a.id: a};
     final summary = <String, int>{};
     void tally(PhotoStatus s) =>
         summary.update(s.wire, (n) => n + 1, ifAbsent: () => 1);
 
+    final total = outcomes.length;
     var done = 0;
-    for (final fix in located) {
-      final asset = byId[fix.assetId];
+    for (final outcome in outcomes) {
+      final asset = byId[outcome.assetId];
       if (asset == null) continue;
-      // Honour the existing-GPS guard exactly like the desktop tagger.
-      if (asset.hasGps && !_replace) {
-        tally(PhotoStatus.alreadyTagged);
-        yield ItemEvent(
-          PhotoRow(path: asset.filename, status: PhotoStatus.alreadyTagged),
-        );
+      final fix = outcome.location;
+      if (fix == null) {
+        // A terminal skip outcome (noTimestamp / alreadyTagged / noGps): report
+        // it exactly like desktop and move on without touching the library.
+        tally(outcome.status);
+        yield ItemEvent(PhotoRow(path: asset.filename, status: outcome.status));
         done++;
-        yield ProgressEvent(done: done, total: located.length);
+        yield ProgressEvent(done: done, total: total);
         continue;
       }
       try {
         if (!_dryRun) {
-          await library.writeGps(
-            asset.id,
-            fix.location.latitude,
-            fix.location.longitude,
-          );
+          await library.writeGps(asset.id, fix.latitude, fix.longitude);
         }
-        final status = _dryRun ? PhotoStatus.dryRun : PhotoStatus.tagged;
+        // outcome.status is tagged vs interpolated by GpsMethod; a dry run
+        // reports dryRun instead of writing, matching desktop semantics.
+        final status = _dryRun ? PhotoStatus.dryRun : outcome.status;
         tally(status);
         yield ItemEvent(
-          PhotoRow(
-            path: asset.filename,
-            status: status,
-            location: fix.location,
-          ),
+          PhotoRow(path: asset.filename, status: status, location: fix),
         );
       } on Object catch (e) {
         tally(PhotoStatus.error);
@@ -1412,7 +1419,7 @@ class AppController extends ChangeNotifier {
         );
       }
       done++;
-      yield ProgressEvent(done: done, total: located.length);
+      yield ProgressEvent(done: done, total: total);
     }
     yield DoneEvent(summary);
   }
@@ -1612,6 +1619,34 @@ class AppController extends ChangeNotifier {
       for (final id in pairing.idsFor(filenames))
         if (mobile.proxyForAsset(id) != null) mobile.proxyForAsset(id)!,
     ];
+  }
+
+  /// Normalises a heterogeneous mobile shrink selection to proxy paths: a path
+  /// already known as a proxy passes through; otherwise it is treated as an
+  /// asset filename (orphans + redundant-pairs stages) and mapped through the
+  /// mobile pairings to its asset's proxy. Drops anything that no longer
+  /// resolves. Mobile-only; desktop never calls this.
+  List<String> _proxyPathsForStaged(List<String> staged) {
+    final mobile = _mobileLibrary;
+    if (mobile == null) return const [];
+    final idByFilename = <String, String>{
+      ...?_mobilePairing?.idByFilename,
+      ...?_shrinkMobilePairing?.idByFilename,
+    };
+    final out = <String>[];
+    for (final path in staged) {
+      // Already a proxy path the engine scanned.
+      if (mobile.assetForProxy(path) != null) {
+        out.add(path);
+        continue;
+      }
+      // Otherwise an asset filename → asset id → its proxy.
+      final id = idByFilename[path];
+      if (id == null) continue;
+      final proxy = mobile.proxyForAsset(id);
+      if (proxy != null) out.add(proxy);
+    }
+    return out;
   }
 
   // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------
@@ -1911,6 +1946,11 @@ class AppController extends ChangeNotifier {
 
   // The classified pairing backing the redundant-pairs review page.
   RawPairing? _shrinkPairing;
+  // On Android mobile, the filename-keyed pairing + filename→asset-id lookup
+  // behind [_shrinkPairing], so a chosen redundant-pair filename can be routed
+  // to the native photo-library delete (proxies are all `.jpg` and lose the RAW
+  // extension). Null on desktop and on iOS.
+  MobilePairing? _shrinkMobilePairing;
   // The low-quality review's hashed candidates below threshold (path → size),
   // and the GPS/size info needed to build candidates on add.
   List<HashedFile> _shrinkLowQHashed = const [];
@@ -2146,10 +2186,7 @@ class AppController extends ChangeNotifier {
       case ShrinkStage.orphans:
         _preparePruneReview();
       case ShrinkStage.pairs:
-        final scan = _scan;
-        _shrinkPairing = scan == null
-            ? null
-            : classifyPairing(_included(scan.photos));
+        _prepareShrinkPairing();
         _shrinkPairSelected
           ..clear()
           ..addAll(shrinkPairCandidates.map((f) => f.path));
@@ -2161,6 +2198,33 @@ class AppController extends ChangeNotifier {
         _hashProgress = HashProgress();
     }
     notifyListeners();
+  }
+
+  /// Classifies the redundant-RAW pairing for the pairs stage.
+  ///
+  /// On desktop (and unchanged there) it classifies over the included proxy/file
+  /// paths. On Android mobile the proxies are all `.jpg` (so classifying them
+  /// finds no RAW); instead it pairs over the assets' ORIGINAL filenames and
+  /// keeps the filename→asset-id lookup so a chosen pair routes to the native
+  /// delete. On iOS RAW pruning is unavailable ([supportsRawPruning] false), so
+  /// the pairing stays null and the stage cleanly shows nothing.
+  void _prepareShrinkPairing() {
+    final scan = _scan;
+    final mobile = _mobileLibrary;
+    if (isMobile) {
+      if (supportsRawPruning && scan != null && mobile != null) {
+        _shrinkMobilePairing = mobile.pairingFromFilenames();
+        _shrinkPairing = _shrinkMobilePairing!.pairing;
+      } else {
+        _shrinkMobilePairing = null;
+        _shrinkPairing = null;
+      }
+      return;
+    }
+    _shrinkMobilePairing = null;
+    _shrinkPairing = scan == null
+        ? null
+        : classifyPairing(_included(scan.photos));
   }
 
   /// Snapshots the active [stage]'s working review state into the per-stage cache
@@ -2181,6 +2245,7 @@ class AppController extends ChangeNotifier {
       ),
       ShrinkStage.pairs => _ShrinkStageCache(
         shrinkPairing: _shrinkPairing,
+        shrinkMobilePairing: _shrinkMobilePairing,
         shrinkPairSelected: Set<String>.of(_shrinkPairSelected),
         shrinkPairDrop: _shrinkPairDrop,
       ),
@@ -2214,6 +2279,7 @@ class AppController extends ChangeNotifier {
           ..addAll(cached.selected ?? const {});
       case ShrinkStage.pairs:
         _shrinkPairing = cached.shrinkPairing;
+        _shrinkMobilePairing = cached.shrinkMobilePairing;
         _shrinkPairDrop = cached.shrinkPairDrop ?? PairDropSide.dropRaw;
         _shrinkPairSelected
           ..clear()
@@ -2329,6 +2395,7 @@ class AppController extends ChangeNotifier {
     _stageCache.clear();
     _shrinkActiveStage = null;
     _shrinkPairing = null;
+    _shrinkMobilePairing = null;
     _shrinkPairSelected.clear();
     _shrinkLowQHashed = const [];
     _shrinkLowQReviewed = false;
@@ -2382,11 +2449,77 @@ class AppController extends ChangeNotifier {
   /// On-disk size of [path] in bytes, or 0 when it can't be read. Exposed for
   /// the shrink review pages, which show each candidate's size.
   int shrinkSizeOf(String path) {
+    // On mobile [path] is a proxy temp file (or an asset filename in the
+    // filename-keyed stages); report the ORIGINAL asset's byte size instead of
+    // the tiny proxy / unreadable filename.
+    if (isMobile) return assetForProxyPath(path)?.byteSize ?? 0;
     try {
       return File(path).lengthSync();
     } on Object {
       return 0;
     }
+  }
+
+  /// The original [LibraryAsset] behind a mobile [path], or null on desktop /
+  /// when it does not resolve. [path] may be a proxy temp-file path (the engine
+  /// scanned it) or an asset filename (the filename-keyed prune/pairs stages);
+  /// both are resolved through the mobile library + pairings.
+  LibraryAsset? assetForProxyPath(String path) {
+    final mobile = _mobileLibrary;
+    if (mobile == null) return null;
+    final direct = mobile.assetForProxy(path);
+    if (direct != null) return direct;
+    final id =
+        _mobilePairing?.idByFilename[path] ??
+        _shrinkMobilePairing?.idByFilename[path];
+    if (id == null) return null;
+    return mobile.assetsById[id];
+  }
+
+  /// The filename to display for [path]: the ORIGINAL asset filename on mobile
+  /// (the proxy path is a sanitized `.jpg` temp name), else the path's own
+  /// basename. Used by the duplicate-pair review, the compare info line, and the
+  /// low-quality row so they never surface the proxy name.
+  String displayFilename(String path) {
+    if (isMobile) {
+      final asset = assetForProxyPath(path);
+      if (asset != null) return asset.filename;
+    }
+    return p.basename(path);
+  }
+
+  /// Full-resolution original bytes for the asset behind a mobile proxy [path],
+  /// or null on desktop / when it doesn't resolve. The compare/preview viewer
+  /// shows these instead of the downscaled proxy on mobile.
+  Future<Uint8List>? fullBytesForProxyPath(String path) {
+    final library = _photoLibrary;
+    final asset = assetForProxyPath(path);
+    if (library == null || asset == null) return null;
+    return library.fullBytes(asset.id);
+  }
+
+  /// The ORIGINAL-asset info backing the compare/preview info line on mobile for
+  /// proxy [path]: its real filename, a [FileMeta] carrying the original
+  /// dimensions / capture date / GPS, and its on-disk byte size. Null on desktop
+  /// or when [path] doesn't resolve to an asset (then the desktop info line —
+  /// proxy name + read meta — is used unchanged). The proxy itself is downscaled
+  /// and stripped, so none of this can be read from the file.
+  MobileInfo? mobileInfoForProxyPath(String path) {
+    final asset = assetForProxyPath(path);
+    if (asset == null) return null;
+    return MobileInfo(
+      filename: asset.filename,
+      fileSize: asset.byteSize > 0 ? asset.byteSize : null,
+      meta: FileMeta(
+        path: path,
+        width: asset.width > 0 ? asset.width : null,
+        height: asset.height > 0 ? asset.height : null,
+        date: asset.createdAt,
+        hasGps: asset.hasGps,
+        latitude: asset.latitude,
+        longitude: asset.longitude,
+      ),
+    );
   }
 
   int _sizeOf(String path) => shrinkSizeOf(path);
@@ -2451,7 +2584,13 @@ class AppController extends ChangeNotifier {
   /// Trashes the wizard's selected set after the silly-word confirm gate. A
   /// no-op when nothing is selected.
   Future<void> runTrashShrink() {
-    final paths = _staged.selectedPaths;
+    final staged = _staged.selectedPaths;
+    if (staged.isEmpty) return Future.value();
+    // The wizard's staged set is heterogeneous on mobile: duplicate/low-quality
+    // stages hold proxy paths, while the orphans + redundant-pairs stages hold
+    // asset FILENAMES (their pairings are filename-keyed). Normalise every entry
+    // to a proxy path so [_trashAssets] can resolve them all to asset ids.
+    final paths = isMobile ? _proxyPathsForStaged(staged) : staged;
     if (paths.isEmpty) return Future.value();
     return _consume(
       _trashPaths(paths),
@@ -2747,6 +2886,23 @@ class AppController extends ChangeNotifier {
   }
 }
 
+/// The original-asset info the mobile compare/preview info line shows in place
+/// of the downscaled proxy's: the real [filename], [fileSize], and a [meta]
+/// carrying the original dimensions / date / GPS.
+class MobileInfo {
+  /// Creates the mobile info bundle for one proxy.
+  const MobileInfo({required this.filename, required this.meta, this.fileSize});
+
+  /// The original asset's display filename.
+  final String filename;
+
+  /// The original asset's on-disk byte size, or null when unknown.
+  final int? fileSize;
+
+  /// The original asset's dimensions / date / GPS (path is the proxy's).
+  final FileMeta meta;
+}
+
 /// A snapshot of one shrink stage's working review state (found results + the
 /// user's selections), cached so leaving a stage and re-opening it within one
 /// session restores it without re-classifying or re-hashing. Only the fields
@@ -2760,6 +2916,7 @@ class _ShrinkStageCache {
     this.visibleKinds,
     this.pruneFilter,
     this.shrinkPairing,
+    this.shrinkMobilePairing,
     this.shrinkPairSelected,
     this.shrinkPairDrop,
     this.shrinkLowQHashed,
@@ -2780,6 +2937,7 @@ class _ShrinkStageCache {
 
   // Redundant-pairs stage.
   final RawPairing? shrinkPairing;
+  final MobilePairing? shrinkMobilePairing;
   final Set<String>? shrinkPairSelected;
   final PairDropSide? shrinkPairDrop;
 

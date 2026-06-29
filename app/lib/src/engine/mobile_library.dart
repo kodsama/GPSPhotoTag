@@ -135,6 +135,8 @@ class MobileLibrary {
           latitude: asset.latitude!,
           longitude: asset.longitude!,
           date: asset.createdAt,
+          width: asset.width,
+          height: asset.height,
         ),
   ];
 
@@ -146,13 +148,17 @@ class MobileLibrary {
   /// filename) plus a filename→id lookup so the controller can route the
   /// trash through [PhotoLibrary.delete]. Filenames may collide; the last asset
   /// with a given filename wins, which is acceptable for a best-effort mobile
-  /// RAW prune.
+  /// RAW prune. Each filename is listed at most once so the review rows and the
+  /// deletion mapping stay one-to-one (a duplicated filename would otherwise
+  /// show twice while only one of them could ever map back for deletion).
   MobilePairing pairingFromFilenames() {
     final idByFilename = <String, String>{};
     final filenames = <String>[];
     for (final asset in _assetById.values) {
+      if (!idByFilename.containsKey(asset.filename)) {
+        filenames.add(asset.filename);
+      }
       idByFilename[asset.filename] = asset.id;
-      filenames.add(asset.filename);
     }
     return MobilePairing(classifyPairing(filenames), idByFilename);
   }
@@ -211,6 +217,8 @@ class MobileExplorePhoto {
     required this.longitude,
     this.proxyPath,
     this.date,
+    this.width = 0,
+    this.height = 0,
   });
 
   /// The platform asset id, used to load the thumbnail on demand.
@@ -228,6 +236,13 @@ class MobileExplorePhoto {
 
   /// Capture date, when known.
   final DateTime? date;
+
+  /// Original pixel width of the asset (0 when the platform did not report it),
+  /// surfaced in the Explore detail panel's info lines.
+  final int width;
+
+  /// Original pixel height of the asset (0 when unknown).
+  final int height;
 }
 
 /// The mobile RAW pairing plus the filename→asset-id lookup needed to route a
@@ -271,6 +286,87 @@ List<LocatedAsset> resolveAssetLocations(
     out.add(LocatedAsset(assetId: photo.assetId, location: fix));
   }
   return out;
+}
+
+/// Classifies the tag outcome for EVERY [photo], mirroring the desktop
+/// `TagService` per-photo decision exactly so the mobile summary tallies the
+/// same status vocabulary (noTimestamp / alreadyTagged / noGps / tagged /
+/// interpolated). The write itself stays in the controller (it needs the
+/// plugin), so a [MobileTagOutcome] whose [MobileTagOutcome.location] is
+/// non-null is the only one that still needs a `writeGps`; the rest are
+/// terminal skip results.
+///
+/// The decision order matches desktop `_tagOne`: a missing capture date is
+/// [PhotoStatus.noTimestamp]; an already-geotagged asset with [replace] off is
+/// [PhotoStatus.alreadyTagged]; no source coordinate within [maxTimeDiff] is
+/// [PhotoStatus.noGps]; otherwise the fix's [GpsMethod] picks `tagged` (exact)
+/// vs `interpolated`. Pure, so the classification is unit-testable.
+List<MobileTagOutcome> classifyTagOutcomes(
+  Iterable<MobileTagPhoto> photos,
+  SourcePool pool, {
+  required Duration maxTimeDiff,
+  required bool replace,
+}) {
+  final locator = Locator(gpx: pool.track, google: pool.google);
+  final out = <MobileTagOutcome>[];
+  for (final photo in photos) {
+    final date = photo.date;
+    if (date == null) {
+      out.add(
+        MobileTagOutcome(
+          assetId: photo.assetId,
+          status: PhotoStatus.noTimestamp,
+        ),
+      );
+      continue;
+    }
+    if (photo.hasGps && !replace) {
+      out.add(
+        MobileTagOutcome(
+          assetId: photo.assetId,
+          status: PhotoStatus.alreadyTagged,
+        ),
+      );
+      continue;
+    }
+    final fix = locator.locate(date, maxTimeDiff);
+    if (fix == null) {
+      out.add(
+        MobileTagOutcome(assetId: photo.assetId, status: PhotoStatus.noGps),
+      );
+      continue;
+    }
+    final status = fix.method == GpsMethod.exact
+        ? PhotoStatus.tagged
+        : PhotoStatus.interpolated;
+    out.add(
+      MobileTagOutcome(assetId: photo.assetId, status: status, location: fix),
+    );
+  }
+  return out;
+}
+
+/// One asset's classified tag outcome. When [location] is non-null the asset
+/// resolved to a fix and the controller must still write it (or report a dry
+/// run); otherwise [status] is a terminal skip reason.
+class MobileTagOutcome {
+  /// Creates an outcome for [assetId] with [status] and an optional resolved
+  /// [location].
+  const MobileTagOutcome({
+    required this.assetId,
+    required this.status,
+    this.location,
+  });
+
+  /// The platform asset id.
+  final String assetId;
+
+  /// The desktop-equivalent [PhotoStatus] for this asset before any write.
+  final PhotoStatus status;
+
+  /// The resolved coordinate when one was found (then [status] is `tagged` or
+  /// `interpolated`); null for every skip outcome.
+  final LocationResult? location;
 }
 
 /// The minimal asset facts the mobile tag resolution needs: which asset, when
