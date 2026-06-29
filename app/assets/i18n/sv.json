@@ -406,5 +406,8 @@
   "tag_mobile_tracks_help": "Välj GPX/KML-spår eller Google Timeline-exporter; koordinaterna matchas mot varje fotos tid och skrivs tillbaka till ditt bibliotek.",
   "tag_mobile_pick_tracks": "Välj GPS-spårfiler",
   "tag_mobile_clear_tracks": "Rensa spårfiler",
-  "prune_mobile_unavailable": "Att matcha foton mot RAW fungerar på Android men inte på iPhone eller iPad: fotobiblioteket behåller en RAW och dess JPEG som ett objekt, och en fristående RAW är din enda kopia — så det finns inget att para ihop eller ta bort säkert här."
+  "prune_mobile_unavailable": "Att matcha foton mot RAW fungerar på Android men inte på iPhone eller iPad: fotobiblioteket behåller en RAW och dess JPEG som ett objekt, och en fristående RAW är din enda kopia — så det finns inget att para ihop eller ta bort säkert här.",
+  "library_stat_line_mobile": "{photos} foton i ditt bibliotek",
+  "library_rescan": "Skanna om biblioteket",
+  "tt_library_rescan": "Skanna fotobiblioteket igen efter nya foton"
 }

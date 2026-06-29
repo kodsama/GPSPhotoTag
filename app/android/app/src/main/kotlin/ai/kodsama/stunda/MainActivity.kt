@@ -30,9 +30,57 @@ class MainActivity : FlutterActivity() {
                             writeGps(id, lat, lng, result)
                         }
                     }
+                    "sizes" -> {
+                        val ids = call.argument<List<String>>("ids")
+                        if (ids == null) {
+                            result.error("bad_args", "sizes needs ids", null)
+                        } else {
+                            sizes(ids, result)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /**
+     * Returns an id -> byte-size map for the given MediaStore image ids.
+     *
+     * photo_manager exposes pixel dimensions but not file size, so the Dart
+     * enumerate() batch-queries MediaStore.Images.Media.SIZE here in one cursor
+     * pass. Ids that aren't found are simply omitted (Dart defaults them to 0).
+     */
+    private fun sizes(ids: List<String>, result: MethodChannel.Result) {
+        val out = HashMap<String, Long>()
+        try {
+            if (ids.isEmpty()) {
+                result.success(out)
+                return
+            }
+            val placeholders = ids.joinToString(",") { "?" }
+            val projection = arrayOf(
+                MediaStore.Images.Media._ID,
+                MediaStore.Images.Media.SIZE,
+            )
+            contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                "${MediaStore.Images.Media._ID} IN ($placeholders)",
+                ids.toTypedArray(),
+                null,
+            ).use { cursor ->
+                if (cursor != null) {
+                    val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                    while (cursor.moveToNext()) {
+                        out[cursor.getLong(idCol).toString()] = cursor.getLong(sizeCol)
+                    }
+                }
+            }
+            result.success(out)
+        } catch (e: Exception) {
+            result.error("sizes_failed", e.message, null)
+        }
     }
 
     private fun writeGps(id: String, lat: Double, lng: Double, result: MethodChannel.Result) {

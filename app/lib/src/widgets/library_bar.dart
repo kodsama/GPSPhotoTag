@@ -22,6 +22,7 @@ class LibraryBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final roots = controller.roots;
+    final isMobile = controller.isMobile;
     final name =
         controller.folderName(context.tr) ?? context.tr('library_default_name');
     return Container(
@@ -49,7 +50,13 @@ class LibraryBar extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _statLine(context, scan),
+                      // On mobile there are no folders or GPX/track sources, so
+                      // show a plain photo count instead of the desktop tallies.
+                      isMobile
+                          ? context.tr('library_stat_line_mobile', {
+                              'photos': scan.photoCount,
+                            })
+                          : _statLine(context, scan),
                       style: text.bodySmall,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -59,32 +66,46 @@ class LibraryBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // Wrap so the two actions reflow onto a second line when the window
+          // Wrap so the actions reflow onto a second line when the window
           // (or a test viewport) is narrow, never overflowing the row.
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.end,
-            children: [
-              Tooltip(
-                message: context.tr('tt_library_add_folder'),
-                child: OutlinedButton.icon(
-                  onPressed: controller.addFolder,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: Text(context.tr('library_add_folder')),
-                ),
-              ),
-              Tooltip(
-                message: context.tr('tt_library_change'),
-                child: OutlinedButton.icon(
-                  onPressed: controller.changeLibrary,
-                  icon: const Icon(Icons.swap_horiz, size: 18),
-                  label: Text(context.tr('library_change')),
-                ),
-              ),
-            ],
+            // On mobile there's no folder picking: offer a single "Rescan
+            // library" that re-enumerates the device photo library. Desktop
+            // keeps "Add folder" + "Change library" exactly as before.
+            children: isMobile
+                ? [
+                    Tooltip(
+                      message: context.tr('tt_library_rescan'),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.scanLibrary,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: Text(context.tr('library_rescan')),
+                      ),
+                    ),
+                  ]
+                : [
+                    Tooltip(
+                      message: context.tr('tt_library_add_folder'),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.addFolder,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: Text(context.tr('library_add_folder')),
+                      ),
+                    ),
+                    Tooltip(
+                      message: context.tr('tt_library_change'),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.changeLibrary,
+                        icon: const Icon(Icons.swap_horiz, size: 18),
+                        label: Text(context.tr('library_change')),
+                      ),
+                    ),
+                  ],
           ),
-          if (roots.length > 1) ...[
+          if (!isMobile && roots.length > 1) ...[
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,

@@ -39,10 +39,38 @@ import UIKit
           return
         }
         writeGps(id: id, lat: lat, lng: lng, result: result)
+      case "sizes":
+        guard let args = call.arguments as? [String: Any],
+          let ids = args["ids"] as? [String]
+        else {
+          result(FlutterError(code: "bad_args", message: "sizes needs ids", details: nil))
+          return
+        }
+        sizes(ids: ids, result: result)
       default:
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  /// Returns an id -> byte-size map for the given PHAsset local identifiers.
+  ///
+  /// photo_manager exposes pixel dimensions but not file size, so the Dart
+  /// enumerate() batch-queries the byte size here from each asset's primary
+  /// PHAssetResource (`fileSize`, a private NSNumber key). Ids that can't be
+  /// sized are omitted (Dart defaults them to 0).
+  private static func sizes(ids: [String], result: @escaping FlutterResult) {
+    var out: [String: Int] = [:]
+    let assets = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+    assets.enumerateObjects { asset, _, _ in
+      let resources = PHAssetResource.assetResources(for: asset)
+      // Prefer the full-sized photo resource; fall back to the first resource.
+      let resource = resources.first { $0.type == .photo } ?? resources.first
+      if let value = resource?.value(forKey: "fileSize") as? NSNumber {
+        out[asset.localIdentifier] = value.intValue
+      }
+    }
+    result(out)
   }
 
   private static func writeGps(

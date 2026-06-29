@@ -406,5 +406,8 @@
   "tag_mobile_tracks_help": "Vælg GPX/KML-spor eller Google Timeline-eksporter; koordinaterne matches med hvert fotos tidspunkt og skrives tilbage til dit bibliotek.",
   "tag_mobile_pick_tracks": "Vælg GPS-sporfiler",
   "tag_mobile_clear_tracks": "Ryd sporfiler",
-  "prune_mobile_unavailable": "At matche fotos med RAW virker på Android, men ikke på iPhone eller iPad: fotobiblioteket gemmer en RAW og dens JPEG som ét element, og en selvstændig RAW er din eneste kopi — så der er intet at parre eller fjerne sikkert her."
+  "prune_mobile_unavailable": "At matche fotos med RAW virker på Android, men ikke på iPhone eller iPad: fotobiblioteket gemmer en RAW og dens JPEG som ét element, og en selvstændig RAW er din eneste kopi — så der er intet at parre eller fjerne sikkert her.",
+  "library_stat_line_mobile": "{photos} fotos i dit bibliotek",
+  "library_rescan": "Scan biblioteket igen",
+  "tt_library_rescan": "Scan dit fotobibliotek igen for nye fotos"
 }

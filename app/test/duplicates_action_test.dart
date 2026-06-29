@@ -306,6 +306,44 @@ void main() {
     },
   );
 
+  testWidgets('confirm dialog stays scrollable when the keyboard is open', (
+    tester,
+  ) async {
+    // A short viewport with a large bottom inset reproduces the soft keyboard
+    // shrinking the screen on a phone; the dialog content Column must scroll
+    // instead of overflowing ("BOTTOM OVERFLOWED BY …").
+    // A realistic phone-with-keyboard viewport: ~440 logical px remain visible
+    // (a real device leaves ~400-480), which the slider header + confirm dialog
+    // must fit/scroll within without overflowing.
+    tester.view.physicalSize = const Size(400, 740);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    final fake = FakeEngineRunner();
+    final c = AppController(runner: fake)
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await tester.pumpWidget(_host(c, random: _FixedRandom(0)));
+
+    final remove = find.text('Remove 1 duplicate(s) on the right');
+    await tester.ensureVisible(remove);
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+
+    // No RenderFlex overflow during layout of the open dialog.
+    expect(tester.takeException(), isNull);
+    expect(find.byType(TextField), findsOneWidget);
+    // The gated Trash button can still be satisfied through the scrollable body.
+    await tester.enterText(find.byType(TextField), sillyWords.first);
+    await tester.pump();
+    final trashButton = find.widgetWithText(FilledButton, 'Move to Trash');
+    expect(tester.widget<FilledButton>(trashButton).onPressed, isNotNull);
+  });
+
   testWidgets('shows the keep-priority pipeline with every rule', (
     tester,
   ) async {

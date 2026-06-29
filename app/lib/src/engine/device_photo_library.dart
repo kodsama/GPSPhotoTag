@@ -51,6 +51,7 @@ class DevicePhotoLibrary implements PhotoLibrary {
   Future<List<LibraryAsset>> enumerate() async {
     final total = await PhotoManager.getAssetCount(type: RequestType.image);
     final assets = <LibraryAsset>[];
+    final entities = <AssetEntity>[];
     _byId.clear();
     for (var start = 0; start < total; start += _pageSize) {
       final end = (start + _pageSize) > total ? total : start + _pageSize;
@@ -61,13 +62,40 @@ class DevicePhotoLibrary implements PhotoLibrary {
       );
       for (final entity in page) {
         _byId[entity.id] = entity;
-        assets.add(await _toLibraryAsset(entity));
+        entities.add(entity);
       }
+    }
+    // photo_manager's AssetEntity exposes pixel dimensions but no file size, so
+    // batch-query the real byte sizes natively (MediaStore.SIZE on Android,
+    // PHAssetResource fileSize on iOS) in one channel round-trip rather than
+    // materialising every file. A failure here is non-fatal: sizes default to 0.
+    final sizes = await _sizes([for (final e in entities) e.id]);
+    for (final entity in entities) {
+      assets.add(await _toLibraryAsset(entity, sizes[entity.id] ?? 0));
     }
     return assets;
   }
 
-  Future<LibraryAsset> _toLibraryAsset(AssetEntity entity) async {
+  /// Batch-fetches the on-disk byte size of each asset id via the native
+  /// `sizes` channel method, returning an id→bytes map. Returns an empty map on
+  /// any failure (callers then fall back to a size of 0).
+  Future<Map<String, int>> _sizes(List<String> ids) async {
+    if (ids.isEmpty) return const {};
+    try {
+      final raw = await _gpsChannel.invokeMapMethod<String, Object?>('sizes', {
+        'ids': ids,
+      });
+      if (raw == null) return const {};
+      return {
+        for (final entry in raw.entries)
+          if (entry.value is int) entry.key: entry.value! as int,
+      };
+    } on Object {
+      return const {};
+    }
+  }
+
+  Future<LibraryAsset> _toLibraryAsset(AssetEntity entity, int byteSize) async {
     final filename = entity.title ?? await entity.titleAsync;
     final latLng = await entity.latlngAsync();
     // photo_manager reports (0, 0) for assets without a location.
@@ -78,7 +106,7 @@ class DevicePhotoLibrary implements PhotoLibrary {
       filename: filename.isEmpty ? '${entity.id}.jpg' : filename,
       width: entity.width,
       height: entity.height,
-      byteSize: 0,
+      byteSize: byteSize,
       createdAt: entity.createDateTime,
       latitude: hasGps ? latLng.latitude : null,
       longitude: hasGps ? latLng.longitude : null,

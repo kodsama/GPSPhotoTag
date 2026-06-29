@@ -406,6 +406,34 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether the system back gesture has an in-app destination to navigate to
+  /// (true everywhere except [AppScreen.welcome], from which back exits the app).
+  bool get canGoBack => _screen != AppScreen.welcome;
+
+  /// Navigates one in-app step "back" for the system back button/gesture, which
+  /// would otherwise pop the single route and quit the app (there is no
+  /// Navigator stack — navigation is modelled by [screen]). Maps action and
+  /// explore back to the workspace hub, the workspace and an in-flight scan back
+  /// to welcome, and is a no-op on welcome (so the caller lets the real pop
+  /// through and the app exits).
+  void goBack() {
+    switch (_screen) {
+      case AppScreen.action:
+        backToLibrary();
+      case AppScreen.explore:
+        closeExplore();
+      case AppScreen.scanning:
+        // Abandon the in-flight scan and return to welcome (scanning is only
+        // ever reached from welcome, so there's no prior library to fall back
+        // to). changeLibrary cancels the scan subscription and resets state.
+        changeLibrary();
+      case AppScreen.workspace:
+        changeLibrary();
+      case AppScreen.welcome:
+        break;
+    }
+  }
+
   // --- Environment self-check ----------------------------------------------
 
   List<ToolStatus> _toolkit = const [];

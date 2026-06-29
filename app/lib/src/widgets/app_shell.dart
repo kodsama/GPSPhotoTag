@@ -76,20 +76,30 @@ class _AppShellState extends State<AppShell> {
         body = MouseRegion(cursor: SystemMouseCursors.help, child: body);
       }
     }
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          AppBackground(
-            imagePath: controller.backgroundImagePath,
-            veil: controller.backgroundVeil,
-          ),
-          body,
-          ActivityLogPanel(
-            visible: _logOpen,
-            onClose: () => setState(() => _logOpen = false),
-          ),
-        ],
+    return PopScope(
+      // The app navigates by AppController.screen, not a Navigator stack, so the
+      // system back button/gesture would pop the single route and quit. Intercept
+      // it: while there's an in-app screen to go back to, navigate there instead;
+      // only let the real pop (app exit) through on the welcome screen.
+      canPop: !controller.canGoBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) controller.goBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            AppBackground(
+              imagePath: controller.backgroundImagePath,
+              veil: controller.backgroundVeil,
+            ),
+            body,
+            ActivityLogPanel(
+              visible: _logOpen,
+              onClose: () => setState(() => _logOpen = false),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -7,7 +7,9 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/screens/explore_map_screen.dart';
 import 'package:stunda/src/widgets/drop_zone.dart';
+import 'package:stunda/src/widgets/library_bar.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
 import 'support/fakes.dart';
@@ -144,5 +146,92 @@ void main() {
     expect(find.byType(PruneAction), findsOneWidget);
     expect(find.textContaining('not on iPhone'), findsNothing);
     expect(c.pruneCandidates, ['IMG_1.DNG', 'IMG_2.DNG']);
+  });
+
+  testWidgets('system back walks explore → workspace → welcome before exiting', (
+    tester,
+  ) async {
+    final c = _mobile(FakePhotoLibrary([_asset('a', lat: 1, lng: 2)]));
+    await c.scanLibrary();
+    await _pump(tester, c);
+    expect(c.screen, AppScreen.workspace);
+
+    // Open the Explore map, then drive the Android system back gesture: it must
+    // step back through the in-app screens (not pop the route / exit the app).
+    c.openExplore();
+    await tester.pump();
+    expect(c.screen, AppScreen.explore);
+
+    var popped = await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(popped, isTrue, reason: 'back was handled in-app, not a route pop');
+    expect(c.screen, AppScreen.workspace);
+
+    popped = await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(popped, isTrue);
+    expect(c.screen, AppScreen.welcome);
+
+    // On welcome there's nothing to go back to, so the pop is allowed through
+    // (the app would exit) — PopScope reports it did not handle it.
+    popped = await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(popped, isFalse, reason: 'welcome lets the real pop / exit through');
+    expect(c.screen, AppScreen.welcome);
+  });
+
+  testWidgets('workspace library bar shows a photo count and a Rescan button', (
+    tester,
+  ) async {
+    final c = _mobile(FakePhotoLibrary([_asset('a'), _asset('b')]));
+    await c.scanLibrary();
+    await _pump(tester, c);
+
+    expect(find.byType(LibraryBar), findsOneWidget);
+    // Mobile summary: a plain photo count, none of the desktop folder/GPX/KML
+    // tallies.
+    expect(find.text('2 photos in your library'), findsOneWidget);
+    expect(find.textContaining('folders'), findsNothing);
+    expect(find.textContaining('GPX'), findsNothing);
+    // The folder affordances are replaced by a single Rescan action.
+    expect(find.text('Rescan library'), findsOneWidget);
+    expect(find.text('Add folder'), findsNothing);
+    expect(find.text('Change library'), findsNothing);
+  });
+
+  testWidgets('explore toolbar fits a 360x780 phone without overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // A dated, geotagged library so the Timeline button is also present (the
+    // widest toolbar variant). Open Explore so the map + overlaid toolbar build.
+    final c = _mobile(
+      FakePhotoLibrary([
+        LibraryAsset(
+          id: 'a',
+          filename: 'a.jpg',
+          width: 100,
+          height: 100,
+          byteSize: 1,
+          createdAt: DateTime(2020, 5, 1),
+          latitude: 1,
+          longitude: 2,
+        ),
+      ]),
+    );
+    await c.scanLibrary();
+    c.openExplore();
+    await tester.pumpWidget(StundaApp(controller: c));
+    await tester.pump();
+
+    expect(c.screen, AppScreen.explore);
+    // The toolbar is present and laid out; a RenderFlex overflow would have
+    // thrown during layout and failed the test.
+    expect(find.byType(ExploreMapScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

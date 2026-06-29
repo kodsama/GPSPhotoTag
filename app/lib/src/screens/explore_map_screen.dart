@@ -335,6 +335,12 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     _maybeInitialFit(points);
     final selection = _detail.selection;
 
+    // On mobile the overlaid toolbar buttons sit under the status bar and the
+    // row is too wide for a phone, so inset by the top safe area and let the
+    // toolbar scroll horizontally. Desktop keeps the original fixed layout.
+    final isMobile = controller.isMobile;
+    final topInset = isMobile ? MediaQuery.of(context).padding.top : 0.0;
+
     return Stack(
       children: [
         RepaintBoundary(
@@ -349,23 +355,28 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
           ),
         ),
         Positioned(
-          top: 12,
+          top: 12 + topInset,
           left: 12,
           child: _BackButton(onPressed: controller.closeExplore),
         ),
         // Top-right controls: a "fit to photos" reset button sits immediately
         // left of the mode button; the loading chip stacks just below the row
-        // so nothing overlaps.
+        // so nothing overlaps. On mobile the back button occupies the left edge
+        // and the toolbar can be wider than the remaining space, so it scrolls
+        // horizontally (reverse-aligned to the right) instead of clipping.
         Positioned(
-          top: 12,
+          top: 12 + topInset,
           right: 12,
+          // Leave room for the back button on mobile so the toolbar never
+          // overlaps or pushes under it; desktop is unconstrained as before.
+          left: isMobile ? 64 : null,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               HelpTarget(
                 topic: HelpTopic.explore,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: _Toolbar(
+                  scrollable: isMobile,
                   children: [
                     // Timeline is offered only when something is datable; with no
                     // dated photos there's no span to filter, so it's hidden.
@@ -433,6 +444,29 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The top-right toolbar row. On desktop it's a plain min-width [Row]; on
+/// mobile ([scrollable] true) the same row is wrapped in a horizontally
+/// scrollable view (reverse-aligned to the right edge) so it can be wider than
+/// a phone screen without clipping or overflowing — you scroll left to reveal
+/// any buttons that don't fit.
+class _Toolbar extends StatelessWidget {
+  const _Toolbar({required this.children, required this.scrollable});
+
+  final List<Widget> children;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Row(mainAxisSize: MainAxisSize.min, children: children);
+    if (!scrollable) return row;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      reverse: true,
+      child: row,
     );
   }
 }

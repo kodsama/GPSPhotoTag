@@ -423,31 +423,37 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
     final matches = sillyWordMatches(_typed, widget.word);
     return AlertDialog(
       title: Text(context.tr('shrink_confirm_title', {'count': widget.count})),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(context.tr('shrink_confirm_body')),
-          const SizedBox(height: 12),
-          Text.rich(
-            TextSpan(
-              text: context.tr('dup_confirm_type_prefix'),
-              children: [
-                TextSpan(
-                  text: widget.word,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                TextSpan(text: context.tr('dup_confirm_type_suffix')),
-              ],
+      // Scroll only the content so the soft keyboard can't make it overflow,
+      // while the actions stay in the OverflowBar (which wraps to a column when
+      // too narrow) rather than whole-dialog `scrollable` (which overflows the
+      // actions row horizontally on a phone).
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(context.tr('shrink_confirm_body')),
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(
+                text: context.tr('dup_confirm_type_prefix'),
+                children: [
+                  TextSpan(
+                    text: widget.word,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: context.tr('dup_confirm_type_suffix')),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            autofocus: true,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            onChanged: (v) => setState(() => _typed = v),
-          ),
-        ],
+            const SizedBox(height: 8),
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              onChanged: (v) => setState(() => _typed = v),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

@@ -303,17 +303,23 @@ class _SimilaritySlider extends StatelessWidget {
         Row(
           children: [
             Text(context.tr('dup_similarity'), style: text.titleSmall),
-            const Spacer(),
+            const SizedBox(width: 12),
             // The currently-picked setting, always visible (not just the drag
             // tooltip): the level's plain-language name + its looseness percent.
-            Text(
-              context.tr('dup_similarity_value', {
-                'label': selected,
-                'percent': controller.similarity,
-              }),
-              style: text.labelLarge?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w600,
+            // Flexible + ellipsis so a long label (e.g. "Minor edits (crop,
+            // exposure) · 40%") shrinks instead of overflowing on a phone.
+            Expanded(
+              child: Text(
+                context.tr('dup_similarity_value', {
+                  'label': selected,
+                  'percent': controller.similarity,
+                }),
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+                style: text.labelLarge?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -759,31 +765,37 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
     final matches = sillyWordMatches(_typed, widget.word);
     return AlertDialog(
       title: Text(context.tr('dup_confirm_title', {'count': widget.count})),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(context.tr('dup_confirm_body')),
-          const SizedBox(height: 12),
-          Text.rich(
-            TextSpan(
-              text: context.tr('dup_confirm_type_prefix'),
-              children: [
-                TextSpan(
-                  text: widget.word,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                TextSpan(text: context.tr('dup_confirm_type_suffix')),
-              ],
+      // Scroll only the content so the soft keyboard (which shrinks the viewport
+      // on mobile) can't make it overflow — while the actions stay in the
+      // AlertDialog's OverflowBar, which wraps to a column when too narrow
+      // (avoiding a horizontal overflow that whole-dialog `scrollable` causes).
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(context.tr('dup_confirm_body')),
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(
+                text: context.tr('dup_confirm_type_prefix'),
+                children: [
+                  TextSpan(
+                    text: widget.word,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: context.tr('dup_confirm_type_suffix')),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            autofocus: true,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            onChanged: (v) => setState(() => _typed = v),
-          ),
-        ],
+            const SizedBox(height: 8),
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              onChanged: (v) => setState(() => _typed = v),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

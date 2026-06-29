@@ -116,6 +116,9 @@ const Map<String, String> kEnglishStrings = {
   'library_remove_root': 'Remove from library',
   'library_stat_line':
       '{dirs} folders · {photos} photos · {gpx} GPX · {kml} KML · {google} Timeline',
+  'library_stat_line_mobile': '{photos} photos in your library',
+  'library_rescan': 'Rescan library',
+  'tt_library_rescan': 'Scan your photo library again for new photos',
   'content_title': 'Library contents',
   'content_supported': 'Supported — will be used',
   'content_not_used': 'Found but not used',

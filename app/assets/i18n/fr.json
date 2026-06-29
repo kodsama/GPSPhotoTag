@@ -406,5 +406,8 @@
   "tag_mobile_tracks_help": "Choisissez des traces GPX/KML ou des exports Google Timeline ; les coordonnées sont associées à l'heure de chaque photo et réécrites dans votre photothèque.",
   "tag_mobile_pick_tracks": "Choisir des fichiers de trace GPS",
   "tag_mobile_clear_tracks": "Effacer les fichiers de trace",
-  "prune_mobile_unavailable": "L'association des photos aux RAW fonctionne sur Android, mais pas sur iPhone ni iPad : la photothèque conserve un RAW et son JPEG comme un seul élément, et un RAW isolé est votre seule copie — il n'y a donc rien à associer ou supprimer sans risque ici."
+  "prune_mobile_unavailable": "L'association des photos aux RAW fonctionne sur Android, mais pas sur iPhone ni iPad : la photothèque conserve un RAW et son JPEG comme un seul élément, et un RAW isolé est votre seule copie — il n'y a donc rien à associer ou supprimer sans risque ici.",
+  "library_stat_line_mobile": "{photos} photos dans votre photothèque",
+  "library_rescan": "Réanalyser la photothèque",
+  "tt_library_rescan": "Réanalyser votre photothèque pour trouver de nouvelles photos"
 }

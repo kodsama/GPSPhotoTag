@@ -406,5 +406,8 @@
   "tag_mobile_tracks_help": "Escolha trilhos GPX/KML ou exportações do Google Timeline; as coordenadas são associadas à hora de cada foto e escritas de volta na sua biblioteca.",
   "tag_mobile_pick_tracks": "Escolher ficheiros de trilho GPS",
   "tag_mobile_clear_tracks": "Limpar ficheiros de trilho",
-  "prune_mobile_unavailable": "Associar fotos a RAW funciona no Android, mas não no iPhone ou iPad: a biblioteca de fotos guarda um RAW e o seu JPEG como um único item, e um RAW autónomo é a sua única cópia — por isso não há nada para associar ou remover em segurança aqui."
+  "prune_mobile_unavailable": "Associar fotos a RAW funciona no Android, mas não no iPhone ou iPad: a biblioteca de fotos guarda um RAW e o seu JPEG como um único item, e um RAW autónomo é a sua única cópia — por isso não há nada para associar ou remover em segurança aqui.",
+  "library_stat_line_mobile": "{photos} fotos na sua biblioteca",
+  "library_rescan": "Reanalisar a biblioteca",
+  "tt_library_rescan": "Analisar novamente a sua biblioteca de fotos em busca de novas fotos"
 }
