@@ -371,6 +371,9 @@ jobs:
   linux-snap:
     name: Build Linux (.snap)
     runs-on: ubuntu-latest
+    # Best-effort extra format: snapcraft in CI is finicky, so a failure here
+    # must not block the release of the core artifacts.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -391,6 +394,8 @@ jobs:
   linux-flatpak:
     name: Build Linux (.flatpak)
     runs-on: ubuntu-latest
+    # Best-effort extra format (see linux-snap) — non-blocking for the release.
+    continue-on-error: true
     container:
       image: bilelmoussaoui/flatpak-github-actions:freedesktop-23.08
       options: --privileged
@@ -415,7 +420,9 @@ jobs:
   # ---------------------------------------------------------------------------
   release:
     name: Publish GitHub Release
-    needs: [android, ios, macos, windows, linux, linux-snap, linux-flatpak]
+    # Gate on the core platform artifacts; snap/flatpak are best-effort extras
+    # (continue-on-error) and are included only if they happen to finish in time.
+    needs: [android, ios, macos, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
