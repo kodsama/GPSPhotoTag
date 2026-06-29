@@ -44,8 +44,10 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
-      # Vendor exiftool so the app's declared bundle asset exists for the build.
-      - run: bash tool/fetch-exiftool.sh
+      # Mobile bundles no exiftool (the engine uses the device photo library) and
+      # no desktop ONNX dylibs (the AAR provides the runtime) — only the models.
+      - run: bash tool/fetch-exiftool.sh --no-exiftool
+      - run: bash tool/fetch-onnx.sh --models-only
 
       - name: Build APK (obfuscated)
         working-directory: app
@@ -98,9 +100,14 @@ jobs:
           channel: stable
 
       - run: flutter --version
+      # ONNX Runtime ships only as a CocoaPod (no Swift Package), so iOS must use
+      # CocoaPods integration rather than Flutter's default SPM.
+      - run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
-      # Vendor exiftool so the app's declared bundle asset exists for the build.
-      - run: bash tool/fetch-exiftool.sh
+      # Mobile bundles no exiftool (the engine uses the device photo library) and
+      # no desktop ONNX dylibs (the pod provides the runtime) — only the models.
+      - run: bash tool/fetch-exiftool.sh --no-exiftool
+      - run: bash tool/fetch-onnx.sh --models-only
 
       - name: Build IPA (unsigned, obfuscated)
         working-directory: app
@@ -159,6 +166,8 @@ jobs:
       - run: flutter pub get
       # Vendor exiftool so the app's declared bundle asset exists for the build.
       - run: bash tool/fetch-exiftool.sh
+      # Vendor the ONNX Runtime lib + detector model (declared assets).
+      - run: bash tool/fetch-onnx.sh
 
       - name: Build macOS app (obfuscated)
         working-directory: app
@@ -218,14 +227,16 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
-      # Vendor exiftool so the app's declared bundle assets exist for the build.
-      # TODO(windows): ship a self-contained exiftool.exe here instead of the
-      # Perl distribution; the `perl -ver` self-check does not hold on Windows,
-      # so this step is best-effort (the app falls back to PATH exiftool).
-      - name: Vendor bundled exiftool (best-effort on Windows)
+      # Vendor the self-contained Windows exiftool.exe (+ exiftool_files/) so the
+      # app's declared bundle assets exist and the tool runs without Perl.
+      - name: Vendor bundled exiftool (Windows self-contained exe)
         shell: bash
-        continue-on-error: true
-        run: bash tool/fetch-exiftool.sh
+        run: bash tool/fetch-exiftool.sh --windows
+
+      # Vendor the Windows ONNX Runtime dll + detector model.
+      - name: Vendor ONNX Runtime + detector model
+        shell: bash
+        run: bash tool/fetch-onnx.sh
 
       - name: Build Windows app (obfuscated)
         working-directory: app
@@ -307,12 +318,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev libkeybinder-3.0-dev libsecret-1-dev \
             rpm patchelf locate fuse
 
       - run: flutter --version
       - run: flutter pub get
       # Vendor exiftool so the app's declared bundle asset exists for the build.
       - run: bash tool/fetch-exiftool.sh
+      # Vendor the ONNX Runtime lib + detector model (declared assets).
+      - run: bash tool/fetch-onnx.sh
 
       - name: Build Linux app (obfuscated)
         working-directory: app

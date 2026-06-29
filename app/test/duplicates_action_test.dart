@@ -1,0 +1,557 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/actions/duplicates_action.dart';
+import 'package:stunda/src/actions/example_scene.dart';
+import 'package:stunda/src/explore/photo_detail_panel.dart';
+import 'package:stunda/src/state/app_controller.dart';
+import 'package:stunda/src/state/app_screen.dart';
+import 'package:stunda/src/state/controller_scope.dart';
+import 'package:stunda/src/state/duplicates_model.dart';
+import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/widgets/image_compare_viewer.dart';
+import 'package:stunda/src/widgets/run_view.dart';
+
+import 'support/fakes.dart';
+
+HashedFile _hf(
+  String path, {
+  int width = 100,
+  int height = 100,
+  int size = 2048,
+}) => HashedFile(
+  path: path,
+  width: width,
+  height: height,
+  fileSize: size,
+  basename: path,
+  isRaw: false,
+);
+
+/// A [Random] returning a fixed index so the silly word is deterministic.
+class _FixedRandom implements Random {
+  _FixedRandom(this.value);
+  final int value;
+  @override
+  int nextInt(int max) => value % max;
+  @override
+  bool nextBool() => false;
+  @override
+  double nextDouble() => 0;
+}
+
+Widget _host(AppController c, {Random? random}) => ControllerScope(
+  controller: c,
+  child: MaterialApp(
+    home: Scaffold(
+      body: SingleChildScrollView(child: DuplicatesAction(random: random)),
+    ),
+  ),
+);
+
+void main() {
+  group('hashedComparePane', () {
+    test('carries dimensions and size when known', () {
+      final pane = hashedComparePane(
+        _hf('/a.jpg', width: 400, height: 300, size: 4096),
+      );
+      expect(pane.path, '/a.jpg');
+      expect(pane.meta?.width, 400);
+      expect(pane.meta?.height, 300);
+      expect(pane.fileSize, 4096);
+    });
+
+    test('omits meta/size when the hashed file lacks them', () {
+      final pane = hashedComparePane(
+        _hf('/a.jpg', width: 0, height: 0, size: 0),
+      );
+      expect(pane.meta, isNull);
+      expect(pane.fileSize, isNull);
+    });
+  });
+
+  testWidgets('shows the similarity slider and run button before a run', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    expect(find.text('Find duplicates'), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+    expect(find.text('Exact'), findsOneWidget);
+    expect(find.text('Loose'), findsOneWidget);
+
+    // The slider spans 0..100 with 10 divisions (11 stops), and its value snaps
+    // to multiples of 10.
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.min, 0);
+    expect(slider.max, 100);
+    expect(slider.divisions, 10);
+
+    // The picked-setting label shows the looseness as a percent.
+    expect(find.text('Identical copies · 0%'), findsOneWidget);
+
+    // Dragging the slider toward Loose raises the similarity (exercises the
+    // onChanged seam → setSimilarity); it lands on a multiple of 10.
+    await tester.drag(find.byType(Slider), const Offset(200, 0));
+    await tester.pump();
+    expect(c.similarity, greaterThan(0));
+    expect(c.similarity % 10, 0);
+  });
+
+  testWidgets(
+    'shows the example pair and updates its caption with similarity',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+      await tester.pumpWidget(_host(c));
+
+      // The example pair renders under the slider at the Exact default.
+      expect(find.byType(ExampleScenePair), findsOneWidget);
+      expect(find.text('Identical copies'), findsOneWidget);
+      // The example pair carries an "≈" glyph (scoped to it, since the Smart
+      // metric card also shows one).
+      expect(
+        find.descendant(
+          of: find.byType(ExampleScenePair),
+          matching: find.text('≈'),
+        ),
+        findsOneWidget,
+      );
+
+      // Driving the controller to Loose (100%) updates the caption live, and
+      // the picked label shows the percent.
+      c.setSimilarity(similarityMaxPercent);
+      await tester.pump();
+      expect(find.text('Loosely similar scenes'), findsOneWidget);
+      expect(find.text('Loosely similar scenes · 100%'), findsOneWidget);
+      expect(find.text('Identical copies'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the metric selector renders both options with explanation, pros/cons '
+    'and an illustration',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+      await tester.pumpWidget(_host(c));
+
+      // Both option labels and their explanations render.
+      expect(find.text(enTr('dup_metric_title')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_fast')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_fast_desc')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart_desc')), findsOneWidget);
+      // Pros/cons for each option.
+      expect(find.text(enTr('dup_metric_fast_pro')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_fast_con')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart_pro')), findsOneWidget);
+      expect(find.text(enTr('dup_metric_smart_con')), findsOneWidget);
+      // One illustration per option (Fast "=" + Smart "≈").
+      expect(find.byType(MetricIllustration), findsNWidgets(2));
+    },
+  );
+
+  testWidgets('selecting Smart persists the metric and drives the run', (
+    tester,
+  ) async {
+    final fake = FakeEngineRunner();
+    final c = AppController(runner: fake)
+      ..debugSetScan(fakeScan(photos: const ['/a.jpg', '/b.jpg']))
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+    expect(c.similarityMetric, SimilarityMetric.fast);
+
+    // Tap the Smart card.
+    await tester.tap(find.text(enTr('dup_metric_smart')));
+    await tester.pump();
+    expect(c.similarityMetric, SimilarityMetric.smart);
+
+    // Running uses the selected metric.
+    await c.runFindDuplicates();
+    expect(fake.lastDuplicateMetric, SimilarityMetric.smart);
+  });
+
+  testWidgets(
+    'shows the fallback note when Smart is selected but unavailable',
+    (tester) async {
+      final c = AppController(
+        runner: FakeEngineRunner()..smartAvailableValue = false,
+      )..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+      await tester.pumpWidget(_host(c));
+
+      // No note while Fast is selected.
+      expect(find.text(enTr('dup_metric_smart_unavailable')), findsNothing);
+
+      // Selecting Smart (unavailable) shows the inline fallback note.
+      await tester.tap(find.text(enTr('dup_metric_smart')));
+      await tester.pump();
+      expect(find.text(enTr('dup_metric_smart_unavailable')), findsOneWidget);
+    },
+  );
+
+  testWidgets('renders best on the left and the duplicate on the right', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(
+          kept: _hf('/best.jpg', width: 400, height: 300),
+          other: _hf('/dup.jpg', width: 100, height: 100),
+        ),
+      ]);
+    await tester.pumpWidget(_host(c));
+
+    expect(find.text('Keep'), findsOneWidget);
+    expect(find.text('Remove'), findsOneWidget);
+    expect(find.text('best.jpg'), findsOneWidget);
+    expect(find.text('dup.jpg'), findsOneWidget);
+    expect(find.byType(PhotoThumbnail), findsNWidgets(2));
+    // The remove button counts the one selected right-side file.
+    expect(find.text('Remove 1 duplicate(s) on the right'), findsOneWidget);
+  });
+
+  testWidgets('tapping a pair thumbnail opens the comparison viewer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(
+          kept: _hf('/best.jpg', width: 400, height: 300),
+          other: _hf('/dup.jpg', width: 100, height: 100),
+        ),
+      ]);
+    await tester.pumpWidget(_host(c));
+
+    await tester.tap(find.byType(PhotoThumbnail).first);
+    await tester.pumpAndSettle();
+
+    // Opens in compare mode (the mode/compare-layout button is present).
+    expect(find.byType(ImageCompareViewer), findsOneWidget);
+    expect(find.byIcon(Icons.splitscreen), findsOneWidget);
+  });
+
+  testWidgets('swap flips the kept side', (tester) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await tester.pumpWidget(_host(c));
+
+    await tester.ensureVisible(find.byIcon(Icons.swap_horiz));
+    await tester.tap(find.byIcon(Icons.swap_horiz));
+    await tester.pump();
+
+    // After swap the right side (removal candidate) is the former best.
+    expect(c.duplicateRemovalPaths, ['/best.jpg']);
+  });
+
+  testWidgets('deselect drops the pair from the removal set', (tester) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await tester.pumpWidget(_host(c));
+
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+
+    expect(c.duplicateRemovalCount, 0);
+    // The remove button is now disabled (nothing selected).
+    final button = find.widgetWithText(
+      FilledButton,
+      'Remove 0 duplicate(s) on the right',
+    );
+    expect(tester.widget<FilledButton>(button).onPressed, isNull);
+  });
+
+  testWidgets(
+    'confirm dialog blocks until the exact silly word is typed, then trashes',
+    (tester) async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake)
+        ..debugSetDuplicatePairs([
+          DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+        ]);
+      // Seed the word pick to the first silly word.
+      await tester.pumpWidget(_host(c, random: _FixedRandom(0)));
+
+      final remove = find.text('Remove 1 duplicate(s) on the right');
+      await tester.ensureVisible(remove);
+      await tester.tap(remove);
+      await tester.pumpAndSettle();
+
+      // The Trash button is disabled until the word matches.
+      final trashButton = find.widgetWithText(FilledButton, 'Move to Trash');
+      expect(tester.widget<FilledButton>(trashButton).onPressed, isNull);
+
+      await tester.enterText(find.byType(TextField), sillyWords.first);
+      await tester.pump();
+      expect(tester.widget<FilledButton>(trashButton).onPressed, isNotNull);
+
+      await tester.tap(trashButton);
+      await tester.pumpAndSettle();
+
+      expect(fake.lastTrashedPaths, ['/dup.jpg']);
+    },
+  );
+
+  testWidgets('confirm dialog stays scrollable when the keyboard is open', (
+    tester,
+  ) async {
+    // A short viewport with a large bottom inset reproduces the soft keyboard
+    // shrinking the screen on a phone; the dialog content Column must scroll
+    // instead of overflowing ("BOTTOM OVERFLOWED BY …").
+    // A realistic phone-with-keyboard viewport: ~440 logical px remain visible
+    // (a real device leaves ~400-480), which the slider header + confirm dialog
+    // must fit/scroll within without overflowing.
+    tester.view.physicalSize = const Size(400, 740);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    final fake = FakeEngineRunner();
+    final c = AppController(runner: fake)
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await tester.pumpWidget(_host(c, random: _FixedRandom(0)));
+
+    final remove = find.text('Remove 1 duplicate(s) on the right');
+    await tester.ensureVisible(remove);
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+
+    // No RenderFlex overflow during layout of the open dialog.
+    expect(tester.takeException(), isNull);
+    expect(find.byType(TextField), findsOneWidget);
+    // The gated Trash button can still be satisfied through the scrollable body.
+    await tester.enterText(find.byType(TextField), sillyWords.first);
+    await tester.pump();
+    final trashButton = find.widgetWithText(FilledButton, 'Move to Trash');
+    expect(tester.widget<FilledButton>(trashButton).onPressed, isNotNull);
+  });
+
+  testWidgets('shows the keep-priority pipeline with every rule', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    expect(find.text('Keep priority'), findsOneWidget);
+    expect(find.text('Resolution'), findsOneWidget);
+    expect(find.text('Quality'), findsOneWidget);
+    // The People rule is now reorderable/toggleable like the others.
+    expect(find.text('People & animals'), findsOneWidget);
+    expect(find.byType(Switch), findsNWidgets(3));
+  });
+
+  testWidgets('the People rule label carries its tags-note tooltip', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    expect(
+      find.byTooltip(
+        'Among similar photos, keep the one containing people or pets.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('toggling a rule switch updates the controller pipeline', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates);
+    await tester.pumpWidget(_host(c));
+
+    // The first switch is Resolution (top of the default order).
+    final resolutionSwitch = find.byType(Switch).first;
+    await tester.ensureVisible(resolutionSwitch);
+    await tester.tap(resolutionSwitch);
+    await tester.pump();
+
+    final resolution = c.keepPipeline.steps.firstWhere(
+      (s) => s.rule == KeepRule.resolution,
+    );
+    expect(resolution.enabled, isFalse);
+  });
+
+  testWidgets('the kept side reflects a controller pipeline change', (
+    tester,
+  ) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(
+          kept: HashedFile(
+            path: '/big.jpg',
+            width: 300,
+            height: 300,
+            fileSize: 10,
+            basename: 'big',
+            isRaw: false,
+            quality: const ImageQuality(
+              sharpness: 0.1,
+              contrast: 0.1,
+              colorfulness: 0.1,
+              composite: 0.1,
+            ),
+          ),
+          other: HashedFile(
+            path: '/crisp.jpg',
+            width: 100,
+            height: 100,
+            fileSize: 10,
+            basename: 'crisp',
+            isRaw: false,
+            quality: const ImageQuality(
+              sharpness: 0.9,
+              contrast: 0.9,
+              colorfulness: 0.9,
+              composite: 0.9,
+            ),
+          ),
+        ),
+      ]);
+    await tester.pumpWidget(_host(c));
+    // Initially resolution keeps the big file.
+    expect(find.text('big.jpg'), findsOneWidget);
+
+    // Disable resolution via the controller → quality keeps the crisp file, and
+    // the review's kept side updates.
+    c.setKeepRuleEnabled(KeepRule.resolution, false);
+    await tester.pump();
+    expect(c.duplicatePairs!.single.kept.path, '/crisp.jpg');
+  });
+
+  testWidgets('an empty result shows the no-duplicates note', (tester) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs(const []);
+    await tester.pumpWidget(_host(c));
+    expect(find.text('No duplicates found.'), findsOneWidget);
+  });
+
+  testWidgets('formatBytes renders B / KB / MB', (tester) async {
+    expect(formatBytes(512, enTr), '512 B');
+    expect(formatBytes(2048, enTr), '2 KB');
+    expect(formatBytes(5 * 1024 * 1024, enTr), '5.0 MB');
+  });
+
+  testWidgets('keepRuleLabel names every keep rule', (tester) async {
+    expect(keepRuleLabel(KeepRule.resolution, enTr), 'Resolution');
+    expect(keepRuleLabel(KeepRule.quality, enTr), 'Quality');
+    expect(keepRuleLabel(KeepRule.people, enTr), 'People & animals');
+  });
+
+  testWidgets('keepRuleTooltip only the people rule has one', (tester) async {
+    expect(keepRuleTooltip(KeepRule.resolution, enTr), isNull);
+    expect(keepRuleTooltip(KeepRule.quality, enTr), isNull);
+    expect(keepRuleTooltip(KeepRule.people, enTr), isNotEmpty);
+  });
+
+  testWidgets('shows live progress while a trash run is in flight', (
+    tester,
+  ) async {
+    final fake = FakeEngineRunner(keepOpen: true);
+    final c = AppController(runner: fake)
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    // Start a trash run that stays open → controller.running is true.
+    unawaited(c.runTrashDuplicates());
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+
+    expect(c.running, isTrue);
+    expect(find.byType(RunProgress), findsOneWidget);
+    fake.release();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('shows the summary and back button after a run', (tester) async {
+    final c = AppController(runner: FakeEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await c.runTrashDuplicates(); // completes → lastSummary set, not running
+    await tester.pumpWidget(_host(c));
+
+    expect(find.text('Done — back to library'), findsOneWidget);
+  });
+
+  testWidgets('surfaces an error banner when a run errors', (tester) async {
+    final c = AppController(runner: ThrowingEngineRunner())
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await c.runTrashDuplicates(); // stream error → errorMessage set
+    await tester.pumpWidget(_host(c));
+
+    expect(find.byType(ErrorBanner), findsOneWidget);
+  });
+
+  testWidgets(
+    'disables the slider and shows determinate hashing progress while hashing',
+    (tester) async {
+      final fake = FakeEngineRunner()..duplicatesGate = Completer<void>();
+      final c = AppController(runner: fake)
+        ..debugSetScreen(AppScreen.action, action: LibraryAction.duplicates)
+        ..debugSetScan(
+          fakeScan(photos: const ['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg']),
+        );
+      // Kick off hashing but hold it open via the gate so findingDuplicates
+      // stays true while we assert on the mid-flight UI.
+      final run = c.runFindDuplicates();
+      // Drive a progress tick directly (no real isolate timing): 1 of 4 hashed.
+      fake.lastOnProgress!(1, 4);
+      await tester.pumpWidget(_host(c));
+      await tester.pump();
+
+      expect(c.findingDuplicates, isTrue);
+      expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+      // A determinate bar (value reflects 1/4), not the old indeterminate one.
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.value, closeTo(0.25, 1e-9));
+      expect(find.text('Hashing 1 / 4'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      fake.duplicatesGate!.complete();
+      await run;
+    },
+  );
+
+  testWidgets('cancelling the confirm dialog trashes nothing', (tester) async {
+    final fake = FakeEngineRunner();
+    final c = AppController(runner: fake)
+      ..debugSetDuplicatePairs([
+        DuplicatePair(kept: _hf('/best.jpg'), other: _hf('/dup.jpg')),
+      ]);
+    await tester.pumpWidget(_host(c, random: _FixedRandom(0)));
+
+    final remove = find.text('Remove 1 duplicate(s) on the right');
+    await tester.ensureVisible(remove);
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(fake.calls, isNot(contains('trashPaths')));
+  });
+}

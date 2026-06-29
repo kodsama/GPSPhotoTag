@@ -20,12 +20,6 @@ abstract interface class EngineRunner {
     required TagOptions options,
   });
 
-  /// Renders a heatmap PNG from the GPS already embedded in [photos].
-  Stream<EngineEvent> map({
-    required List<String> photos,
-    required MapOptions options,
-  });
-
   /// Prunes orphan RAW files under [roots].
   Stream<EngineEvent> prune({
     required List<String> roots,
@@ -49,9 +43,57 @@ abstract interface class EngineRunner {
   /// dialog's progressive per-row metadata.
   Stream<FileMeta> readImageMeta(List<String> paths);
 
+  /// Batch-reads the curated camera/exposure EXIF set for [paths] (off the UI
+  /// isolate), streaming one [CuratedExif] per path as exiftool yields each
+  /// chunk. Backs the big-preview viewer's EXIF info line.
+  Stream<CuratedExif> readCuratedExif(List<String> paths);
+
   /// Extracts an embedded JPEG preview of [path] (a RAW/HEIC file) on a worker
   /// isolate via the bundled exiftool, returning the cached JPEG path — or null
   /// when the file carries no usable embedded image. [full] picks the largest
   /// preview (fullscreen) vs the small thumbnail (list miniature).
   Future<String?> extractPreview(String path, {bool full = false});
+
+  /// Perceptually hashes [paths] across worker isolates and groups files whose
+  /// combined similarity is at least [minSimilarity] (0..1), returning the
+  /// duplicate groups (undecodable files and RAW companions are excluded).
+  /// RAW/HEIC are hashed via their embedded preview using the bundled exiftool.
+  ///
+  /// [onProgress] (when given) is called as files finish hashing with the
+  /// running `done` count against the fixed `total` (= `paths.length`), so the
+  /// UI can show determinate progress instead of an indeterminate spinner.
+  ///
+  /// [metric] selects which per-pair similarity groups the files:
+  /// [SimilarityMetric.fast] (pHash + colour) or [SimilarityMetric.smart] (the
+  /// on-device embedding). Smart hashing also computes each file's embedding;
+  /// when no embedding model is bundled it produces none, so grouping degrades
+  /// to Fast (surfaced via [smartUnavailable]).
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
+    void Function(int done, int total)? onProgress,
+  });
+
+  /// Whether the Smart (embedding) metric can run here — true only when an
+  /// embedding model + ONNX Runtime are bundled and load. The UI uses this to
+  /// show the "fell back to Fast" note when Smart is selected but unavailable.
+  bool get smartAvailable;
+
+  /// Perceptually hashes [paths] across worker isolates, returning every
+  /// [HashedFile] (each carrying its on-disk size, dimensions, and an
+  /// [ImageQuality] composite score). Backs both the duplicate grouping and the
+  /// shrink wizard's low-quality stage, so neither has to re-decode the library.
+  ///
+  /// [onProgress] (when given) reports the running `done` count against the
+  /// fixed `total` (= `paths.length`) as files finish hashing.
+  ///
+  /// [embed] additionally computes each file's Smart-metric embedding (when a
+  /// model is bundled); the low-quality shrink stage leaves it false since it
+  /// only needs the quality score.
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    bool embed = false,
+    void Function(int done, int total)? onProgress,
+  });
 }

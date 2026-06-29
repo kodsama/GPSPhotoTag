@@ -34,6 +34,9 @@ class _DropZoneState extends State<DropZone> {
 
   @override
   Widget build(BuildContext context) {
+    // desktop_drop's DropTarget is a desktop affordance; on mobile there is no
+    // drag-and-drop, so pass the child straight through (no DropTarget at all).
+    if (ControllerScope.of(context).isMobile) return widget.child;
     final scheme = Theme.of(context).colorScheme;
     return DropTarget(
       onDragEntered: (_) => setState(() => _dragging = true),

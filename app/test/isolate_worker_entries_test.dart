@@ -5,8 +5,10 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/engine/isolate_runner.dart';
+import 'package:stunda/src/engine/onnx_bundle.dart';
 
 import 'support/fakes.dart';
 
@@ -124,26 +126,6 @@ void main() {
       expect(events.whereType<ItemEvent>().single.row.location, isNotNull);
     });
 
-    test('mapEntry without exiftool reports a missing_toolkit error', () async {
-      final jpg = await writeJpegWithDate(
-        tmp,
-        'm.jpg',
-        dateTimeOriginal: DateTime(2026, 1, 1, 9),
-      );
-      final events = await _drain(
-        (port) => mapEntry(
-          MapRequest(
-            port: port,
-            photos: [jpg],
-            options: MapOptions(outputPng: '${tmp.path}/h.png'),
-            exiftoolAvailable: false,
-            bundleDir: null,
-          ),
-        ),
-      );
-      expect(events.whereType<ErrorEvent>().single.code, 'missing_toolkit');
-    });
-
     test('pruneEntry over an empty tree ends cleanly', () async {
       final events = await _drain(
         (port) => pruneEntry(
@@ -187,6 +169,25 @@ void main() {
       },
     );
 
+    test(
+      'readCuratedExifEntry sends a CuratedExif per path then a sentinel',
+      () async {
+        final jpg = await writeJpegWithDate(
+          tmp,
+          'c.jpg',
+          dateTimeOriginal: DateTime(2026, 4, 4, 4),
+        );
+        final events = await _drain(
+          (port) => readCuratedExifEntry(
+            ReadCuratedExifRequest(port: port, paths: [jpg], bundleDir: null),
+          ),
+        );
+        // One record per path (the synthetic JPEG carries no camera tags, so
+        // the record may be empty — the path is what proves the worker ran).
+        expect(events.whereType<CuratedExif>().map((m) => m.path), [jpg]);
+      },
+    );
+
     test('fixDatesEntry reports a result per file in-process', () async {
       final jpg = await writeJpegWithDate(
         tmp,
@@ -210,6 +211,131 @@ void main() {
       expect(events.whereType<DoneEvent>(), isNotEmpty);
     });
 
+    test(
+      'hashFilesEntry hashes via the batch path and ticks per file',
+      () async {
+        final jpg = await writeJpegWithDate(tmp, 'h.jpg');
+        final txt = File('${tmp.path}/notes.txt')
+          ..writeAsStringSync('not image');
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [jpg, txt.path],
+              bundleDir: null,
+            ),
+          ),
+        );
+        // The JPEG hashes (via the batch fallback decode); the text file is
+        // skipped (undecodable) — but both still emit a progress tick.
+        final hashed = events.whereType<HashedFile>().toList();
+        expect(hashed.map((h) => h.path), [jpg]);
+        // One `1` tick per input file (hashed or skipped) keeps the bar moving.
+        final ticks = events.whereType<int>().toList();
+        expect(ticks, [1, 1]);
+      },
+    );
+
+    test(
+      'hashFilesEntry runs Tier-2 detection when a model is bundled',
+      () async {
+        final bundleDir = _onnxBundleDir();
+        final hasBundle =
+            bundleDir != null &&
+            (resolveOnnxBundle(bundleDir)?.isComplete ?? false);
+        if (!hasBundle) {
+          markTestSkipped('no ONNX bundle (run tool/fetch-onnx.sh)');
+          return;
+        }
+        // A real photo of a person, hashed with NO people metadata, so the only
+        // way it gets a non-zero peopleScore is the Tier-2 native detector.
+        final person = p.join(tmp.path, 'person.jpg');
+        File(
+          person,
+        ).writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [person],
+              bundleDir: null,
+              onnxBundleDir: bundleDir,
+            ),
+          ),
+        );
+        final hashed = events.whereType<HashedFile>().single;
+        expect(hashed.peopleScore, greaterThan(0.5));
+      },
+    );
+
+    test(
+      'hashFilesEntry computes a Smart embedding when embed + a model bundled',
+      () async {
+        final bundleDir = _onnxBundleDir();
+        final hasBundle =
+            bundleDir != null &&
+            (resolveEmbeddingBundle(bundleDir)?.isComplete ?? false);
+        if (!hasBundle) {
+          markTestSkipped('no ONNX bundle (run tool/fetch-onnx.sh)');
+          return;
+        }
+        final person = p.join(tmp.path, 'person.jpg');
+        File(
+          person,
+        ).writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [person],
+              bundleDir: null,
+              onnxBundleDir: bundleDir,
+              embed: true,
+            ),
+          ),
+        );
+        final hashed = events.whereType<HashedFile>().single;
+        expect(hashed.embedding, isNotEmpty);
+        expect(hashed.embedding.length, 1000);
+      },
+    );
+
+    test(
+      'hashFilesEntry leaves the embedding empty when embed is false',
+      () async {
+        final jpg = await writeJpegWithDate(tmp, 'noembed.jpg');
+        final events = await _drain(
+          (port) => hashFilesEntry(
+            HashFilesRequest(
+              port: port,
+              paths: [jpg],
+              bundleDir: null,
+              onnxBundleDir: _onnxBundleDir(),
+            ),
+          ),
+        );
+        final hashed = events.whereType<HashedFile>().single;
+        expect(hashed.embedding, isEmpty);
+      },
+    );
+
+    test('hashFilesEntry processes more than one chunk', () async {
+      // More paths than [hashBatchChunk] forces a second batch iteration. The
+      // files are non-images (skipped) but each still ticks, so progress reaches
+      // the total across both chunks.
+      final paths = [
+        for (var i = 0; i < hashBatchChunk + 5; i++)
+          (File('${tmp.path}/n$i.txt')..writeAsStringSync('x')).path,
+      ];
+      final events = await _drain(
+        (port) => hashFilesEntry(
+          HashFilesRequest(port: port, paths: paths, bundleDir: null),
+        ),
+      );
+      expect(events.whereType<HashedFile>(), isEmpty);
+      expect(events.whereType<int>(), hasLength(paths.length));
+    });
+
     test('extractPreviewEntry returns null for a non-RAW file', () async {
       final txt = File('${tmp.path}/notes.txt')..writeAsStringSync('hi');
       final receive = ReceivePort();
@@ -227,4 +353,32 @@ void main() {
       expect(result, isNull);
     });
   });
+}
+
+/// An image fixture under test/fixtures/ (cwd is the package root in tests).
+String _fixture(String name) {
+  for (final base in const [
+    ['test', 'fixtures'],
+    ['app', 'test', 'fixtures'],
+  ]) {
+    final path = p.joinAll([Directory.current.path, ...base, name]);
+    if (File(path).existsSync()) return path;
+  }
+  return p.join('test', 'fixtures', name);
+}
+
+/// The repo's `app/assets/onnx/<platform>/` bundle dir (populated by
+/// tool/fetch-onnx.sh), found by walking up from the working directory, or null.
+String? _onnxBundleDir() {
+  final platform = onnxPlatformSubdir(Platform.operatingSystem);
+  if (platform == null) return null;
+  var dir = Directory.current.absolute.path;
+  for (var i = 0; i < 6; i++) {
+    final candidate = p.join(dir, 'app', 'assets', 'onnx', platform);
+    if (Directory(candidate).existsSync()) return candidate;
+    final parent = p.dirname(dir);
+    if (parent == dir) break;
+    dir = parent;
+  }
+  return null;
 }

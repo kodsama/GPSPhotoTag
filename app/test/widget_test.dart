@@ -56,31 +56,32 @@ void main() {
     expect(find.text('Choose photo library'), findsOneWidget);
   });
 
-  testWidgets('the welcome screen shows the drop hint and Add folder', (
-    tester,
-  ) async {
+  testWidgets('the welcome screen shows Choose-library + drop hint, no Add '
+      'folder', (tester) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
     await _pumpApp(tester, controller);
 
+    expect(find.text('Choose photo library'), findsOneWidget);
     expect(find.text('Drop folders or photos here'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Add folder'), findsOneWidget);
+    // Add folder belongs to the workspace, not the empty welcome screen.
+    expect(find.widgetWithText(OutlinedButton, 'Add folder'), findsNothing);
   });
 
-  testWidgets('tapping Add folder on welcome adds a root and scans', (
+  testWidgets('tapping Add folder in the workspace appends a root and scans', (
     tester,
   ) async {
     final fake = FakeEngineRunner(scanEvents: [ScanDoneEvent(fakeScan())]);
-    final controller = AppController(
-      runner: fake,
-      pickFolder: () async => '/pics',
-    )..debugSetToolkit([_tool('exiftool')]);
+    final controller =
+        AppController(runner: fake, pickFolder: () async => '/pics')
+          ..debugSetToolkit([_tool('exiftool')])
+          ..debugSetScan(fakeScan(), roots: ['/a']);
     await _pumpApp(tester, controller);
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Add folder'));
     await tester.pumpAndSettle();
 
-    expect(controller.roots, ['/pics']);
+    expect(controller.roots, ['/a', '/pics']);
     expect(controller.screen, AppScreen.workspace);
   });
 
@@ -188,7 +189,7 @@ void main() {
       await controller.checkEnvironment();
       await _pumpApp(tester, controller);
 
-      expect(controller.environmentWarning, isNull);
+      expect(controller.hasEnvironmentWarning, isFalse);
       expect(find.textContaining("ExifTool couldn't start"), findsNothing);
     });
   });
@@ -286,6 +287,20 @@ void main() {
     },
   );
 
+  testWidgets('a locale override drives MaterialApp.locale (non-null branch)', (
+    tester,
+  ) async {
+    // With a language override set, StundaApp.build feeds a concrete Locale to
+    // MaterialApp (the `Locale(localeCode!)` arm), not the system-follow null.
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')])
+      ..setLocaleCode('sv');
+    await _pumpApp(tester, controller);
+
+    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(materialApp.locale, const Locale('sv'));
+  });
+
   testWidgets('MCP status no longer lives in the header', (tester) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
@@ -301,7 +316,7 @@ void main() {
     await _pumpApp(tester, controller);
 
     // The standalone toggle is gone — the theme lives in the overflow menu.
-    await tester.tap(find.byTooltip('Menu'));
+    await tester.tap(find.byTooltip('Open settings, licenses, and appearance'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Appearance:'));
     await tester.pumpAndSettle();
@@ -322,7 +337,7 @@ void main() {
       expect(find.byType(FloatingActionButton), findsNothing);
 
       // It rides in the header as a tappable button.
-      final logButton = find.byTooltip('Activity log');
+      final logButton = find.byTooltip('Show the activity log of recent runs');
       expect(logButton, findsOneWidget);
 
       await tester.tap(logButton);
@@ -335,7 +350,10 @@ void main() {
       await tester.tapAt(const Offset(20, 20));
       await tester.pumpAndSettle();
       // Still in the header, still not a FAB.
-      expect(find.byTooltip('Activity log'), findsOneWidget);
+      expect(
+        find.byTooltip('Show the activity log of recent runs'),
+        findsOneWidget,
+      );
       expect(find.byType(FloatingActionButton), findsNothing);
     },
   );
@@ -364,7 +382,7 @@ void main() {
     );
 
     // Opening the log marks it read, so the badge disappears.
-    await tester.tap(find.byTooltip('Activity log'));
+    await tester.tap(find.byTooltip('Show the activity log of recent runs'));
     await tester.pumpAndSettle();
     expect(controller.unreadCount, 0);
     expect(

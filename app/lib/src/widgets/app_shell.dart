@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../branding/logo_mark.dart';
 import '../screens/action_screen.dart';
@@ -6,6 +7,7 @@ import '../screens/explore_map_screen.dart';
 import '../screens/scanning_screen.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/workspace_screen.dart';
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/app_screen.dart';
 import '../state/controller_scope.dart';
@@ -13,6 +15,7 @@ import '../theme/app_colors.dart';
 import 'activity_log_panel.dart';
 import 'app_background.dart';
 import 'glass.dart';
+import 'help.dart';
 import 'licenses.dart';
 import 'settings_dialog.dart';
 import 'warning_banner.dart';
@@ -44,26 +47,59 @@ class _AppShellState extends State<AppShell> {
     final showHeader =
         controller.screen == AppScreen.welcome ||
         controller.screen == AppScreen.workspace;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          AppBackground(
-            imagePath: controller.backgroundImagePath,
-            veil: controller.backgroundVeil,
-          ),
-          Column(
-            children: [
-              if (showHeader) _Header(onToggleLog: _toggleLog),
-              const WarningBanner(),
-              const Expanded(child: _ScreenBody()),
-            ],
-          ),
-          ActivityLogPanel(
-            visible: _logOpen,
-            onClose: () => setState(() => _logOpen = false),
-          ),
-        ],
+    final helpMode = controller.helpMode;
+    // While contextual help mode is on, the whole body shows a help cursor and a
+    // dismissible banner makes it obvious + exitable; Esc also exits.
+    Widget body = Column(
+      children: [
+        if (showHeader) _Header(onToggleLog: _toggleLog),
+        const WarningBanner(),
+        if (helpMode) _HelpModeBanner(onDone: controller.exitHelpMode),
+        const Expanded(child: _ScreenBody()),
+      ],
+    );
+    if (helpMode) {
+      body = Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.exitHelpMode();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: body,
+      );
+      // The help cursor only means something with a pointer — skip it on mobile.
+      if (!controller.isMobile) {
+        body = MouseRegion(cursor: SystemMouseCursors.help, child: body);
+      }
+    }
+    return PopScope(
+      // The app navigates by AppController.screen, not a Navigator stack, so the
+      // system back button/gesture would pop the single route and quit. Intercept
+      // it: while there's an in-app screen to go back to, navigate there instead;
+      // only let the real pop (app exit) through on the welcome screen.
+      canPop: !controller.canGoBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) controller.goBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            AppBackground(
+              imagePath: controller.backgroundImagePath,
+              veil: controller.backgroundVeil,
+            ),
+            body,
+            ActivityLogPanel(
+              visible: _logOpen,
+              onClose: () => setState(() => _logOpen = false),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -88,7 +124,12 @@ class _ScreenBody extends StatelessWidget {
         AppScreen.scanning => const ScanningScreen(),
         AppScreen.workspace => const WorkspaceScreen(),
         AppScreen.action => const ActionScreen(),
+        // coverage:ignore-start
+        // Unreachable: the explore screen is intercepted above (returns
+        // ExploreMapScreen) before this switch; this arm exists only to keep
+        // the switch exhaustive.
         AppScreen.explore => const SizedBox.shrink(),
+        // coverage:ignore-end
       },
     );
   }
@@ -116,9 +157,9 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Stunda', style: text.headlineSmall),
+                Text(context.tr('app_name'), style: text.headlineSmall),
                 Text(
-                  'Give every photo its moment',
+                  context.tr('app_tagline'),
                   style: text.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -126,8 +167,95 @@ class _Header extends StatelessWidget {
             ),
           ),
           _LogButton(unread: controller.unreadCount, onPressed: onToggleLog),
+          _HelpMenu(controller: controller),
           _SettingsMenu(controller: controller),
         ],
+      ),
+    );
+  }
+}
+
+/// The header "?" button: a small popup menu offering the full Documentation
+/// (the Help page) and the contextual "What's this?" help mode.
+class _HelpMenu extends StatelessWidget {
+  const _HelpMenu({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: context.tr('tt_help'),
+      icon: const Icon(Icons.help_outline),
+      position: PopupMenuPosition.under,
+      onSelected: (v) {
+        switch (v) {
+          case 'docs':
+            showHelp(context);
+          case 'contextual':
+            controller.enterHelpMode();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'docs',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.menu_book_outlined),
+            title: Text(context.tr('help_menu_documentation')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'contextual',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.touch_app_outlined),
+            title: Text(context.tr('help_menu_contextual')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The dismissible banner shown while contextual help mode is on: it explains
+/// the mode and offers a Done button to exit.
+class _HelpModeBanner extends StatelessWidget {
+  const _HelpModeBanner({required this.onDone});
+
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              Icons.help_outline,
+              size: 18,
+              color: scheme.onPrimaryContainer,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                context.tr('help_mode_banner'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onDone,
+              child: Text(context.tr('help_mode_done')),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -143,7 +271,7 @@ class _SettingsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return PopupMenuButton<String>(
-      tooltip: 'Menu',
+      tooltip: context.tr('tt_settings'),
       icon: const Icon(Icons.settings),
       position: PopupMenuPosition.under,
       onSelected: (v) {
@@ -152,6 +280,8 @@ class _SettingsMenu extends StatelessWidget {
             controller.setDark(!isDark);
           case 'settings':
             showSettingsDialog(context, controller);
+          case 'help':
+            showHelp(context);
           case 'licenses':
             showAppLicenses(context);
           case 'about':
@@ -165,34 +295,47 @@ class _SettingsMenu extends StatelessWidget {
             dense: true,
             contentPadding: EdgeInsets.zero,
             leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            title: Text(isDark ? 'Appearance: Light' : 'Appearance: Dark'),
+            title: Text(
+              context.tr(
+                isDark ? 'menu_appearance_light' : 'menu_appearance_dark',
+              ),
+            ),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'settings',
           child: ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.tune),
-            title: Text('Settings…'),
+            leading: const Icon(Icons.tune),
+            title: Text(context.tr('menu_settings')),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
+          value: 'help',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.help_outline),
+            title: Text(context.tr('menu_help')),
+          ),
+        ),
+        PopupMenuItem(
           value: 'licenses',
           child: ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.gavel),
-            title: Text('Licenses'),
+            leading: const Icon(Icons.gavel),
+            title: Text(context.tr('menu_licenses')),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'about',
           child: ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline),
-            title: Text('About'),
+            leading: const Icon(Icons.info_outline),
+            title: Text(context.tr('menu_about')),
           ),
         ),
       ],
@@ -204,13 +347,10 @@ class _SettingsMenu extends StatelessWidget {
 void _showAbout(BuildContext context) {
   showAboutDialog(
     context: context,
-    applicationName: 'Stunda',
-    applicationVersion: '2.0.0',
+    applicationName: context.tr('app_name'),
+    applicationVersion: context.tr('app_version'),
     applicationIcon: const LogoMark(size: 48),
-    applicationLegalese:
-        'Give every photo its moment.\n'
-        'Author: Kodsama\n'
-        'GPL-3.0-or-later',
+    applicationLegalese: context.tr('about_legalese'),
   );
 }
 
@@ -229,7 +369,7 @@ class _LogButton extends StatelessWidget {
       children: [
         IconButton(
           onPressed: onPressed,
-          tooltip: 'Activity log',
+          tooltip: context.tr('tt_activity_log'),
           icon: const Icon(Icons.receipt_long),
         ),
         if (unread > 0)
@@ -245,7 +385,7 @@ class _LogButton extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               alignment: Alignment.center,
               child: Text(
-                unread > 99 ? '99+' : '$unread',
+                unread > 99 ? context.tr('badge_overflow') : '$unread',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 9,

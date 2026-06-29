@@ -6,6 +6,7 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_prefs.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/widgets/help.dart';
 import 'package:stunda/src/widgets/licenses.dart';
 import 'package:stunda/src/widgets/settings_dialog.dart';
 
@@ -30,7 +31,7 @@ Future<void> _pump(WidgetTester tester, AppController controller) async {
 
 void main() {
   group('settings overflow menu', () {
-    testWidgets('lists the four items and is the only theme control', (
+    testWidgets('lists the menu items and is the only theme control', (
       tester,
     ) async {
       final controller = AppController(runner: FakeEngineRunner())
@@ -41,10 +42,13 @@ void main() {
       expect(find.byTooltip('Switch to light'), findsNothing);
       expect(find.byTooltip('Switch to dark'), findsNothing);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       expect(find.textContaining('Appearance:'), findsOneWidget);
       expect(find.text('Settings…'), findsOneWidget);
+      expect(find.text('Help'), findsOneWidget);
       expect(find.text('Licenses'), findsOneWidget);
       expect(find.text('About'), findsOneWidget);
     });
@@ -58,7 +62,9 @@ void main() {
       )..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Settings…'));
       await tester.pumpAndSettle();
@@ -94,7 +100,9 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Licenses'));
       await tester.pumpAndSettle();
@@ -106,6 +114,33 @@ void main() {
       expect(find.textContaining('flutter_map'), findsWidgets);
     });
 
+    testWidgets('Help opens the page and scrolls through the sections', (
+      tester,
+    ) async {
+      final controller = AppController(runner: FakeEngineRunner())
+        ..debugSetToolkit([_tool('exiftool')]);
+      await _pump(tester, controller);
+
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Help'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HelpPage), findsOneWidget);
+      // The first section heading is visible at the top.
+      expect(find.text('Getting started'), findsOneWidget);
+
+      // The page scrolls — a later section is reachable by scrolling.
+      await tester.dragUntilVisible(
+        find.text('For power users'),
+        find.byType(Scrollable).first,
+        const Offset(0, -300),
+      );
+      expect(find.text('For power users'), findsOneWidget);
+    });
+
     testWidgets('About opens a dialog with the version and tagline', (
       tester,
     ) async {
@@ -113,7 +148,9 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('About'));
       await tester.pumpAndSettle();
@@ -133,7 +170,9 @@ void main() {
         ..debugSetToolkit([_tool('exiftool')]);
       await _pump(tester, controller);
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(
+        find.byTooltip('Open settings, licenses, and appearance'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('Appearance:'));
       await tester.pumpAndSettle();

@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
+import 'library_action.dart';
+
 /// A small, persisted bag of user preferences.
 ///
 /// Construct directly with explicit values (tests), or via [load] which reads
@@ -26,7 +28,14 @@ class AppPrefs {
     this.defaultMaxTimeDiffSeconds = 300,
     this.backgroundImagePath,
     this.backgroundVeil = 0.85,
-  });
+    this.keepPipeline = KeepPipeline.standard,
+    this.localeCode,
+    Set<QualityParam>? lowQParams,
+    this.lowQThreshold = 0.35,
+    this.similarityPercent = 0,
+    this.similarityMetric = SimilarityMetric.fast,
+    this.homeActions = HomeActionsConfig.standard,
+  }) : lowQParams = lowQParams ?? QualityParam.values.toSet();
 
   /// The backing JSON file path, or null when persistence is disabled.
   final String? file;
@@ -48,6 +57,33 @@ class AppPrefs {
   /// is more subtle (more veil, fainter background). Defaults to a subtle 0.85.
   double backgroundVeil;
 
+  /// The duplicate-finder keep-priority pipeline (rule order + enabled flags).
+  KeepPipeline keepPipeline;
+
+  /// The user's language override (a supported locale code), or null to follow
+  /// the system locale.
+  String? localeCode;
+
+  /// The quality components the Shrink "low quality" stage treats as defining
+  /// low quality (default: all four). The candidate filter scores each photo on
+  /// only these via [compositeFrom].
+  Set<QualityParam> lowQParams;
+
+  /// The Shrink "low quality" stage's quality threshold in 0..1 (default 0.35).
+  double lowQThreshold;
+
+  /// The duplicate-finder looseness slider, a percent 0..100 (default 0 = Exact).
+  /// Snapped to a multiple of 10 by the controller on use.
+  int similarityPercent;
+
+  /// The duplicate-finder metric: Fast (perceptual hash + colour) or Smart
+  /// (on-device embedding). Defaults to Fast.
+  SimilarityMetric similarityMetric;
+
+  /// The home-screen action configuration: which action cards show and in what
+  /// order. Defaults to the canonical order (Explore first), all visible.
+  HomeActionsConfig homeActions;
+
   /// Loads preferences from `preferences.json` in [dir], falling back to the
   /// defaults for anything missing or unreadable.
   static Future<AppPrefs> load(String dir) async {
@@ -64,6 +100,25 @@ class AppPrefs {
       if (bg is String && bg.isNotEmpty) prefs.backgroundImagePath = bg;
       final veil = map['backgroundVeil'];
       if (veil is num) prefs.backgroundVeil = veil.toDouble().clamp(0.0, 1.0);
+      if (map.containsKey('keepPipeline')) {
+        prefs.keepPipeline = KeepPipeline.fromJson(map['keepPipeline']);
+      }
+      final code = map['localeCode'];
+      if (code is String && code.isNotEmpty) prefs.localeCode = code;
+      final params = map['lowQParams'];
+      if (params is List) prefs.lowQParams = _parseLowQParams(params);
+      final lowQT = map['lowQThreshold'];
+      if (lowQT is num) prefs.lowQThreshold = lowQT.toDouble().clamp(0.0, 1.0);
+      // Clamp any persisted value into the new 0..100 looseness range; an old
+      // 0..15-step value lands at the strict end and is snapped on use.
+      final sim = map['similarityPercent'];
+      if (sim is int) prefs.similarityPercent = sim.clamp(0, 100);
+      prefs.similarityMetric = _parseSimilarityMetric(
+        map['similarityMetric'] as String?,
+      );
+      if (map.containsKey('homeActions')) {
+        prefs.homeActions = HomeActionsConfig.fromJson(map['homeActions']);
+      }
     } on Object {
       // No saved preferences yet (or unreadable) — keep the defaults.
     }
@@ -82,6 +137,13 @@ class AppPrefs {
           'defaultMaxTimeDiffSeconds': defaultMaxTimeDiffSeconds,
           'backgroundImagePath': backgroundImagePath,
           'backgroundVeil': backgroundVeil,
+          'keepPipeline': keepPipeline.toJson(),
+          'localeCode': localeCode,
+          'lowQParams': [for (final p in lowQParams) p.name],
+          'lowQThreshold': lowQThreshold,
+          'similarityPercent': similarityPercent,
+          'similarityMetric': similarityMetric.name,
+          'homeActions': homeActions.toJson(),
         }),
       );
     } on Object {
@@ -100,4 +162,21 @@ class AppPrefs {
     'embed' => RawMode.embed,
     _ => RawMode.auto,
   };
+
+  static SimilarityMetric _parseSimilarityMetric(String? name) =>
+      switch (name) {
+        'smart' => SimilarityMetric.smart,
+        _ => SimilarityMetric.fast,
+      };
+
+  /// Parses a persisted list of [QualityParam] names, ignoring any unknown
+  /// entries. An empty/all-unknown list is honoured as the empty set (the user
+  /// had every toggle off).
+  static Set<QualityParam> _parseLowQParams(List<dynamic> raw) {
+    final byName = {for (final p in QualityParam.values) p.name: p};
+    return {
+      for (final entry in raw)
+        if (entry is String && byName.containsKey(entry)) byName[entry]!,
+    };
+  }
 }

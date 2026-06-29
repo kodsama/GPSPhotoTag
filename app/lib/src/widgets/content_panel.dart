@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'file_list_dialog.dart';
 import 'glass.dart';
@@ -37,18 +38,18 @@ class ContentPanel extends StatelessWidget {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             initiallyExpanded: true,
-            title: Text('Library contents', style: text.titleMedium),
+            title: Text(context.tr('content_title'), style: text.titleMedium),
             childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
             children: [
-              _SectionLabel('Supported — will be used'),
+              _SectionLabel(context.tr('content_supported')),
               const SizedBox(height: 12),
-              _Chips(chips: _supportedChips(scan)),
+              _Chips(chips: _supportedChips(context, scan)),
               if (scan.unsupportedCount > 0) ...[
                 const SizedBox(height: 20),
-                _SectionLabel('Found but not used', muted: true),
+                _SectionLabel(context.tr('content_not_used'), muted: true),
                 const SizedBox(height: 6),
                 Text(
-                  'Detected in the folder but not processed by Stunda.',
+                  context.tr('content_not_used_explainer'),
                   style: text.bodySmall,
                 ),
                 const SizedBox(height: 10),
@@ -64,7 +65,10 @@ class ContentPanel extends StatelessWidget {
   /// Chip specs for the supported section: photo formats (by count desc) then
   /// GPS sources. Each carries the file paths behind it so a tap can open the
   /// drill-down dialog. Counts are plain integers — no thousands grouping.
-  static List<_ChipSpec> _supportedChips(FolderScanResult scan) {
+  static List<_ChipSpec> _supportedChips(
+    BuildContext context,
+    FolderScanResult scan,
+  ) {
     final chips = <_ChipSpec>[];
     final byFormat = <String, List<String>>{};
     for (final path in scan.photos) {
@@ -76,13 +80,23 @@ class ContentPanel extends StatelessWidget {
       chips.add(_ChipSpec(e.key.toUpperCase(), e.value, gps: false));
     }
     if (scan.gpxCount > 0) {
-      chips.add(_ChipSpec('GPX', scan.gpxFiles, gps: true));
+      chips.add(
+        _ChipSpec(context.tr('content_chip_gpx'), scan.gpxFiles, gps: true),
+      );
     }
     if (scan.kmlCount > 0) {
-      chips.add(_ChipSpec('KML', scan.kmlFiles, gps: true));
+      chips.add(
+        _ChipSpec(context.tr('content_chip_kml'), scan.kmlFiles, gps: true),
+      );
     }
     if (scan.googleCount > 0) {
-      chips.add(_ChipSpec('Timeline', scan.googleFiles, gps: true));
+      chips.add(
+        _ChipSpec(
+          context.tr('content_chip_timeline'),
+          scan.googleFiles,
+          gps: true,
+        ),
+      );
     }
     return chips;
   }
@@ -124,7 +138,7 @@ class _Chips extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     if (chips.isEmpty) {
       return Text(
-        'Nothing supported found.',
+        context.tr('content_nothing_supported'),
         style: text.bodySmall?.copyWith(
           color: scheme.onSurface.withValues(alpha: 0.5),
         ),
@@ -142,7 +156,10 @@ class _Chips extends StatelessWidget {
               borderRadius: BorderRadius.circular(9),
               onTap: () => showFileListDialog(
                 context,
-                title: '${chip.label} — ${chip.count} files',
+                title: context.tr('content_chip_title', {
+                  'label': chip.label,
+                  'count': chip.count,
+                }),
                 paths: chip.paths,
                 supported: true,
                 gps: chip.gps,
@@ -199,11 +216,11 @@ class _UnsupportedGroups extends StatelessWidget {
 
   final FolderScanResult scan;
 
-  static const _labels = {
-    UnsupportedCategory.image: 'Images',
-    UnsupportedCategory.video: 'Videos',
-    UnsupportedCategory.gpsData: 'GPS data',
-    UnsupportedCategory.other: 'Other',
+  static const _labelKeys = {
+    UnsupportedCategory.image: 'content_cat_images',
+    UnsupportedCategory.video: 'content_cat_videos',
+    UnsupportedCategory.gpsData: 'content_cat_gps',
+    UnsupportedCategory.other: 'content_cat_other',
   };
 
   @override
@@ -216,8 +233,14 @@ class _UnsupportedGroups extends StatelessWidget {
         for (final cat in UnsupportedCategory.values)
           if ((byCat[cat] ?? 0) > 0) ...[
             _CategoryRow(
-              label: '${_labels[cat]} (${byCat[cat]})',
-              title: '${_labels[cat]} — ${byCat[cat]} files',
+              label: context.tr('content_category_label', {
+                'label': context.tr(_labelKeys[cat]!),
+                'count': byCat[cat],
+              }),
+              title: context.tr('content_category_title', {
+                'label': context.tr(_labelKeys[cat]!),
+                'count': byCat[cat],
+              }),
               exts: _extsFor(scan, cat, byExt),
               paths: _pathsFor(scan, cat),
             ),

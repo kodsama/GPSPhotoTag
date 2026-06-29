@@ -20,13 +20,21 @@ class IsolateRunner implements EngineRunner {
   /// probe for itself. [exiftoolBundleDir] is the on-disk directory of the
   /// app-bundled exiftool (null = use whatever is on `PATH`); each worker builds
   /// its own [ExiftoolRunner] from it since runners aren't isolate-sendable.
-  const IsolateRunner({this.exiftoolAvailable, this.exiftoolBundleDir});
+  const IsolateRunner({
+    this.exiftoolAvailable,
+    this.exiftoolBundleDir,
+    this.onnxBundleDir,
+  });
 
   /// Whether exiftool was detected; null means "detect inside the worker".
   final bool? exiftoolAvailable;
 
   /// On-disk dir of the bundled exiftool, or null to use `PATH`.
   final String? exiftoolBundleDir;
+
+  /// On-disk dir of the bundled ONNX Runtime lib + detector model, or null when
+  /// no model is bundled (then duplicate hashing uses Tier-1 metadata only).
+  final String? onnxBundleDir;
 
   /// Scans [roots] on a worker isolate, streaming [ScanEvent]s back.
   @override
@@ -54,23 +62,6 @@ class IsolateRunner implements EngineRunner {
       gpxFiles: gpxFiles,
       kmlFiles: kmlFiles,
       googleFiles: googleFiles,
-      options: options,
-      exiftoolAvailable: exiftoolAvailable,
-      bundleDir: exiftoolBundleDir,
-    ),
-    onSpawnError: ErrorEvent.new,
-  );
-
-  /// Renders a heatmap PNG from the GPS already embedded in [photos].
-  @override
-  Stream<EngineEvent> map({
-    required List<String> photos,
-    required MapOptions options,
-  }) => _spawn(
-    mapEntry,
-    (port) => MapRequest(
-      port: port,
-      photos: photos,
       options: options,
       exiftoolAvailable: exiftoolAvailable,
       bundleDir: exiftoolBundleDir,
@@ -169,6 +160,55 @@ class IsolateRunner implements EngineRunner {
     return controller.stream;
   }
 
+  /// Batch-reads the curated EXIF set for [paths], fanned out across worker
+  /// isolates exactly like [readImageMeta], merging each [CuratedExif] into one
+  /// stream as it is read. The stream closes when every worker is done.
+  @override
+  Stream<CuratedExif> readCuratedExif(List<String> paths) {
+    if (paths.isEmpty) return const Stream<CuratedExif>.empty();
+    final cores = Platform.numberOfProcessors;
+    final workers = paths.length <= 64
+        ? 1
+        : (cores - 2).clamp(2, 6).clamp(1, (paths.length / 64).ceil());
+
+    final controller = StreamController<CuratedExif>();
+    final isolates = <Isolate>[];
+    var active = workers;
+
+    void onWorkerDone() {
+      active--;
+      if (active <= 0 && !controller.isClosed) controller.close();
+    }
+
+    for (var w = 0; w < workers; w++) {
+      final slice = [for (var i = w; i < paths.length; i += workers) paths[i]];
+      final receive = ReceivePort();
+      receive.listen((message) {
+        if (message == null) {
+          receive.close();
+          onWorkerDone();
+        } else if (message is CuratedExif && !controller.isClosed) {
+          controller.add(message);
+        }
+      });
+      Isolate.spawn(
+        readCuratedExifEntry,
+        ReadCuratedExifRequest(
+          port: receive.sendPort,
+          paths: slice,
+          bundleDir: exiftoolBundleDir,
+        ),
+      ).then((iso) => isolates.add(iso), onError: (_, _) => onWorkerDone());
+    }
+
+    controller.onCancel = () {
+      for (final iso in isolates) {
+        iso.kill(priority: Isolate.immediate);
+      }
+    };
+    return controller.stream;
+  }
+
   /// Extracts an embedded JPEG preview of [path] on a one-shot worker isolate
   /// via the bundled exiftool, returning the cached JPEG path (or null when no
   /// embedded image is produced or the worker fails to start).
@@ -192,6 +232,108 @@ class IsolateRunner implements EngineRunner {
     final result = await receive.first;
     receive.close();
     return result is String ? result : null;
+  }
+
+  /// Perceptually hashes [paths] across worker isolates, then groups the
+  /// returned [HashedFile]s at or above [minSimilarity] on the UI isolate
+  /// (cheap, pure).
+  ///
+  /// Fans the paths out round-robin across a CPU-bounded set of workers (each
+  /// running its own bundled exiftool for RAW/HEIC previews), collects every
+  /// hashed file, then runs [groupDuplicates]. Undecodable files and a worker
+  /// that fails to start are simply skipped.
+  @override
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    // A Smart run also embeds each file (when a model is bundled). When Smart is
+    // requested but no embedder is available, grouping with the Smart metric
+    // would find nothing (every embedding is empty), so fall back to Fast.
+    final wantSmart = metric == SimilarityMetric.smart && smartAvailable;
+    final all = await hashFiles(
+      paths,
+      embed: wantSmart,
+      onProgress: onProgress,
+    );
+    return groupDuplicates(
+      all,
+      minSimilarity: minSimilarity,
+      metric: wantSmart ? SimilarityMetric.smart : SimilarityMetric.fast,
+    );
+  }
+
+  /// Whether the Smart metric can run: an embedding model + ONNX Runtime are
+  /// bundled and resolve to a complete bundle. Mirrors how the worker decides to
+  /// build the embedder, so the UI's "fell back to Fast" note is accurate.
+  @override
+  bool get smartAvailable =>
+      resolveEmbeddingBundle(onnxBundleDir)?.isComplete ?? false;
+
+  /// Fans [paths] out round-robin across CPU-bounded workers (each with its own
+  /// bundled exiftool for RAW/HEIC previews) and concatenates their hashed files
+  /// in worker order for deterministic downstream grouping.
+  @override
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    bool embed = false,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    if (paths.isEmpty) return const [];
+    final total = paths.length;
+    final cores = Platform.numberOfProcessors;
+    final workers = paths.length <= 32
+        ? 1
+        : (cores - 2).clamp(2, 6).clamp(1, (paths.length / 32).ceil());
+
+    final results = <int, List<HashedFile>>{};
+    final futures = <Future<void>>[];
+    // Running count of files every worker has finished (hashed or skipped),
+    // surfaced to [onProgress] against the fixed [total] as ticks arrive.
+    var hashedCount = 0;
+
+    for (var w = 0; w < workers; w++) {
+      final slice = [for (var i = w; i < paths.length; i += workers) paths[i]];
+      final receive = ReceivePort();
+      final done = Completer<void>();
+      final collected = <HashedFile>[];
+      receive.listen((message) {
+        if (message == null) {
+          receive.close();
+          if (!done.isCompleted) done.complete();
+        } else if (message is HashedFile) {
+          collected.add(message);
+        } else if (message is int) {
+          // A per-file progress tick (1 per file the worker processed).
+          hashedCount += message;
+          onProgress?.call(hashedCount, total);
+        }
+      });
+      final slot = w;
+      results[slot] = collected;
+      Isolate.spawn(
+        hashFilesEntry,
+        HashFilesRequest(
+          port: receive.sendPort,
+          paths: slice,
+          bundleDir: exiftoolBundleDir,
+          onnxBundleDir: onnxBundleDir,
+          embed: embed,
+        ),
+      ).catchError((Object _) {
+        // A worker that never starts contributes no hashes; unblock the join.
+        receive.close();
+        if (!done.isCompleted) done.complete();
+        return Isolate.current;
+      });
+      futures.add(done.future);
+    }
+
+    await Future.wait(futures);
+    // Concatenate worker outputs in worker order for deterministic grouping.
+    return <HashedFile>[for (var w = 0; w < workers; w++) ...?results[w]];
   }
 
   /// Spawns a worker via [entry], wiring its [SendPort] into the request built
@@ -224,6 +366,14 @@ class IsolateRunner implements EngineRunner {
         receive.close();
       },
     );
+
+    // Cancelling the (sole) subscription tears down the worker: kill the
+    // isolate immediately and close the port so a cancelled run leaves nothing
+    // running. Safe to call before spawn resolves (isolate is then null).
+    controller.onCancel = () {
+      isolate?.kill(priority: Isolate.immediate);
+      receive.close();
+    };
 
     return controller.stream;
   }
@@ -262,23 +412,6 @@ class TagRequest {
   final List<String> kmlFiles;
   final List<String> googleFiles;
   final TagOptions options;
-  final bool? exiftoolAvailable;
-  final String? bundleDir;
-}
-
-@visibleForTesting
-class MapRequest {
-  const MapRequest({
-    required this.port,
-    required this.photos,
-    required this.options,
-    required this.exiftoolAvailable,
-    required this.bundleDir,
-  });
-
-  final SendPort port;
-  final List<String> photos;
-  final MapOptions options;
   final bool? exiftoolAvailable;
   final String? bundleDir;
 }
@@ -339,6 +472,39 @@ class ReadImageMetaRequest {
   final SendPort port;
   final List<String> paths;
   final String? bundleDir;
+}
+
+@visibleForTesting
+class ReadCuratedExifRequest {
+  const ReadCuratedExifRequest({
+    required this.port,
+    required this.paths,
+    required this.bundleDir,
+  });
+
+  final SendPort port;
+  final List<String> paths;
+  final String? bundleDir;
+}
+
+@visibleForTesting
+class HashFilesRequest {
+  const HashFilesRequest({
+    required this.port,
+    required this.paths,
+    required this.bundleDir,
+    this.onnxBundleDir,
+    this.embed = false,
+  });
+
+  final SendPort port;
+  final List<String> paths;
+  final String? bundleDir;
+  final String? onnxBundleDir;
+
+  /// Whether to also compute each file's Smart-metric embedding (only set for
+  /// a Smart duplicate run; the embedder is unavailable when no model bundled).
+  final bool embed;
 }
 
 @visibleForTesting
@@ -441,25 +607,6 @@ Future<void> tagEntry(TagRequest req) async {
 }
 
 @visibleForTesting
-Future<void> mapEntry(MapRequest req) async {
-  try {
-    final exiftool = await resolveWorkerExiftool(req.exiftoolAvailable);
-    final service = MapService(
-      runner: buildWorkerRunner(req.bundleDir),
-      exiftoolAvailable: exiftool,
-    );
-    await pumpEvents(
-      req.port,
-      service.render(req.photos, req.options),
-      onError: ErrorEvent.new,
-    );
-  } on Object catch (e) {
-    req.port.send(ErrorEvent('$e'));
-    req.port.send(null);
-  }
-}
-
-@visibleForTesting
 Future<void> pruneEntry(PruneRequest req) async {
   try {
     final pruner = Pruner(trash: const SystemTrash());
@@ -503,12 +650,77 @@ Future<void> readImageMetaEntry(ReadImageMetaRequest req) async {
   }
 }
 
+@visibleForTesting
+Future<void> readCuratedExifEntry(ReadCuratedExifRequest req) async {
+  try {
+    final runner = buildWorkerRunner(req.bundleDir);
+    await for (final exif in readCuratedExif(req.paths, runner: runner)) {
+      req.port.send(exif);
+    }
+  } on Object {
+    // Best-effort: a failed exiftool read just leaves the EXIF line empty.
+  } finally {
+    req.port.send(null);
+  }
+}
+
 /// The shared on-disk cache directory for extracted previews (stable across a
 /// session so re-opening a photo is instant). Lives under the system temp dir,
 /// which is reachable from any isolate without a platform plugin.
 @visibleForTesting
 Directory previewCacheDir() =>
     Directory(p.join(Directory.systemTemp.path, 'stunda_preview_cache'));
+
+/// How many paths each worker hands to one [hashFilesBatch] call: a single
+/// exiftool spawn covers the whole chunk, so larger chunks mean fewer spawns —
+/// capped so a chunk's argument list stays well within OS limits.
+@visibleForTesting
+const int hashBatchChunk = 150;
+
+@visibleForTesting
+Future<void> hashFilesEntry(HashFilesRequest req) async {
+  // The Tier-2 detector is built INSIDE the worker (FFI handles aren't isolate-
+  // sendable). It's unavailable when no model is bundled, so hashing falls back
+  // to Tier-1 metadata. Closed in the finally so the native session is freed.
+  final detector = OrtPeopleDetector.fromBundleDir(req.onnxBundleDir);
+  // The Smart-metric embedder, built INSIDE the worker only for a Smart run.
+  // Unavailable when no embedding model is bundled, so the Smart metric degrades
+  // to Fast. A non-embedding run uses the no-op so no native session is loaded.
+  final ImageEmbedder embedder = req.embed
+      ? OrtImageEmbedder.fromBundleDir(req.onnxBundleDir)
+      : const NoopImageEmbedder();
+  try {
+    final runner = buildWorkerRunner(req.bundleDir);
+    final tmpDir = previewCacheDir().path;
+    // Batch the slice in chunks: one set of exiftool spawns per chunk (a small
+    // handful), NOT one spawn per file as the old per-file path did.
+    for (var i = 0; i < req.paths.length; i += hashBatchChunk) {
+      final end = (i + hashBatchChunk < req.paths.length)
+          ? i + hashBatchChunk
+          : req.paths.length;
+      final chunk = req.paths.sublist(i, end);
+      final hashed = await hashFilesBatch(
+        chunk,
+        runner: runner,
+        tmpDir: tmpDir,
+        detector: detector,
+        embedder: embedder,
+        // One progress tick per file processed (even skips) so the aggregated
+        // `done` count reaches the total when the run finishes.
+        onFileDone: () => req.port.send(1),
+      );
+      for (final h in hashed) {
+        req.port.send(h);
+      }
+    }
+  } on Object {
+    // Best-effort: a failed worker just contributes no hashes.
+  } finally {
+    detector.close();
+    if (embedder is OrtImageEmbedder) embedder.close();
+    req.port.send(null);
+  }
+}
 
 @visibleForTesting
 Future<void> extractPreviewEntry(ExtractPreviewRequest req) async {

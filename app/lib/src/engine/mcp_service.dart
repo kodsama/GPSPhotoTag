@@ -43,8 +43,13 @@ class McpService extends ChangeNotifier {
         debugName: 'mcp-server',
       );
     } on Object catch (e) {
+      // coverage:ignore-start
+      // Reached only if Isolate.spawn itself throws (a process-level failure to
+      // create the worker). Not inducible under `flutter test` with a valid
+      // top-level entry, so this guard can't be exercised by the unit suite.
       _error = '$e';
       notifyListeners();
+      // coverage:ignore-end
     }
   }
 

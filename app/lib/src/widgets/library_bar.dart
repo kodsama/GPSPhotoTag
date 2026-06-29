@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../state/library_roots.dart';
 import '../theme/app_theme.dart';
@@ -21,6 +22,9 @@ class LibraryBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final roots = controller.roots;
+    final isMobile = controller.isMobile;
+    final name =
+        controller.folderName(context.tr) ?? context.tr('library_default_name');
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -40,13 +44,19 @@ class LibraryBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      controller.folderName ?? 'Library',
+                      name,
                       style: text.titleMedium,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _statLine(scan),
+                      // On mobile there are no folders or GPX/track sources, so
+                      // show a plain photo count instead of the desktop tallies.
+                      isMobile
+                          ? context.tr('library_stat_line_mobile', {
+                              'photos': scan.photoCount,
+                            })
+                          : _statLine(context, scan),
                       style: text.bodySmall,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -56,26 +66,46 @@ class LibraryBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // Wrap so the two actions reflow onto a second line when the window
+          // Wrap so the actions reflow onto a second line when the window
           // (or a test viewport) is narrow, never overflowing the row.
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.end,
-            children: [
-              OutlinedButton.icon(
-                onPressed: controller.addFolder,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add folder'),
-              ),
-              OutlinedButton.icon(
-                onPressed: controller.changeLibrary,
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: const Text('Change library'),
-              ),
-            ],
+            // On mobile there's no folder picking: offer a single "Rescan
+            // library" that re-enumerates the device photo library. Desktop
+            // keeps "Add folder" + "Change library" exactly as before.
+            children: isMobile
+                ? [
+                    Tooltip(
+                      message: context.tr('tt_library_rescan'),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.scanLibrary,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: Text(context.tr('library_rescan')),
+                      ),
+                    ),
+                  ]
+                : [
+                    Tooltip(
+                      message: context.tr('tt_library_add_folder'),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.addFolder,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: Text(context.tr('library_add_folder')),
+                      ),
+                    ),
+                    Tooltip(
+                      message: context.tr('tt_library_change'),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.changeLibrary,
+                        icon: const Icon(Icons.swap_horiz, size: 18),
+                        label: Text(context.tr('library_change')),
+                      ),
+                    ),
+                  ],
           ),
-          if (roots.length > 1) ...[
+          if (!isMobile && roots.length > 1) ...[
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
@@ -86,7 +116,9 @@ class LibraryBar extends StatelessWidget {
                     label: Text(rootLabel(root)),
                     onDeleted: () => controller.removeLibraryRoot(root),
                     deleteIcon: const Icon(Icons.close, size: 16),
-                    deleteButtonTooltipMessage: 'Remove from library',
+                    deleteButtonTooltipMessage: context.tr(
+                      'library_remove_root',
+                    ),
                   ),
               ],
             ),
@@ -96,8 +128,12 @@ class LibraryBar extends StatelessWidget {
     );
   }
 
-  static String _statLine(FolderScanResult scan) =>
-      '${scan.photoCount} photos · ${scan.gpxCount} GPX · '
-      '${scan.kmlCount} KML · ${scan.googleCount} Timeline · ${scan.dirs} '
-      'folders';
+  static String _statLine(BuildContext context, FolderScanResult scan) =>
+      context.tr('library_stat_line', {
+        'dirs': scan.dirs,
+        'photos': scan.photoCount,
+        'gpx': scan.gpxCount,
+        'kml': scan.kmlCount,
+        'google': scan.googleCount,
+      });
 }

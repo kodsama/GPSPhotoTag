@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_prefs.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/library_action.dart';
+import 'package:stunda/src/state/prune_direction.dart';
 
 import 'support/fakes.dart';
 
@@ -47,7 +49,7 @@ void main() {
       await c.startScan('/library');
       expect(c.screen, AppScreen.workspace);
       expect(c.scan, isNotNull);
-      expect(c.folderName, 'library');
+      expect(c.folderName(enTr), 'library');
       expect(c.scanProgress, isNull);
     });
 
@@ -75,13 +77,13 @@ void main() {
       final withGpx = fakeScan(gpxFiles: const ['/library/t.gpx']);
       final r = LibraryAction.tag.readiness(withGpx);
       expect(r.enabled, isTrue);
-      expect(r.label, contains('1'));
+      expect(r.label(enTr), contains('1'));
     });
 
-    test('map needs photos', () {
-      expect(LibraryAction.map.readiness(fakeScan()).enabled, isTrue);
+    test('explore needs photos', () {
+      expect(LibraryAction.explore.readiness(fakeScan()).enabled, isTrue);
       expect(
-        LibraryAction.map.readiness(fakeScan(photos: const [])).enabled,
+        LibraryAction.explore.readiness(fakeScan(photos: const [])).enabled,
         isFalse,
       );
     });
@@ -213,20 +215,6 @@ void main() {
       expect(c.running, isFalse);
     });
 
-    test('renderMap returns null without a scan, runs with one', () async {
-      final noLib = AppController(runner: FakeEngineRunner());
-      expect(await noLib.renderMap(), isNull);
-
-      final tmp = Directory.systemTemp.createTempSync('rendermap');
-      addTearDown(() => tmp.deleteSync(recursive: true));
-      final fake = FakeEngineRunner();
-      final c = AppController(runner: fake)
-        ..debugSetScan(fakeScan(), folder: tmp.path);
-      final path = await c.renderMap(dpi: 300);
-      expect(fake.calls, contains('map'));
-      expect(path, endsWith('stunda-heatmap.png'));
-    });
-
     test('opening prune classifies the library and pre-selects orphans', () {
       final c = AppController(runner: FakeEngineRunner())
         ..debugSetScan(
@@ -256,7 +244,7 @@ void main() {
         ..debugSetScan(fakeScan(photos: const ['/library/a.raf']))
         ..openAction(LibraryAction.pruneRaw);
       expect(c.pairing, isNotNull);
-      c.openAction(LibraryAction.map);
+      c.openAction(LibraryAction.tag);
       expect(c.pairing, isNull);
     });
 
@@ -299,14 +287,47 @@ void main() {
         ..openAction(LibraryAction.pruneRaw);
 
       expect(c.selectedCount, 2);
-      c.selectAllOrphans(false);
+      c.selectAllCandidates(false);
       expect(c.selectedCount, 0);
       c.toggleSelected('/library/x.raf', true);
       expect(c.selectedPaths, {'/library/x.raf'});
       c.toggleSelected('/library/x.raf', false);
       expect(c.selectedPaths, isEmpty);
-      c.selectAllOrphans(true);
+      c.selectAllCandidates(true);
       expect(c.selectedCount, 2);
+    });
+
+    test('direction B targets orphan images and resets the selection', () {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(
+          fakeScan(
+            photos: const [
+              '/library/a.raf', // orphan RAW
+              '/library/b.raf', // paired RAW
+              '/library/b.jpg', // photo with RAW
+              '/library/c.jpg', // orphan image
+            ],
+          ),
+        )
+        ..openAction(LibraryAction.pruneRaw);
+
+      // Direction A (default): orphan RAWs are the candidates.
+      expect(c.pruneDirection, PruneDirection.removeOrphanRaws);
+      expect(c.selectedPaths, {'/library/a.raf'});
+      expect(c.isKindVisible(PairKind.orphanRaw), isTrue);
+
+      // Switching to B re-targets orphan images, resets selection + visibility.
+      c.setPruneDirection(PruneDirection.removeOrphanImages);
+      expect(c.pruneDirection, PruneDirection.removeOrphanImages);
+      expect(c.selectedPaths, {'/library/c.jpg'});
+      expect(c.isKindVisible(PairKind.photoWithoutRaw), isTrue);
+      expect(c.isKindVisible(PairKind.orphanRaw), isFalse);
+
+      // Setting the same direction again is a no-op (no re-selection churn).
+      c
+        ..selectAllCandidates(false)
+        ..setPruneDirection(PruneDirection.removeOrphanImages);
+      expect(c.selectedPaths, isEmpty);
     });
 
     test('runTrashSelected sends exactly the selected paths', () async {
@@ -318,7 +339,7 @@ void main() {
         ..openAction(LibraryAction.pruneRaw);
 
       c
-        ..selectAllOrphans(false)
+        ..selectAllCandidates(false)
         ..toggleSelected('/library/x.raf', true);
       await c.runTrashSelected();
 
@@ -331,7 +352,7 @@ void main() {
       final c = AppController(runner: fake)
         ..debugSetScan(fakeScan(photos: const ['/library/x.raf']))
         ..openAction(LibraryAction.pruneRaw)
-        ..selectAllOrphans(false);
+        ..selectAllCandidates(false);
       await c.runTrashSelected();
       expect(fake.calls, isEmpty);
     });
@@ -352,6 +373,45 @@ void main() {
       final c = AppController(runner: ThrowingEngineRunner());
       await c.startScan('/library');
       expect(c.logEntries.any((e) => e.level == LogLevel.error), isTrue);
+    });
+  });
+
+  group('savePng', () {
+    final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
+
+    test('cancel (null path) writes nothing and returns null', () async {
+      final c = AppController(runner: FakeEngineRunner());
+      final logsBefore = c.logEntries.length;
+      final result = await c.savePng(bytes, pickPath: () async => null);
+      expect(result, isNull);
+      // No success/failure entry was logged on a cancel.
+      expect(c.logEntries.length, logsBefore);
+    });
+
+    test('a chosen path writes the bytes and reports success', () async {
+      final dir = Directory.systemTemp.createTempSync('savepng');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final out = '${dir.path}/stunda-map.png';
+      final c = AppController(runner: FakeEngineRunner());
+
+      final result = await c.savePng(bytes, pickPath: () async => out);
+
+      expect(result, out);
+      expect(File(out).readAsBytesSync(), bytes);
+      expect(c.logEntries.last.message, contains(out));
+      expect(c.logEntries.last.level, LogLevel.info);
+    });
+
+    test('a write failure is reported and never throws', () async {
+      // A path inside a non-existent directory makes writeAsBytes fail.
+      final bad = '${Directory.systemTemp.path}/no_such_dir_xyz/map.png';
+      final c = AppController(runner: FakeEngineRunner());
+
+      final result = await c.savePng(bytes, pickPath: () async => bad);
+
+      expect(result, isNull);
+      expect(c.logEntries.last.level, LogLevel.error);
+      expect(c.logEntries.last.message, contains('Failed to save map view'));
     });
   });
 
@@ -449,6 +509,68 @@ void main() {
       await expectLater(prefs.save(), completes);
     });
 
+    test('the similarity slider loads, snaps, persists, and round-trips', () {
+      // A loaded value snaps to a slider stop on the controller.
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json')
+        ..similarityPercent = 47;
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.similarity, 50);
+
+      // Setting it writes the snapped percent back into the shared bag.
+      c.setSimilarity(83);
+      expect(c.similarity, 80);
+      expect(prefs.similarityPercent, 80);
+    });
+
+    test(
+      'similarityPercent round-trips through a file and clamps on load',
+      () async {
+        final prefs = await AppPrefs.load(dir.path)
+          ..similarityPercent = 70;
+        await prefs.save();
+        expect((await AppPrefs.load(dir.path)).similarityPercent, 70);
+
+        // An out-of-range stored value is clamped into 0..100 on load.
+        File(
+          '${dir.path}/preferences.json',
+        ).writeAsStringSync('{"similarityPercent": 250}');
+        expect((await AppPrefs.load(dir.path)).similarityPercent, 100);
+      },
+    );
+
+    test('the similarity metric loads, persists, and round-trips', () async {
+      // A loaded Smart value applies on the controller.
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json')
+        ..similarityMetric = SimilarityMetric.smart;
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.similarityMetric, SimilarityMetric.smart);
+
+      // Switching writes it back into the shared bag.
+      c.setSimilarityMetric(SimilarityMetric.fast);
+      expect(prefs.similarityMetric, SimilarityMetric.fast);
+
+      // Round-trips through a file, defaulting to Fast for an unknown value.
+      await prefs.save();
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.similarityMetric, SimilarityMetric.fast);
+
+      File(
+        '${dir.path}/preferences.json',
+      ).writeAsStringSync('{"similarityMetric": "smart"}');
+      expect(
+        (await AppPrefs.load(dir.path)).similarityMetric,
+        SimilarityMetric.smart,
+      );
+
+      File(
+        '${dir.path}/preferences.json',
+      ).writeAsStringSync('{"similarityMetric": "bogus"}');
+      expect(
+        (await AppPrefs.load(dir.path)).similarityMetric,
+        SimilarityMetric.fast,
+      );
+    });
+
     test('setDefaultRawMode rejects embed without exiftool', () {
       final c = AppController(runner: FakeEngineRunner(), prefs: AppPrefs());
       c.setDefaultRawMode(RawMode.embed);
@@ -503,6 +625,140 @@ void main() {
       expect(prefs.backgroundVeil, 1.0);
     });
 
+    test('keep pipeline defaults to standard and round-trips', () async {
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.keepPipeline.steps.map((s) => s.rule), [
+        KeepRule.resolution,
+        KeepRule.quality,
+        KeepRule.people,
+      ]);
+
+      prefs.keepPipeline = const KeepPipeline([
+        KeepStep(KeepRule.quality),
+        KeepStep(KeepRule.resolution, enabled: false),
+      ]);
+      await prefs.save();
+
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.keepPipeline.steps[0].rule, KeepRule.quality);
+      expect(reloaded.keepPipeline.steps[0].enabled, isTrue);
+      expect(reloaded.keepPipeline.steps[1].rule, KeepRule.resolution);
+      expect(reloaded.keepPipeline.steps[1].enabled, isFalse);
+    });
+
+    test('low-quality params default to all four and round-trip', () async {
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.lowQParams, QualityParam.values.toSet());
+      expect(prefs.lowQThreshold, 0.35);
+
+      prefs.lowQParams = {QualityParam.sharpness, QualityParam.exposure};
+      prefs.lowQThreshold = 0.6;
+      await prefs.save();
+
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.lowQParams, {
+        QualityParam.sharpness,
+        QualityParam.exposure,
+      });
+      expect(reloaded.lowQThreshold, 0.6);
+    });
+
+    test('an empty saved param set round-trips as empty', () async {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json')
+        ..lowQParams = <QualityParam>{};
+      await prefs.save();
+      final reloaded = await AppPrefs.load(dir.path);
+      expect(reloaded.lowQParams, isEmpty);
+    });
+
+    test('load ignores unknown param names and clamps the threshold', () async {
+      File('${dir.path}/preferences.json').writeAsStringSync(
+        '{"lowQParams": ["sharpness", "bogus"], "lowQThreshold": 9.0}',
+      );
+      final prefs = await AppPrefs.load(dir.path);
+      expect(prefs.lowQParams, {QualityParam.sharpness});
+      expect(prefs.lowQThreshold, 1.0);
+    });
+
+    test('controller persists param toggle + threshold to the store', () {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      c.setLowQParamEnabled(QualityParam.color, false);
+      expect(prefs.lowQParams.contains(QualityParam.color), isFalse);
+      c.setShrinkQualityThreshold(0.7);
+      expect(prefs.lowQThreshold, 0.7);
+    });
+
+    test(
+      'controller loads the persisted params + threshold on construction',
+      () {
+        final prefs = AppPrefs(
+          lowQParams: {QualityParam.contrast},
+          lowQThreshold: 0.5,
+        );
+        final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+        expect(c.lowQParams, {QualityParam.contrast});
+        expect(c.shrinkQualityThreshold, 0.5);
+      },
+    );
+
+    test('controller persists pipeline reorder/toggle to the store', () {
+      final prefs = AppPrefs(file: '${dir.path}/preferences.json');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      c.reorderKeepRule(1, 0); // quality to the front
+      expect(prefs.keepPipeline.steps.first.rule, KeepRule.quality);
+      c.setKeepRuleEnabled(KeepRule.resolution, false);
+      final resolution = prefs.keepPipeline.steps.firstWhere(
+        (s) => s.rule == KeepRule.resolution,
+      );
+      expect(resolution.enabled, isFalse);
+    });
+
+    test('controller loads the persisted pipeline on construction', () {
+      final prefs = AppPrefs(
+        keepPipeline: const KeepPipeline([KeepStep(KeepRule.quality)]),
+      );
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.keepPipeline.steps.first.rule, KeepRule.quality);
+    });
+
+    test(
+      'setLocaleCode persists the override, round-trips, and notifies',
+      () async {
+        final path = '${dir.path}/preferences.json';
+        final prefs = AppPrefs(file: path);
+        final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+        var notified = 0;
+        c.addListener(() => notified++);
+
+        expect(c.localeCode, isNull); // null = follow system
+        c.setLocaleCode('sv');
+        expect(c.localeCode, 'sv');
+        expect(prefs.localeCode, 'sv');
+        expect(notified, 1);
+
+        // Setting the same value again is a no-op (no extra notify).
+        c.setLocaleCode('sv');
+        expect(notified, 1);
+
+        await prefs.save();
+        final reloaded = await AppPrefs.load(dir.path);
+        expect(reloaded.localeCode, 'sv');
+
+        // Clearing it back to system default persists null.
+        c.setLocaleCode(null);
+        expect(c.localeCode, isNull);
+        expect(prefs.localeCode, isNull);
+        expect(notified, 2);
+      },
+    );
+
+    test('controller loads the persisted localeCode on construction', () {
+      final prefs = AppPrefs(localeCode: 'ja');
+      final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
+      expect(c.localeCode, 'ja');
+    });
+
     test('setBackgroundImagePath persists and notifies', () {
       final prefs = AppPrefs();
       final c = AppController(runner: FakeEngineRunner(), prefs: prefs);
@@ -553,10 +809,10 @@ void main() {
         final c = AppController(
           probeToolkit: () async => [_tool('exiftool', present: false)],
         );
-        expect(c.environmentWarning, isNull);
+        expect(c.hasEnvironmentWarning, isFalse);
         await c.checkEnvironment();
         expect(c.exiftoolAvailable, isFalse);
-        expect(c.environmentWarning, contains("ExifTool couldn't start"));
+        expect(c.hasEnvironmentWarning, isTrue);
         expect(c.logEntries.any((e) => e.level == LogLevel.warning), isTrue);
       },
     );
@@ -565,7 +821,7 @@ void main() {
       final c = AppController(probeToolkit: () async => [_tool('exiftool')]);
       await c.checkEnvironment();
       expect(c.exiftoolAvailable, isTrue);
-      expect(c.environmentWarning, isNull);
+      expect(c.hasEnvironmentWarning, isFalse);
     });
 
     test('is idempotent — the probe runs at most once', () async {
@@ -589,7 +845,7 @@ void main() {
       expect(c.warningDismissed, isFalse);
       c.dismissWarning();
       expect(c.warningDismissed, isTrue);
-      expect(c.environmentWarning, isNotNull);
+      expect(c.hasEnvironmentWarning, isTrue);
     });
 
     test('hasBundledExiftool reflects the injected bundle dir', () {
@@ -646,20 +902,6 @@ void main() {
       expect(fake.lastTagGpx, ['/keep.gpx']);
     });
 
-    test('renderMap receives only included photos', () async {
-      final dir = Directory.systemTemp.createTempSync('map_excl');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final fake = FakeEngineRunner();
-      final c = AppController(runner: fake)
-        ..debugSetScan(
-          fakeScan(photos: const ['/keep.jpg', '/drop.jpg']),
-          folder: dir.path,
-        );
-      c.setFileIncluded('/drop.jpg', false);
-      await c.renderMap();
-      expect(fake.lastMapPhotos, ['/keep.jpg']);
-    });
-
     test('changeLibrary clears exclusions and metadata', () async {
       final c = AppController(runner: FakeEngineRunner())
         ..debugSetScan(fakeScan());
@@ -707,6 +949,53 @@ void main() {
       await c.loadImageMeta(['/a.jpg']);
       expect(c.metaLoading, isFalse);
       expect(c.fileMeta('/a.jpg'), isNull);
+    });
+  });
+
+  group('curated EXIF cache', () {
+    test('loadCuratedExif streams records into the cache', () async {
+      const exif = CuratedExif(path: '/a.jpg', make: 'Canon', iso: '400');
+      final c = AppController(
+        runner: FakeEngineRunner(curatedExif: const {'/a.jpg': exif}),
+      );
+      expect(c.curatedExif('/a.jpg'), isNull);
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(c.curatedExif('/a.jpg')?.make, 'Canon');
+      expect(c.curatedExif('/a.jpg')?.iso, '400');
+    });
+
+    test('loadCuratedExif skips already-cached/in-flight paths', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.loadCuratedExif(['/a.jpg']);
+      fake.lastCuratedExifPaths = null;
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(fake.lastCuratedExifPaths, isNull);
+    });
+
+    test('loadCuratedExif is a no-op for an empty pending set', () async {
+      final fake = FakeEngineRunner();
+      final c = AppController(runner: fake);
+      await c.loadCuratedExif(const []);
+      expect(fake.lastCuratedExifPaths, isNull);
+    });
+
+    test('loadCuratedExif surfaces stream errors without crashing', () async {
+      final c = AppController(runner: ThrowingEngineRunner());
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(c.curatedExif('/a.jpg'), isNull);
+    });
+
+    test('changeLibrary clears the curated EXIF cache', () async {
+      final c = AppController(
+        runner: FakeEngineRunner(
+          curatedExif: const {'/a.jpg': CuratedExif(path: '/a.jpg', iso: '1')},
+        ),
+      )..debugSetScan(fakeScan());
+      await c.loadCuratedExif(['/a.jpg']);
+      expect(c.curatedExif('/a.jpg'), isNotNull);
+      c.changeLibrary();
+      expect(c.curatedExif('/a.jpg'), isNull);
     });
   });
 
@@ -846,6 +1135,26 @@ void main() {
       expect(after, before);
     });
 
+    test(
+      'addRootPaths subsumes a child root under a newly added parent',
+      () async {
+        // A real dir holding a file: start with the file root, then add the
+        // parent dir. Containment-aware merge swaps the child for the parent —
+        // the list length is unchanged (1 -> 1) but contents differ, so it must
+        // still rescan on the new single parent root.
+        final fake = FakeEngineRunner();
+        final c = AppController(runner: fake);
+        final dir = Directory.systemTemp.createTempSync('subsume');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final jpg = File('${dir.path}/a.jpg')..writeAsStringSync('x');
+        await c.startScan(jpg.path);
+        expect(c.roots, [jpg.path]);
+        await c.addRootPaths([dir.path]);
+        expect(c.roots, [dir.path]);
+        expect(fake.lastScanRoots, [dir.path]);
+      },
+    );
+
     test('addFolder appends the picked folder', () async {
       final fake = FakeEngineRunner();
       final c = AppController(runner: fake, pickFolder: () async => '/b');
@@ -922,9 +1231,9 @@ void main() {
     test('folderName reflects single vs multiple roots', () async {
       final c = AppController(runner: FakeEngineRunner());
       await c.startScan('/a');
-      expect(c.folderName, 'a');
+      expect(c.folderName(enTr), 'a');
       await c.addRootPaths(['/b']);
-      expect(c.folderName, '2 locations');
+      expect(c.folderName(enTr), '2 locations');
     });
 
     test('changeLibrary clears the roots', () async {
@@ -932,7 +1241,7 @@ void main() {
       await c.startScan('/a');
       c.changeLibrary();
       expect(c.roots, isEmpty);
-      expect(c.folderName, isNull);
+      expect(c.folderName(enTr), isNull);
     });
 
     test('folder getter returns the first directory root', () async {

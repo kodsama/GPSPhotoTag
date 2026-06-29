@@ -320,6 +320,19 @@ void main() {
       expect(code, ExitCodes.badInput);
       expect(lastJsonLine()['code'], 'bad_input');
     });
+
+    test(
+      'missing --mode -> bad_input, not an unhandled crash (exit 3)',
+      () async {
+        final path = p.join(tmp.path, 'img.jpg');
+        File(path).writeAsBytesSync(minimalJpeg());
+        final code = await run(['--json', 'fix-dates', '-p', tmp.path]);
+        expect(code, ExitCodes.badInput);
+        final err = lastJsonLine();
+        expect(err['code'], 'bad_input');
+        expect(err['message'], contains('mode'));
+      },
+    );
   });
 
   group('map', () {

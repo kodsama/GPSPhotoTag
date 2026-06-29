@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../actions/map_action.dart';
+import '../actions/duplicates_action.dart';
 import '../actions/prune_action.dart';
+import '../actions/shrink_action.dart';
 import '../actions/tag_action.dart';
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../state/library_action.dart';
 
@@ -26,17 +28,39 @@ class ActionScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextButton.icon(
-              onPressed: controller.running ? null : controller.backToLibrary,
-              icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Library'),
+            Row(
+              children: [
+                // Navigating back NEVER cancels the run — it keeps going in the
+                // background and the workspace card shows its progress. Mid
+                // shrink session a stage page was reached from the wizard, so
+                // back returns there; standalone it returns to the library. This
+                // is the single back affordance in either context.
+                TextButton.icon(
+                  onPressed: controller.goBackFromAction,
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: Text(
+                    context.tr(
+                      controller.inShrinkSession
+                          ? 'shrink_review_back'
+                          : 'action_library_back',
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (controller.runStateFor(action).running)
+                  TextButton.icon(
+                    onPressed: () => controller.cancelAction(action),
+                    icon: const Icon(Icons.close, size: 18),
+                    label: Text(context.tr('action_cancel')),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
                 Icon(action.icon, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 10),
-                Text(action.title, style: text.headlineSmall),
+                Text(action.title(context.tr), style: text.headlineSmall),
               ],
             ),
             const SizedBox(height: 20),
@@ -49,8 +73,9 @@ class ActionScreen extends StatelessWidget {
 
   Widget _body(LibraryAction action) => switch (action) {
     LibraryAction.tag => const TagAction(),
-    LibraryAction.map => const MapAction(),
     LibraryAction.pruneRaw => const PruneAction(),
+    LibraryAction.duplicates => DuplicatesAction(),
+    LibraryAction.shrink => ShrinkAction(),
     // Explore is a full screen (AppScreen.explore), never an action panel.
     LibraryAction.explore => const SizedBox.shrink(),
   };

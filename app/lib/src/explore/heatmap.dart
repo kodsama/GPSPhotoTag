@@ -8,30 +8,42 @@ import 'package:flutter_map/flutter_map.dart';
 
 import 'explore_model.dart';
 
-/// Per-point influence radius, in SCREEN pixels — a constant, never scaled by
-/// zoom or photo count. A tight cluster therefore reads as a small hot dot when
-/// zoomed out and spreads naturally as you zoom in. Density (and thus heat)
-/// comes from how many points overlap within this radius, not from inflating it.
-const double kHeatRadius = 34;
+/// Per-photo influence radius, in SCREEN pixels — a constant, never scaled by
+/// zoom or photo count. This is the distance at which a splat's gaussian
+/// falloff has decayed to essentially nothing. A larger radius blends nearby
+/// photos into a smoother field. Heat comes from how many splats OVERLAP within
+/// this radius, not from inflating it (every splat is the same size).
+const double kHeatRadius = 48;
+
+/// Per-photo peak alpha (0..1) deposited at a splat's exact centre, before
+/// accumulation. Deliberately low so a single isolated photo is only a faint
+/// glow; density — and thus heat — builds up only where many splats overlap and
+/// their alphas sum (via [BlendMode.plus]).
+const double kHeatPointAlpha = 0.18;
 
 /// Overall opacity (0..1) of the entire composited heat overlay, including the
 /// hot red cores, so the map (streets, labels, water) always reads through it —
-/// like a reference heatmap.js layer. Tune this single knob to make the heat
-/// more or less translucent.
-const double kHeatLayerOpacity = 0.65;
+/// like a reference heatmap.js / leaflet.heat layer. Tune this single knob to
+/// make the heat more or less translucent.
+const double kHeatLayerOpacity = 0.6;
 
-/// One heat point to paint: a soft additive splat centred at [offset], reaching
-/// [kHeatRadius] pixels, contributing [weight] (0..1) of density at its core.
+/// Number of radial gradient colour stops used to approximate the gaussian
+/// falloff of one splat. More stops = smoother curve; this is plenty for a
+/// soft, blended look.
+const int _kGaussianStops = 8;
+
+/// One heat splat to paint: a soft gaussian blob centred at [offset]
+/// contributing [weight] (0..1) of peak density at its core, fading smoothly to
+/// nothing by [kHeatRadius].
 @immutable
 class HeatBlob {
-  /// Creates a splat at [offset] contributing [weight] (0..1) of density.
+  /// Creates a splat at [offset] contributing [weight] (0..1) of peak density.
   const HeatBlob({required this.offset, required this.weight});
 
   /// Splat centre in screen pixels.
   final Offset offset;
 
-  /// Per-point density contribution at the centre, in 0..1. More photos at one
-  /// coordinate ⇒ a heavier single splat; overlapping splats then accumulate.
+  /// Peak density contribution at the centre, in 0..1.
   final double weight;
 
   @override
@@ -42,29 +54,27 @@ class HeatBlob {
   int get hashCode => Object.hash(offset, weight);
 }
 
-/// Computes the heat splats to paint for points given each point's projected
-/// screen [offsets] and the viewport [size].
+/// Computes the heat splats to paint given each photo's projected screen
+/// [offsets] and the viewport [size].
 ///
-/// Pure (no widgets, no map camera) so the projection→cull→weight math is unit
-/// testable: input is the already-projected screen offsets (one per point, in
-/// the same order) plus each point's photo [counts]; output is the splat list.
-/// Points whose influence can't reach the viewport (offset further than
-/// [radius] outside it) are dropped. Each splat's [HeatBlob.weight] grows with
-/// the point's photo count — a single photo is a light splat, a stacked
-/// coordinate a heavier one — but the radius is the same constant for all, so
-/// density (and heat) builds from OVERLAP, not from inflating any one splat.
+/// Pure (no widgets, no map camera) so the projection→cull math is unit
+/// testable: input is the already-projected screen offsets — ONE PER PHOTO, at
+/// full coordinate precision (the field is built from individual photos, never
+/// pre-grouped points) — plus the viewport [size]; output is the splat list.
+/// Each splat carries the same low [kHeatPointAlpha] peak weight, so a city's
+/// many photos blend into a smooth field and a lone photo stays faint; heat
+/// builds purely from OVERLAP. Splats whose influence can't reach the viewport
+/// (centre further than [radius] outside it) are dropped.
 List<HeatBlob> computeHeatBlobs({
   required List<Offset> offsets,
-  required List<int> counts,
   required Size size,
   double radius = kHeatRadius,
+  double pointAlpha = kHeatPointAlpha,
 }) {
-  assert(offsets.length == counts.length, 'offsets/counts length mismatch');
   if (offsets.isEmpty) return const [];
 
   final blobs = <HeatBlob>[];
-  for (var i = 0; i < offsets.length; i++) {
-    final o = offsets[i];
+  for (final o in offsets) {
     // Cull splats whose influence can't reach the viewport.
     if (o.dx < -radius ||
         o.dy < -radius ||
@@ -72,45 +82,47 @@ List<HeatBlob> computeHeatBlobs({
         o.dy > size.height + radius) {
       continue;
     }
-    blobs.add(HeatBlob(offset: o, weight: weightForCount(counts[i])));
+    blobs.add(HeatBlob(offset: o, weight: pointAlpha));
   }
   return blobs;
 }
 
-/// The per-point density [HeatBlob.weight] for a coordinate holding [count]
-/// photos, in 0..1.
+/// The normalized gaussian falloff alpha at fractional distance [t] (0..1) from
+/// a splat's centre to its [kHeatRadius] edge.
 ///
-/// A single photo gets a soft floor so it still shows as a cool spot; extra
-/// photos at the same coordinate add diminishing weight (log-shaped) so one
-/// huge stack doesn't swamp the field on its own — overlap between distinct
-/// points is what drives the hot core.
-double weightForCount(int count) {
-  final n = count < 1 ? 1 : count;
-  // 1 → 0.45, 2 → ~0.76, 6 → ~1.0 (clamped). log2 so a single huge stack rises
-  // fast then flattens, letting overlap between points drive the hot core.
-  final w = 0.45 + 0.31 * (math.log(n) / math.ln2);
-  return w.clamp(0.0, 1.0);
+/// Returns `exp(-(t/σ)²/2)` with σ tuned so the blob has a soft, rounded core
+/// and is nearly zero at the edge (t = 1) — NOT a near-flat plateau that cuts
+/// off abruptly. Pure, so the falloff shape is unit testable: 1.0 at the centre,
+/// monotonically decreasing, and small (< ~0.05) at the rim.
+double gaussianFalloff(double t) {
+  // σ ≈ 0.38 puts the edge (t=1) at exp(-3.46) ≈ 0.031 — a clean soft fade.
+  const sigma = 0.38;
+  final x = t.clamp(0.0, 1.0) / sigma;
+  return math.exp(-(x * x) / 2);
 }
 
 /// Builds the 256-entry intensity→RGBA palette lookup table used to colorize
 /// the accumulated density field, returned as a flat `Uint8List` of length
 /// 256×4 (`[r,g,b,a, r,g,b,a, …]`, straight/unpremultiplied).
 ///
-/// Index `i` (0..255) is density `i/255`. The ramp matches a classic
-/// heatmap.js / leaflet.heat look: the cold end is fully transparent (so sparse
-/// areas reveal the map under both light and dark tiles), rising through blue,
-/// cyan, green, yellow to an opaque hot red core. Pure, so the key stops and
-/// the transparent floor are unit testable.
+/// Index `i` (0..255) is accumulated density `i/255`. The ramp matches a classic
+/// heatmap.js / leaflet.heat look but with a LONG transparent/cool tail: the low
+/// end stays fully (then barely) transparent so sparse areas reveal the map
+/// under both light and dark tiles, ramping blue→cyan→green→yellow→red only as
+/// many splats overlap and density climbs — never an abrupt jump straight to
+/// opaque red. Pure, so the key stops and the transparent floor are unit
+/// testable.
 Uint8List buildHeatPalette() {
-  // (stop in 0..1, color, alpha 0..255). Alpha ramps in quickly from the
-  // transparent floor so even sparse density is faintly visible.
+  // (stop in 0..1, r, g, b, alpha 0..255). A long transparent tail keeps sparse
+  // density see-through; alpha and warmth ramp up only as density accumulates.
   const stops = <(double, int, int, int, int)>[
-    (0.00, 0x00, 0x00, 0x00, 0), // transparent
-    (0.15, 0x22, 0x22, 0xEE, 90), // blue
-    (0.35, 0x22, 0xCC, 0xEE, 160), // cyan
-    (0.55, 0x22, 0xEE, 0x44, 205), // green
-    (0.75, 0xEE, 0xEE, 0x22, 235), // yellow
-    (1.00, 0xEE, 0x22, 0x22, 255), // hot red
+    (0.00, 0x00, 0x00, 0x00, 0), // fully transparent
+    (0.20, 0x20, 0x40, 0xEE, 0), // still transparent (long cool tail)
+    (0.35, 0x20, 0x60, 0xEE, 70), // blue, just becoming visible
+    (0.50, 0x20, 0xC0, 0xEE, 130), // cyan
+    (0.65, 0x20, 0xEE, 0x50, 175), // green
+    (0.82, 0xEE, 0xEE, 0x20, 215), // yellow
+    (1.00, 0xEE, 0x20, 0x20, 255), // hot red core
   ];
 
   final lut = Uint8List(256 * 4);
@@ -158,20 +170,22 @@ int _lerpByte(int a, int b, double f) =>
   );
 }
 
-/// A flutter_map layer drawing a density heat overlay for [points] that tracks
-/// pan/zoom via the live [MapCamera].
+/// A flutter_map layer drawing a density heat overlay for individual [photos]
+/// that tracks pan/zoom via the live [MapCamera].
 ///
-/// Thin glue: projection per-frame uses the camera, then the unit-tested
-/// [computeHeatBlobs] decides what to splat. The two-pass density→colorize
-/// render (accumulate grayscale, then map through [buildHeatPalette]) happens in
+/// Thin glue: each photo's full-precision coordinate is projected per-frame
+/// using the camera (NOT pre-grouped), then the unit-tested [computeHeatBlobs]
+/// decides what to splat. The two-pass density→colorize render (accumulate a
+/// soft gaussian field, then map through [buildHeatPalette]) happens in
 /// [_HeatmapLayerState], which recomputes the colorized image only when the
 /// splats or viewport change — not every paint — so panning stays smooth.
 class HeatmapLayer extends StatefulWidget {
-  /// Creates the heat overlay for [points].
-  const HeatmapLayer({super.key, required this.points});
+  /// Creates the heat overlay from individual [photos].
+  const HeatmapLayer({super.key, required this.photos});
 
-  /// The grouped map points to render as heat.
-  final List<MapPoint> points;
+  /// The individual geotagged photos to render as heat (full precision, NOT
+  /// grouped). Overlapping splats are what create the smooth gradient.
+  final List<ExplorePhoto> photos;
 
   @override
   State<HeatmapLayer> createState() => _HeatmapLayerState();
@@ -195,17 +209,11 @@ class _HeatmapLayerState extends State<HeatmapLayer> {
   Widget build(BuildContext context) {
     final camera = MapCamera.of(context);
     final size = camera.size;
-    final offsets = <Offset>[];
-    final counts = <int>[];
-    for (final point in widget.points) {
-      offsets.add(camera.latLngToScreenOffset(point.position));
-      counts.add(point.count);
-    }
-    final blobs = computeHeatBlobs(
-      offsets: offsets,
-      counts: counts,
-      size: size,
-    );
+    final offsets = <Offset>[
+      for (final photo in widget.photos)
+        camera.latLngToScreenOffset(photo.position),
+    ];
+    final blobs = computeHeatBlobs(offsets: offsets, size: size);
 
     // Only rebuild the (expensive) colorized image when inputs change.
     if (blobs != _blobs || size != _size) {
@@ -247,11 +255,12 @@ class _HeatmapLayerState extends State<HeatmapLayer> {
 /// the viewport is empty.
 ///
 /// Pass 1 accumulates a grayscale density field: each splat is a white radial
-/// gradient (alpha = its [HeatBlob.weight] at centre, fading to transparent at
-/// [kHeatRadius]) composited additively so overlapping splats sum their alpha,
-/// saturating at full. Pass 2 reads that field back and maps each pixel's
-/// accumulated alpha through [palette] to RGBA, producing the cool→hot gradient
-/// with a transparent cold floor.
+/// gradient whose alpha follows [gaussianFalloff] (peak = its [HeatBlob.weight]
+/// at centre, fading smoothly to ~0 at [kHeatRadius]) composited additively so
+/// overlapping splats SUM their alpha, saturating at full only where many pile
+/// up. Pass 2 reads that field back and maps each pixel's accumulated alpha
+/// through [palette] to RGBA, producing the cool→hot gradient with its long
+/// transparent cold floor.
 Future<ui.Image?> renderHeatmapImage({
   required List<HeatBlob> blobs,
   required Size size,
@@ -261,17 +270,30 @@ Future<ui.Image?> renderHeatmapImage({
   final h = size.height.floor();
   if (blobs.isEmpty || w <= 0 || h <= 0) return null;
 
-  // Pass 1: accumulate grayscale density.
+  // Precompute the gaussian gradient colour stops (shared by every splat shape;
+  // only the peak alpha per blob differs). _kGaussianStops samples of
+  // gaussianFalloff from centre (t=0) to rim (t=1).
+  final stopPositions = <double>[
+    for (var s = 0; s < _kGaussianStops; s++) s / (_kGaussianStops - 1),
+  ];
+  final falloffs = <double>[for (final t in stopPositions) gaussianFalloff(t)];
+
+  // Pass 1: accumulate a soft gaussian grayscale density field.
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   for (final blob in blobs) {
-    final core = const Color(0xFFFFFFFF).withValues(alpha: blob.weight);
+    final colors = <Color>[
+      for (final f in falloffs)
+        const Color(0xFFFFFFFF).withValues(alpha: blob.weight * f),
+    ];
     final paint = Paint()
       ..blendMode = BlendMode.plus
-      ..shader = ui.Gradient.radial(blob.offset, kHeatRadius, <Color>[
-        core,
-        const Color(0x00FFFFFF),
-      ]);
+      ..shader = ui.Gradient.radial(
+        blob.offset,
+        kHeatRadius,
+        colors,
+        stopPositions,
+      );
     canvas.drawCircle(blob.offset, kHeatRadius, paint);
   }
   final picture = recorder.endRecording();
@@ -284,8 +306,8 @@ Future<ui.Image?> renderHeatmapImage({
 
   // Pass 2: colorize each pixel's accumulated alpha through the palette LUT.
   // The accumulated alpha (0..255, saturating where many splats overlap) is the
-  // density field directly: a lone splat (weight ≈ 0.45) lands mid-blue/cyan,
-  // and a few overlapping splats ramp it to the hot red core.
+  // density field directly: a lone faint splat stays in the transparent cold
+  // tail, and many overlapping splats ramp it up to the hot red core.
   final src = bytes.buffer.asUint8List();
   final out = Uint8List(src.length);
   for (var i = 0; i < src.length; i += 4) {

@@ -253,6 +253,54 @@ void main() {
     expect(r.photos.where((path) => p.basename(path) == 'a.jpg').length, 1);
   });
 
+  test('nested directory roots do not double-count the overlap', () async {
+    // /root and /root/2025 overlap on the 2025 subtree; walking both must walk
+    // and count every shared file and directory exactly once.
+    final whole = await _resultOf(
+      await FolderScanner().scan([root.path]).toList(),
+    );
+    final overlapping = await _resultOf(
+      await FolderScanner().scan([
+        root.path,
+        p.join(root.path, '2025'),
+        p.join(root.path, '2025', '06'),
+      ]).toList(),
+    );
+    expect(overlapping.files, whole.files);
+    expect(overlapping.dirs, whole.dirs);
+    expect(overlapping.photoCount, whole.photoCount);
+    expect(overlapping.byExtension, whole.byExtension);
+  });
+
+  test(
+    'differently-formed paths to the same file dedupe to one count',
+    () async {
+      final base = p.join(root.path, '2025', '06');
+      final plain = p.join(base, 'a.jpg');
+      final dotted = p.join(base, '.', 'a.jpg'); // ./a.jpg
+      final viaParent = p.join(base, '..', '06', 'a.jpg'); // ../06/a.jpg
+      final r = await _resultOf(
+        await FolderScanner().scan([plain, dotted, viaParent]).toList(),
+      );
+      expect(r.files, 1);
+      expect(r.photoCount, 1);
+    },
+  );
+
+  test(
+    'a trailing-slash directory root dedupes against its plain form',
+    () async {
+      final plain = p.join(root.path, '2025');
+      final slashed = '$plain${Platform.pathSeparator}';
+      final r = await _resultOf(
+        await FolderScanner().scan([plain, slashed]).toList(),
+      );
+      // 2025 + 2025/06 walked once each despite two path-forms of the root.
+      expect(r.dirs, 2);
+      expect(r.photoCount, 3); // a.jpg, b.png, e.webp
+    },
+  );
+
   test('unsupported sample list is capped while counts stay exact', () async {
     final big = Directory.systemTemp.createTempSync('capscan');
     addTearDown(() => big.deleteSync(recursive: true));

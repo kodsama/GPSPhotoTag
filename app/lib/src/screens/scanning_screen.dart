@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -25,14 +26,14 @@ class ScanningScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Scanning your library…',
+              context.tr('scanning_title'),
               style: text.headlineSmall,
               textAlign: TextAlign.center,
             ),
-            if (controller.folderName != null) ...[
+            if (controller.folderName(context.tr) != null) ...[
               const SizedBox(height: 6),
               Text(
-                controller.folderName!,
+                controller.folderName(context.tr)!,
                 style: text.bodySmall,
                 textAlign: TextAlign.center,
               ),
@@ -47,26 +48,46 @@ class ScanningScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               alignment: WrapAlignment.center,
-              children: [
-                _Tile(label: 'Files', value: progress.files),
-                _Tile(label: 'Folders', value: progress.dirs),
-                _Tile(
-                  label: 'Photos',
-                  value: progress.photos,
-                  accent: AppColors.terracotta,
-                ),
-                _Tile(
-                  label: 'GPS tracks',
-                  value: progress.tracks,
-                  accent: AppColors.contour,
-                ),
-                _Tile(
-                  label: 'Timeline',
-                  value: progress.google,
-                  accent: AppColors.contour,
-                ),
-                _Tile(label: 'Unsupported', value: progress.unsupported),
-              ],
+              // On mobile the library is photos only — folders, GPS tracks,
+              // Timeline and "unsupported" don't apply, so show just the photo
+              // count. Desktop keeps the full per-category tally.
+              children: controller.isMobile
+                  ? [
+                      _Tile(
+                        label: context.tr('scan_tile_photos'),
+                        value: progress.photos,
+                        accent: AppColors.terracotta,
+                      ),
+                    ]
+                  : [
+                      _Tile(
+                        label: context.tr('scan_tile_files'),
+                        value: progress.files,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_folders'),
+                        value: progress.dirs,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_photos'),
+                        value: progress.photos,
+                        accent: AppColors.terracotta,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_tracks'),
+                        value: progress.tracks,
+                        accent: AppColors.contour,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_timeline'),
+                        value: progress.google,
+                        accent: AppColors.contour,
+                      ),
+                      _Tile(
+                        label: context.tr('scan_tile_unsupported'),
+                        value: progress.unsupported,
+                      ),
+                    ],
             ),
           ],
         ),

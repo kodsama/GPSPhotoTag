@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
 import '../data/iana_timezones.dart';
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
@@ -51,11 +52,16 @@ class _Options extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On mobile there is no exiftool and no scanned track files: the user picks
+    // GPS track / Google-history files and the app resolves + writes GPS through
+    // the photo library. A focused form replaces the desktop options.
+    if (controller.isMobile) {
+      return _MobileOptions(controller: controller);
+    }
     final count = controller.photoCount;
     final label = controller.dryRun
-        ? 'Preview $count photos'
-        : 'Tag $count '
-              'photos';
+        ? context.tr('tag_preview_photos', {'count': count})
+        : context.tr('tag_tag_photos', {'count': count});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -64,15 +70,15 @@ class _Options extends StatelessWidget {
           const SizedBox(height: 14),
         ],
         _Switch(
-          label: 'Copy to a new folder',
-          help: 'Off modifies originals in place; on writes tagged copies.',
+          label: context.tr('tag_copy_label'),
+          help: context.tr('tag_copy_help'),
           value: controller.copyToFolder,
           onChanged: controller.setCopyToFolder,
         ),
         if (controller.copyToFolder) _outDir(context),
         _Switch(
-          label: 'Replace existing GPS',
-          help: 'Overwrite coordinates already present in a photo.',
+          label: context.tr('tag_replace_label'),
+          help: context.tr('tag_replace_help'),
           value: controller.replace,
           onChanged: controller.setReplace,
         ),
@@ -84,8 +90,8 @@ class _Options extends StatelessWidget {
         _timezone(context),
         const SizedBox(height: 8),
         _Switch(
-          label: 'Dry run',
-          help: 'Locate and report only — write nothing.',
+          label: context.tr('tag_dry_run'),
+          help: context.tr('tag_dry_run_help'),
           value: controller.dryRun,
           onChanged: controller.setDryRun,
         ),
@@ -113,7 +119,11 @@ class _Options extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: controller.pickOutDir,
             icon: const Icon(Icons.folder_open),
-            label: Text(dir == null ? 'Choose destination folder' : 'Change'),
+            label: Text(
+              dir == null
+                  ? context.tr('tag_choose_destination')
+                  : context.tr('tag_change'),
+            ),
           ),
           if (dir != null)
             Padding(
@@ -130,7 +140,7 @@ class _Options extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Pick a folder to continue.',
+                context.tr('tag_pick_folder'),
                 style: text.bodySmall?.copyWith(color: AppColors.warning),
               ),
             ),
@@ -145,15 +155,21 @@ class _Options extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('RAW write mode', style: text.titleMedium),
+        Text(context.tr('tag_raw_mode'), style: text.titleMedium),
         const SizedBox(height: 8),
         SegmentedButton<RawMode>(
           segments: [
-            const ButtonSegment(value: RawMode.auto, label: Text('Auto')),
-            const ButtonSegment(value: RawMode.sidecar, label: Text('Sidecar')),
+            ButtonSegment(
+              value: RawMode.auto,
+              label: Text(context.tr('tag_raw_auto')),
+            ),
+            ButtonSegment(
+              value: RawMode.sidecar,
+              label: Text(context.tr('tag_raw_sidecar')),
+            ),
             ButtonSegment(
               value: RawMode.embed,
-              label: const Text('Embed'),
+              label: Text(context.tr('tag_raw_embed')),
               enabled: !embedDisabled,
             ),
           ],
@@ -164,10 +180,7 @@ class _Options extends StatelessWidget {
         if (embedDisabled)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              'Embed needs ExifTool (missing) — Auto falls back to sidecars.',
-              style: text.bodySmall,
-            ),
+            child: Text(context.tr('tag_embed_help'), style: text.bodySmall),
           ),
       ],
     );
@@ -182,12 +195,9 @@ class _Options extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Max time difference (seconds)', style: text.titleMedium),
+              Text(context.tr('tag_max_diff'), style: text.titleMedium),
               const SizedBox(height: 2),
-              Text(
-                'Largest gap between a photo and a GPS point.',
-                style: text.bodySmall,
-              ),
+              Text(context.tr('tag_max_diff_help'), style: text.bodySmall),
             ],
           ),
         ),
@@ -208,25 +218,25 @@ class _Options extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Timezone (optional)', style: text.titleMedium),
+        Text(context.tr('tag_timezone_optional'), style: text.titleMedium),
         const SizedBox(height: 2),
-        Text(
-          'IANA name used when EXIF has no offset, e.g. Europe/Paris.',
-          style: text.bodySmall,
-        ),
+        Text(context.tr('tag_timezone_help'), style: text.bodySmall),
         const SizedBox(height: 8),
         DropdownMenu<String>(
-          // 'Auto-detect' maps to a null timezone (use EXIF offset).
+          // The auto-detect sentinel maps to a null timezone (use EXIF offset).
           initialSelection: controller.timezone ?? _autoDetect,
           enableFilter: true,
           requestFocusOnTap: true,
           expandedInsets: EdgeInsets.zero,
-          label: const Text('Timezone'),
+          label: Text(context.tr('tag_timezone')),
           onSelected: (value) => controller.setTimezone(
             value == null || value == _autoDetect ? null : value,
           ),
           dropdownMenuEntries: [
-            const DropdownMenuEntry(value: _autoDetect, label: _autoDetect),
+            DropdownMenuEntry(
+              value: _autoDetect,
+              label: context.tr('tag_auto_detect'),
+            ),
             for (final zone in kIanaTimezones)
               DropdownMenuEntry(value: zone, label: zone),
           ],
@@ -238,6 +248,88 @@ class _Options extends StatelessWidget {
 
 /// The sentinel "auto-detect" entry that maps to a null timezone.
 const _autoDetect = 'Auto-detect';
+
+/// The mobile tag form: pick GPS track / Google-history files, then write
+/// resolved coordinates back onto the photo library through the native GPS API.
+///
+/// There is no exiftool, no RAW mode, and no copy-to-folder on mobile; the only
+/// inputs are the track files, the existing-GPS guard, the time window, and a
+/// dry-run preview toggle.
+class _MobileOptions extends StatelessWidget {
+  const _MobileOptions({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final tracks = controller.mobileTrackFiles;
+    final hasTracks = tracks.isNotEmpty;
+    final count = controller.photoCount;
+    final label = controller.dryRun
+        ? context.tr('tag_preview_photos', {'count': count})
+        : context.tr('tag_tag_photos', {'count': count});
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.tr('tag_mobile_tracks_title'), style: text.titleMedium),
+        const SizedBox(height: 2),
+        Text(context.tr('tag_mobile_tracks_help'), style: text.bodySmall),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: controller.pickMobileTrackFiles,
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: Text(context.tr('tag_mobile_pick_tracks')),
+        ),
+        if (hasTracks) ...[
+          const SizedBox(height: 10),
+          for (final path in tracks)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.insert_drive_file_outlined,
+                    size: 18,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(path, style: text.bodySmall)),
+                ],
+              ),
+            ),
+          const SizedBox(height: 6),
+          TextButton.icon(
+            onPressed: controller.clearMobileTrackFiles,
+            icon: const Icon(Icons.clear, size: 18),
+            label: Text(context.tr('tag_mobile_clear_tracks')),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _Switch(
+          label: context.tr('tag_replace_label'),
+          help: context.tr('tag_replace_help'),
+          value: controller.replace,
+          onChanged: controller.setReplace,
+        ),
+        const SizedBox(height: 8),
+        _Switch(
+          label: context.tr('tag_dry_run'),
+          help: context.tr('tag_dry_run_help'),
+          value: controller.dryRun,
+          onChanged: controller.setDryRun,
+        ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: (hasTracks && count > 0) ? controller.runTagMobile : null,
+          icon: const Icon(Icons.play_arrow),
+          label: Text(label),
+        ),
+      ],
+    );
+  }
+}
 
 /// The post-run result: summary table + back-to-library button.
 class _Done extends StatelessWidget {
@@ -264,7 +356,7 @@ class _Done extends StatelessWidget {
         FilledButton.icon(
           onPressed: controller.backToLibrary,
           icon: const Icon(Icons.check),
-          label: const Text('Done — back to library'),
+          label: Text(context.tr('done_back_to_library')),
         ),
       ],
     );

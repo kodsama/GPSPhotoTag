@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -9,12 +11,17 @@ import 'package:path/path.dart' as p;
 import '../engine/engine_runner.dart';
 import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
+import '../engine/mobile_library.dart';
 import '../explore/explore_model.dart';
+import 'action_run_state.dart';
 import 'app_prefs.dart';
 import 'app_screen.dart';
+import 'duplicates_model.dart';
 import 'library_action.dart';
 import 'library_roots.dart';
 import 'log_entry.dart';
+import 'prune_direction.dart';
+import 'shrink_model.dart';
 
 /// The single source of truth for the Stunda GUI.
 ///
@@ -34,8 +41,25 @@ class AppController extends ChangeNotifier {
     Future<String?> Function()? pickFolder,
     Future<List<ToolStatus>> Function()? probeToolkit,
     String? exiftoolBundleDir,
+    String? onnxBundleDir,
     AppPrefs? prefs,
-  }) : _pickFolder = pickFolder ?? getDirectoryPath,
+    PhotoLibrary? photoLibrary,
+    Future<bool> Function()? requestPhotoAccess,
+    Future<List<String>> Function()? pickTrackFiles,
+    bool mobileRawPruning = false,
+  }) : _pickTrackFiles = pickTrackFiles ?? _defaultPickTrackFiles,
+       _rawPruningOnMobile = mobileRawPruning,
+       // Public params mapping to private fields can't be initializing formals
+       // (that would expose the private names as the param names).
+       // ignore: prefer_initializing_formals
+       _photoLibrary = photoLibrary,
+       // ignore: prefer_initializing_formals
+       _requestPhotoAccess = requestPhotoAccess,
+       // A public param name mapping to a private field can't be an
+       // initializing formal (that would expose `_onnxBundleDir` as the param).
+       // ignore: prefer_initializing_formals
+       _onnxBundleDir = onnxBundleDir,
+       _pickFolder = pickFolder ?? getDirectoryPath,
        _exiftoolBundleDir = exiftoolBundleDir,
        _prefs = prefs,
        _probeToolkit =
@@ -52,6 +76,13 @@ class AppController extends ChangeNotifier {
       _themeMode = prefs.themeMode;
       _rawMode = prefs.defaultRawMode;
       _maxTimeDiffSeconds = prefs.defaultMaxTimeDiffSeconds;
+      _keepPipeline = prefs.keepPipeline;
+      _localeCode = prefs.localeCode;
+      _lowQParams = Set<QualityParam>.of(prefs.lowQParams);
+      _shrinkQualityThreshold = prefs.lowQThreshold;
+      _similarity = snapSimilarityPercent(prefs.similarityPercent);
+      _similarityMetric = prefs.similarityMetric;
+      _homeActions = prefs.homeActions;
     }
   }
 
@@ -66,9 +97,49 @@ class AppController extends ChangeNotifier {
   /// On-disk dir of the app-bundled exiftool, or null when none is bundled.
   final String? _exiftoolBundleDir;
 
+  /// On-disk dir of the app-bundled ONNX Runtime lib + detector model, or null
+  /// when none is bundled (then duplicate hashing uses Tier-1 metadata only).
+  final String? _onnxBundleDir;
+
   /// The always-on MCP server for LLM clients. Constructed eagerly (cheap), but
   /// only spawns its isolate when [McpService.start] is called from `main`.
   final McpService mcp;
+
+  /// The device photo library on mobile (iOS Photos / Android MediaStore), or
+  /// null on desktop. Its presence flips the controller into [isMobile] mode:
+  /// the library is enumerated + exported to proxy files for the engine, and
+  /// trash + GPS-write route through it instead of touching the filesystem.
+  final PhotoLibrary? _photoLibrary;
+
+  /// Requests photo-library access on mobile (granted → true). Defaults to a
+  /// no-op denying access; `main` wires it to the device library's permission
+  /// prompt, and tests inject a canned grant/deny.
+  final Future<bool> Function()? _requestPhotoAccess;
+
+  /// Opens a file picker for GPS track / Google-history files on mobile,
+  /// returning the chosen paths (empty when cancelled). Defaults to a
+  /// file_selector picker; tests inject canned paths.
+  final Future<List<String>> Function() _pickTrackFiles;
+
+  /// The mobile proxy↔asset mapping built by the last [scanLibrary]; null on
+  /// desktop or before the first mobile scan.
+  MobileLibrary? _mobileLibrary;
+
+  /// Whether the app is running against a device photo library (mobile) rather
+  /// than the desktop filesystem. Every mobile-only code path is guarded by
+  /// this; when false the existing desktop logic runs exactly as before.
+  bool get isMobile => _photoLibrary != null;
+
+  /// Whether RAW pruning is viable on this mobile platform (set by `main` to
+  /// `Platform.isAndroid`). Android exposes a RAW and its JPEG as separate
+  /// MediaStore assets that pair by filename; iOS fuses RAW+JPEG into one Photos
+  /// asset (and a stand-alone ProRAW is the only copy), so there is nothing safe
+  /// to pair or delete there. Ignored on desktop.
+  final bool _rawPruningOnMobile;
+
+  /// Whether the Match-Images-to-RAW feature is available: always on desktop,
+  /// and on Android mobile; not on iOS (see [_rawPruningOnMobile]).
+  bool get supportsRawPruning => !isMobile || _rawPruningOnMobile;
 
   /// Whether a bundled exiftool is present on disk.
   bool get hasBundledExiftool => _exiftoolBundleDir != null;
@@ -77,7 +148,31 @@ class AppController extends ChangeNotifier {
   EngineRunner get _engine => _runner ??= IsolateRunner(
     exiftoolAvailable: exiftoolAvailable,
     exiftoolBundleDir: _exiftoolBundleDir,
+    onnxBundleDir: _onnxBundleDir,
   );
+
+  // --- Contextual help mode ("What's this?") -------------------------------
+
+  bool _helpMode = false;
+
+  /// Whether the contextual "What's this?" help mode is active: the next click
+  /// on a tagged control opens the Help page at that control's section instead
+  /// of performing the control's action. Exited on Done, Esc, or after one use.
+  bool get helpMode => _helpMode;
+
+  /// Enters contextual help mode (idempotent).
+  void enterHelpMode() {
+    if (_helpMode) return;
+    _helpMode = true;
+    notifyListeners();
+  }
+
+  /// Exits contextual help mode (idempotent).
+  void exitHelpMode() {
+    if (!_helpMode) return;
+    _helpMode = false;
+    notifyListeners();
+  }
 
   // --- Theme ---------------------------------------------------------------
 
@@ -100,6 +195,24 @@ class AppController extends ChangeNotifier {
   /// always flips what the user sees — even from [ThemeMode.system].
   void setDark(bool dark) =>
       setThemeMode(dark ? ThemeMode.dark : ThemeMode.light);
+
+  // --- Language (persisted) ------------------------------------------------
+
+  String? _localeCode;
+
+  /// The persisted language override (a supported locale code), or null to
+  /// follow the system locale.
+  String? get localeCode => _localeCode;
+
+  /// Sets (null = follow system) the language override and persists it; the app
+  /// rebuilds `MaterialApp` with the new locale live.
+  void setLocaleCode(String? code) {
+    if (_localeCode == code) return;
+    _localeCode = code;
+    _prefs?.localeCode = code;
+    _persistPrefs();
+    notifyListeners();
+  }
 
   // --- Tag defaults (persisted) --------------------------------------------
 
@@ -133,7 +246,44 @@ class AppController extends ChangeNotifier {
     final prefs = _prefs;
     if (prefs == null) return;
     prefs.themeMode = _themeMode;
+    prefs.keepPipeline = _keepPipeline;
+    prefs.localeCode = _localeCode;
+    prefs.lowQParams = Set<QualityParam>.of(_lowQParams);
+    prefs.lowQThreshold = _shrinkQualityThreshold;
+    prefs.similarityPercent = _similarity;
+    prefs.similarityMetric = _similarityMetric;
+    prefs.homeActions = _homeActions;
     prefs.save();
+  }
+
+  // --- Home actions (order + visibility, persisted) ------------------------
+
+  HomeActionsConfig _homeActions = HomeActionsConfig.standard;
+
+  /// The full home-action configuration (order + hidden set) — what the Settings
+  /// editor lists, every action in its current order.
+  HomeActionsConfig get homeActions => _homeActions;
+
+  /// The ordered, visible-only actions the workspace grid renders. Empty when
+  /// the user has hidden every action.
+  List<LibraryAction> get visibleActionsInOrder => _homeActions.visibleInOrder;
+
+  /// Moves the home action at [oldIndex] to [newIndex] (drag-to-reorder),
+  /// persisting the new order so the workspace reflects it live.
+  void reorderHomeAction(int oldIndex, int newIndex) {
+    final next = _homeActions.reorder(oldIndex, newIndex);
+    if (identical(next, _homeActions)) return;
+    _homeActions = next;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Shows ([visible] true) or hides [action] on the workspace, persisting it.
+  void setHomeActionVisible(LibraryAction action, bool visible) {
+    if (_homeActions.isVisible(action) == visible) return;
+    _homeActions = _homeActions.withVisibility(action, visible);
+    _persistPrefs();
+    notifyListeners();
   }
 
   // --- Background (persisted) ----------------------------------------------
@@ -172,9 +322,14 @@ class AppController extends ChangeNotifier {
   /// The action whose focused panel is open (only on [AppScreen.action]).
   LibraryAction? get action => _action;
 
-  /// Opens the focused panel for [action] (resets any prior run state).
+  /// Opens the focused panel for [action], clearing its attention badge.
   ///
-  /// Destructive actions preview first: opening [LibraryAction.pruneRaw]
+  /// A background run keeps going across navigation, so opening an action that
+  /// is still running (or has finished and is waiting to be reviewed) returns to
+  /// its live progress / results rather than resetting it. Only an idle action
+  /// is reset to a fresh pre-run state.
+  ///
+  /// Destructive actions preview first: opening an idle [LibraryAction.pruneRaw]
   /// classifies the library (cheap, in-process) so the panel can show a
   /// reviewable, selectable list — nothing is removed until the user confirms.
   void openAction(LibraryAction action) {
@@ -185,20 +340,41 @@ class AppController extends ChangeNotifier {
       return;
     }
     _action = action;
-    _resetRun();
-    if (action == LibraryAction.pruneRaw) {
-      _preparePruneReview();
-    } else {
-      _pairing = null;
+    // Opening the action is the user's acknowledgement: clear its badge.
+    _clearAttention(action);
+    final state = _runStates[action] ?? ActionRunState.idle;
+    // A running or to-be-reviewed action keeps its live state; only a truly
+    // idle action is reset to a fresh pre-run surface.
+    if (!state.running && !state.needsReview) {
+      _resetRun();
+      _duplicatePairs = null;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      if (action == LibraryAction.pruneRaw) {
+        _preparePruneReview();
+      } else if (action == LibraryAction.shrink) {
+        _pairing = null;
+        _prepareShrink();
+      } else {
+        _pairing = null;
+      }
     }
     _screen = AppScreen.action;
     notifyListeners();
   }
 
-  /// Returns from an action panel to the workspace hub.
+  /// Returns from an action panel to the workspace hub WITHOUT cancelling any
+  /// run — the run keeps going in the background and its card shows progress.
+  ///
+  /// The live run fields are only reset when the action being left is idle, so a
+  /// finished-and-reviewed action returns to a clean slate next time.
   void backToLibrary() {
+    final action = _action;
+    final state = action == null
+        ? ActionRunState.idle
+        : (_runStates[action] ?? ActionRunState.idle);
     _action = null;
-    _resetRun();
+    if (!state.running) _resetRun();
     _screen = AppScreen.workspace;
     notifyListeners();
   }
@@ -207,6 +383,9 @@ class AppController extends ChangeNotifier {
   void changeLibrary() {
     _sub?.cancel();
     _metaSub?.cancel();
+    _curatedSub?.cancel();
+    _curatedLoading.clear();
+    _curatedExif.clear();
     _exploreSub?.cancel();
     _explorePhotos.clear();
     _exploreLoading = false;
@@ -214,6 +393,10 @@ class AppController extends ChangeNotifier {
     _roots.clear();
     _action = null;
     _resetRun();
+    _runStates.clear();
+    _activeAction = null;
+    _duplicatesCancelled = true;
+    _findingDuplicates = false;
     _excludedFiles.clear();
     _meta.clear();
     _metaLoading.clear();
@@ -223,12 +406,35 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Environment self-check ----------------------------------------------
+  /// Whether the system back gesture has an in-app destination to navigate to
+  /// (true everywhere except [AppScreen.welcome], from which back exits the app).
+  bool get canGoBack => _screen != AppScreen.welcome;
 
-  /// User-facing message shown when exiftool couldn't start.
-  static const _exiftoolWarning =
-      "ExifTool couldn't start, so RAW-embed, HEIC, and Fuji/Canon RAW "
-      'timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.';
+  /// Navigates one in-app step "back" for the system back button/gesture, which
+  /// would otherwise pop the single route and quit the app (there is no
+  /// Navigator stack — navigation is modelled by [screen]). Maps action and
+  /// explore back to the workspace hub, the workspace and an in-flight scan back
+  /// to welcome, and is a no-op on welcome (so the caller lets the real pop
+  /// through and the app exits).
+  void goBack() {
+    switch (_screen) {
+      case AppScreen.action:
+        backToLibrary();
+      case AppScreen.explore:
+        closeExplore();
+      case AppScreen.scanning:
+        // Abandon the in-flight scan and return to welcome (scanning is only
+        // ever reached from welcome, so there's no prior library to fall back
+        // to). changeLibrary cancels the scan subscription and resets state.
+        changeLibrary();
+      case AppScreen.workspace:
+        changeLibrary();
+      case AppScreen.welcome:
+        break;
+    }
+  }
+
+  // --- Environment self-check ----------------------------------------------
 
   List<ToolStatus> _toolkit = const [];
   bool _checked = false;
@@ -237,10 +443,11 @@ class AppController extends ChangeNotifier {
   bool get exiftoolAvailable =>
       _toolkit.any((t) => t.id == 'exiftool' && t.present);
 
-  String? _environmentWarning;
+  bool _hasEnvironmentWarning = false;
 
-  /// A non-alarming warning to surface as a banner, or null when all is well.
-  String? get environmentWarning => _environmentWarning;
+  /// Whether a non-alarming environment warning should surface as a banner. The
+  /// banner localizes the message itself (the controller has no `BuildContext`).
+  bool get hasEnvironmentWarning => _hasEnvironmentWarning;
 
   bool _warningDismissed = false;
 
@@ -261,10 +468,10 @@ class AppController extends ChangeNotifier {
     _toolkit = await _probeToolkit();
     _runner = null; // rebuild engine with fresh exiftool availability
     if (exiftoolAvailable) {
-      _environmentWarning = null;
+      _hasEnvironmentWarning = false;
       _log('Environment OK: ExifTool ready');
     } else {
-      _environmentWarning = _exiftoolWarning;
+      _hasEnvironmentWarning = true;
       _log('ExifTool unavailable', level: LogLevel.warning);
     }
     notifyListeners();
@@ -280,9 +487,9 @@ class AppController extends ChangeNotifier {
   /// The ordered library roots (each a directory or an individual file).
   List<String> get roots => List.unmodifiable(_roots);
 
-  /// The first directory root, used as the default output location (e.g. for the
-  /// rendered heatmap) and for compact display; null when the library is empty
-  /// or made only of individual files.
+  /// The first directory root, used as the default output location and for
+  /// compact display; null when the library is empty or made only of
+  /// individual files.
   String? get folder {
     for (final root in _roots) {
       if (FileSystemEntity.isDirectorySync(root)) return root;
@@ -290,12 +497,13 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
-  /// A compact label for the library: the single root's basename, or
-  /// "N locations" when the library spans several roots; null when empty.
-  String? get folderName => switch (_roots.length) {
+  /// A compact label for the library: the single root's basename via [tr] for
+  /// the "{count} locations" plural, or null when empty. Takes a [Translator] so
+  /// the controller stays Flutter-free of any `BuildContext`.
+  String? folderName(Translator tr) => switch (_roots.length) {
     0 => null,
     1 => rootLabel(_roots.first),
-    final n => '$n locations',
+    final n => tr('library_locations', {'count': n}),
   };
 
   /// The completed scan result, or null until a scan finishes.
@@ -328,11 +536,24 @@ class AppController extends ChangeNotifier {
   /// rescans the combined set. A no-op when nothing new is added.
   Future<void> addRootPaths(Iterable<String> paths) async {
     final next = addRoots(_roots, paths);
-    if (next.length == _roots.length) return;
+    // A no-op when the merge changed nothing — every addition was already
+    // covered (containment-aware), so the root list is identical. (A subsume
+    // can keep the length while swapping a child for its parent, so compare
+    // contents, not just length.)
+    if (_sameRoots(next, _roots)) return;
     _roots
       ..clear()
       ..addAll(next);
     await startScan();
+  }
+
+  /// Whether [a] and [b] hold the same roots in the same order.
+  static bool _sameRoots(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   /// Classifies dropped [paths] and adds the directories + supported files to
@@ -398,6 +619,70 @@ class AppController extends ChangeNotifier {
           },
         );
     return completer.future;
+  }
+
+  // --- Mobile library scan (proxy export) ----------------------------------
+
+  /// Longest-edge pixel size of the downscaled JPEG proxies the engine hashes.
+  static const int _proxyMaxEdge = 1024;
+
+  bool _photoPermissionDenied = false;
+
+  /// Whether the user denied photo-library access on the last [scanLibrary]
+  /// attempt, so the welcome screen can show a clear "grant access" message.
+  bool get photoPermissionDenied => _photoPermissionDenied;
+
+  /// Scans the device photo library on mobile: requests access, enumerates
+  /// assets, exports a downscaled proxy JPEG per asset, and lands on the
+  /// workspace with a synthesized [FolderScanResult] whose `photos` are the
+  /// proxy paths — so every existing desktop runner works unchanged.
+  ///
+  /// A no-op on desktop (where [isMobile] is false). On denied access it sets
+  /// [photoPermissionDenied] and returns to the welcome screen.
+  Future<void> scanLibrary() async {
+    final library = _photoLibrary;
+    if (library == null) return;
+    _photoPermissionDenied = false;
+    final granted = await (_requestPhotoAccess?.call() ?? Future.value(false));
+    if (!granted) {
+      _photoPermissionDenied = true;
+      _log('Photo-library access denied', level: LogLevel.warning);
+      _screen = AppScreen.welcome;
+      notifyListeners();
+      return;
+    }
+
+    _scan = null;
+    _scanProgress = const ScanProgress();
+    _screen = AppScreen.scanning;
+    _log('Scanning photo library…');
+    notifyListeners();
+
+    final assets = await library.enumerate();
+    final proxyPaths = <String>[];
+    var exported = 0;
+    for (final asset in assets) {
+      try {
+        proxyPaths.add(await library.exportProxy(asset.id, _proxyMaxEdge));
+      } on Object catch (e) {
+        // A single un-exportable asset is dropped from the scan, not fatal.
+        proxyPaths.add('');
+        _log('Could not export ${asset.filename}: $e', level: LogLevel.debug);
+      }
+      exported++;
+      _scanProgress = ScanProgress(files: exported, photos: exported, dirs: 1);
+      notifyListeners();
+    }
+
+    _mobileLibrary = MobileLibrary.fromExports(assets, proxyPaths);
+    _scan = synthesizeScan(assets, proxyPaths);
+    _scanProgress = null;
+    _roots
+      ..clear()
+      ..add('photo-library');
+    _screen = AppScreen.workspace;
+    _log('Photo library: ${_scan!.photoCount} photo(s)');
+    notifyListeners();
   }
 
   void _handleScanEvent(ScanEvent event) {
@@ -514,6 +799,95 @@ class AppController extends ChangeNotifier {
     dryRun: _dryRun,
   );
 
+  // --- Per-action background run state -------------------------------------
+
+  /// The lifecycle phase of every action's background run, keyed by action.
+  /// Drives the workspace cards' progress ring and attention badge. An action
+  /// absent from the map is [ActionRunState.idle].
+  final Map<LibraryAction, ActionRunState> _runStates = {};
+
+  /// The action whose stream-backed run is currently consuming events, or null.
+  LibraryAction? _activeAction;
+
+  /// The background run state for [action] (idle when never run).
+  ActionRunState runStateFor(LibraryAction action) =>
+      _runStates[action] ?? ActionRunState.idle;
+
+  /// Whether ANY action's background run is currently in flight. Pure getter so
+  /// the close-while-running guard is testable.
+  bool get anyRunning => _runStates.values.any((s) => s.running);
+
+  /// The actions whose finished run is waiting to be reviewed (badge showing).
+  Set<LibraryAction> get actionsNeedingReview => {
+    for (final entry in _runStates.entries)
+      if (entry.value.attention) entry.key,
+  };
+
+  /// Sets [action]'s run state and notifies. Idle entries are dropped to keep
+  /// the map small and equality simple.
+  void _setRunState(LibraryAction action, ActionRunState state) {
+    if (state == ActionRunState.idle) {
+      _runStates.remove(action);
+    } else {
+      _runStates[action] = state;
+    }
+    notifyListeners();
+  }
+
+  /// Clears [action]'s attention badge (called when the user opens it).
+  void _clearAttention(LibraryAction action) {
+    final state = _runStates[action];
+    if (state == null || !state.needsReview) return;
+    _runStates.remove(action);
+  }
+
+  /// Cancels the running action's worker(s) and marks it idle.
+  ///
+  /// Cancelling the (sole) stream subscription tears down the worker isolate via
+  /// the runner's `onCancel`, so further events are ignored and nothing keeps
+  /// running. A cancelled run leaves no partial destructive side effects — trash
+  /// runs act atomically inside the worker, so cancelling before they finish
+  /// simply stops them.
+  void cancelAction(LibraryAction action) {
+    if (!runStateFor(action).running) return;
+    if (action == _activeAction) {
+      _sub?.cancel();
+      _sub = null;
+      _activeAction = null;
+      _running = false;
+      // A cancelled subscription never fires onDone, so settle the run's Future
+      // here — otherwise callers awaiting runTag()/etc. hang forever.
+      if (_runCompleter?.isCompleted == false) _runCompleter!.complete();
+      _runCompleter = null;
+    }
+    if (action == LibraryAction.duplicates || action == LibraryAction.shrink) {
+      // The hashing future can't be force-stopped, but flagging it cancelled
+      // makes the controller ignore its result and reset its live state. The
+      // shrink wizard's hashing stages share this machinery.
+      _duplicatesCancelled = true;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      _shrinkBusy = false;
+    }
+    _setRunState(action, ActionRunState.idle);
+  }
+
+  /// The exit response for a quit/close request: cancel it while any action is
+  /// running (so the user must stop it first), otherwise allow it. Pure so the
+  /// close-while-running guard is testable without the OS exit plumbing.
+  AppExitResponse get exitDecision =>
+      anyRunning ? AppExitResponse.cancel : AppExitResponse.exit;
+
+  /// Cancels whichever action is currently running, if any.
+  void cancelActiveRun() {
+    for (final action in LibraryAction.all) {
+      if (runStateFor(action).running) {
+        cancelAction(action);
+        return;
+      }
+    }
+  }
+
   // --- Run state -----------------------------------------------------------
 
   int _done = 0;
@@ -523,6 +897,10 @@ class AppController extends ChangeNotifier {
   final List<PhotoRow> _rows = [];
   Map<String, int>? _lastSummary;
   StreamSubscription<EngineEvent>? _sub;
+
+  /// Completes the Future returned by the active stream run ([_consume]); kept so
+  /// [cancelAction] can settle it (a cancelled subscription never fires onDone).
+  Completer<void>? _runCompleter;
 
   /// Items completed so far in the current/last run.
   int get done => _done;
@@ -690,6 +1068,58 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  // --- Curated EXIF cache (big-preview viewer info line) -------------------
+
+  /// Memoized curated EXIF per source path, so re-opening the same photo in the
+  /// big-preview viewer never re-runs exiftool. A completed entry holds the read
+  /// record (possibly empty); an in-flight read is tracked by [_curatedLoading].
+  final Map<String, CuratedExif> _curatedExif = {};
+  final Set<String> _curatedLoading = {};
+  StreamSubscription<CuratedExif>? _curatedSub;
+
+  /// Cached curated EXIF for [path], or null if not read yet.
+  CuratedExif? curatedExif(String path) => _curatedExif[path];
+
+  /// Reads (and caches) the curated EXIF set for any of [paths] not already read
+  /// or in flight, streaming results in off the UI isolate and notifying as each
+  /// arrives so the viewer's info line fills in progressively.
+  Future<void> loadCuratedExif(List<String> paths) async {
+    // On mobile there is no exiftool to shell out to, and the viewer's info line
+    // is sourced from the asset metadata we already hold (see [assetForProxy]),
+    // so skip the (broken) curated-EXIF read entirely.
+    if (isMobile) return;
+    final pending = [
+      for (final path in paths)
+        if (!_curatedExif.containsKey(path) && !_curatedLoading.contains(path))
+          path,
+    ];
+    if (pending.isEmpty) return;
+    _curatedLoading.addAll(pending);
+
+    await _curatedSub?.cancel();
+    final completer = Completer<void>();
+    _curatedSub = _engine
+        .readCuratedExif(pending)
+        .listen(
+          (exif) {
+            _curatedExif[exif.path] = exif;
+            _curatedLoading.remove(exif.path);
+            notifyListeners();
+          },
+          onError: (Object _) {
+            _curatedLoading.removeAll(pending);
+            notifyListeners();
+            if (!completer.isCompleted) completer.complete();
+          },
+          onDone: () {
+            _curatedLoading.removeAll(pending);
+            notifyListeners();
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+    return completer.future;
+  }
+
   // --- Explore map ---------------------------------------------------------
 
   final List<ExplorePhoto> _explorePhotos = [];
@@ -741,9 +1171,42 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves a captured PNG of the Explore view to a user-chosen path.
+  ///
+  /// The pick→write→report flow behind the "Save view as PNG" button, kept here
+  /// (off the widget) so it's fully unit-testable: [pickPath] resolves to the
+  /// destination path (or null when the user cancels the save panel), and
+  /// [bytes] are the already-captured PNG. Cancelling is a silent no-op; a
+  /// successful write and any failure are both surfaced in the activity log and
+  /// returned so the screen can show a matching SnackBar. Never throws.
+  Future<String?> savePng(
+    Uint8List bytes, {
+    required Future<String?> Function() pickPath,
+  }) async {
+    final path = await pickPath();
+    if (path == null) return null;
+    try {
+      await File(path).writeAsBytes(bytes);
+      _log('Saved map view to $path');
+      notifyListeners();
+      return path;
+    } on Object catch (e) {
+      _log('Failed to save map view: $e', level: LogLevel.error);
+      notifyListeners();
+      return null;
+    }
+  }
+
   void _loadExploreCoordinates() {
     final scan = _scan;
     if (scan == null) return;
+    // On mobile every asset's GPS + date are already known from enumeration, so
+    // build the map points directly — no proxy read, no engine round-trip. The
+    // marker/detail images load from each asset's already-exported proxy JPEG.
+    if (isMobile) {
+      _loadExploreFromAssets();
+      return;
+    }
     final photos = _included(scan.photos);
     _explorePhotos.clear();
     _exploreLoaded = 0;
@@ -794,6 +1257,49 @@ class AppController extends ChangeNotifier {
         );
   }
 
+  /// Builds the Explore map points directly from the mobile library's geotagged
+  /// assets (synchronously — coordinates and dates come from enumeration). Each
+  /// point's image is its already-exported proxy JPEG, so the desktop map +
+  /// detail panel render it unchanged.
+  void _loadExploreFromAssets() {
+    final mobile = _mobileLibrary;
+    _explorePhotos.clear();
+    if (mobile == null) {
+      _exploreLoaded = 0;
+      _exploreTotal = 0;
+      _exploreLoading = false;
+      notifyListeners();
+      return;
+    }
+    final geotagged = mobile.exploreFromAssets;
+    for (final photo in geotagged) {
+      final path = photo.proxyPath;
+      if (path == null) continue;
+      _explorePhotos.add(
+        ExplorePhoto(
+          path: path,
+          latitude: photo.latitude,
+          longitude: photo.longitude,
+          meta: FileMeta(
+            path: path,
+            hasGps: true,
+            latitude: photo.latitude,
+            longitude: photo.longitude,
+            date: photo.date,
+            // Surface the ORIGINAL asset dimensions in the detail panel (the
+            // proxy is downscaled, so we can't read these from the file).
+            width: photo.width > 0 ? photo.width : null,
+            height: photo.height > 0 ? photo.height : null,
+          ),
+        ),
+      );
+    }
+    _exploreLoaded = _explorePhotos.length;
+    _exploreTotal = _explorePhotos.length;
+    _exploreLoading = false;
+    notifyListeners();
+  }
+
   // --- Operations ----------------------------------------------------------
 
   /// Number of photos the tag run will process (after exclusions).
@@ -812,48 +1318,193 @@ class AppController extends ChangeNotifier {
         googleFiles: _included(scan.googleFiles),
         options: buildTagOptions(),
       ),
+      owner: LibraryAction.tag,
       startMessage: _dryRun
           ? 'Previewing ${photos.length} photo(s)…'
           : 'Tagging ${photos.length} photo(s)…',
       total: photos.length,
+      reviewOnDone: true,
     );
   }
 
-  /// Renders a heatmap PNG into the library folder; returns its path or null.
-  Future<String?> renderMap({int? dpi}) async {
-    final dir = folder ?? Directory.systemTemp.path;
-    final scan = _scan;
-    if (scan == null) return null;
-    final photos = _included(scan.photos);
-    final out = p.join(dir, 'stunda-heatmap.png');
-    await _consume(
-      _engine.map(
-        photos: photos,
-        options: MapOptions(outputPng: out, dpi: dpi ?? 200),
-      ),
-      startMessage: 'Rendering heatmap…',
-      total: photos.length,
-    );
-    return _errorMessage == null ? out : null;
+  // --- Mobile tag (pick tracks → resolve app-side → writeGps) --------------
+
+  final List<String> _mobileTrackFiles = [];
+
+  /// GPS track / Google-history files the user picked for a mobile tag run.
+  List<String> get mobileTrackFiles => List.unmodifiable(_mobileTrackFiles);
+
+  /// Opens the file picker (mobile) and adds the chosen GPS track / Google
+  /// files to the mobile tag set, deduping. A no-op when cancelled.
+  Future<void> pickMobileTrackFiles() async {
+    final picked = await _pickTrackFiles();
+    var changed = false;
+    for (final path in picked) {
+      if (!_mobileTrackFiles.contains(path)) {
+        _mobileTrackFiles.add(path);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
   }
+
+  /// Clears the picked mobile track files.
+  void clearMobileTrackFiles() {
+    if (_mobileTrackFiles.isEmpty) return;
+    _mobileTrackFiles.clear();
+    notifyListeners();
+  }
+
+  /// Tags the mobile library's geotagged-from-tracks photos.
+  ///
+  /// The engine's exiftool writer is absent on mobile, so the resolution runs
+  /// app-side: it pools the picked track files into a [SourcePool], resolves
+  /// each asset's coordinates from its capture date via the pure [Locator]
+  /// ([resolveAssetLocations]), then writes each fix back through the photo
+  /// library's native GPS write. Assets that already carry GPS are skipped
+  /// unless [replace] is on. Streams synthesized events so the existing run-
+  /// state UI works. A no-op on desktop or with no tracks picked.
+  Future<void> runTagMobile() {
+    final mobile = _mobileLibrary;
+    final library = _photoLibrary;
+    if (mobile == null || library == null) return Future.value();
+    final assets = mobile.assetsById.values.toList(growable: false);
+    return _consume(
+      _tagMobileStream(assets, library),
+      owner: LibraryAction.tag,
+      startMessage: 'Tagging ${assets.length} photo(s) from tracks…',
+      total: assets.length,
+      reviewOnDone: true,
+    );
+  }
+
+  Stream<EngineEvent> _tagMobileStream(
+    List<LibraryAsset> assets,
+    PhotoLibrary library,
+  ) async* {
+    final pool = poolSources(
+      gpxFiles: [
+        for (final p in _mobileTrackFiles)
+          if (_isGpx(p)) p,
+      ],
+      kmlFiles: [
+        for (final p in _mobileTrackFiles)
+          if (_isKml(p)) p,
+      ],
+      googleJsonFiles: [
+        for (final p in _mobileTrackFiles)
+          if (_isJson(p)) p,
+      ],
+    );
+    final photos = [
+      for (final a in assets)
+        MobileTagPhoto(assetId: a.id, date: a.createdAt, hasGps: a.hasGps),
+    ];
+    // Classify EVERY asset the way desktop's TagService does, so the summary
+    // tallies noTimestamp / alreadyTagged / noGps alongside tagged /
+    // interpolated — not just the assets that resolved to a fix.
+    final outcomes = classifyTagOutcomes(
+      photos,
+      pool,
+      maxTimeDiff: Duration(seconds: _maxTimeDiffSeconds),
+      replace: _replace,
+    );
+    final byId = {for (final a in assets) a.id: a};
+    final summary = <String, int>{};
+    void tally(PhotoStatus s) =>
+        summary.update(s.wire, (n) => n + 1, ifAbsent: () => 1);
+
+    final total = outcomes.length;
+    var done = 0;
+    for (final outcome in outcomes) {
+      final asset = byId[outcome.assetId];
+      if (asset == null) continue;
+      final fix = outcome.location;
+      if (fix == null) {
+        // A terminal skip outcome (noTimestamp / alreadyTagged / noGps): report
+        // it exactly like desktop and move on without touching the library.
+        tally(outcome.status);
+        yield ItemEvent(PhotoRow(path: asset.filename, status: outcome.status));
+        done++;
+        yield ProgressEvent(done: done, total: total);
+        continue;
+      }
+      try {
+        if (!_dryRun) {
+          await library.writeGps(asset.id, fix.latitude, fix.longitude);
+        }
+        // outcome.status is tagged vs interpolated by GpsMethod; a dry run
+        // reports dryRun instead of writing, matching desktop semantics.
+        final status = _dryRun ? PhotoStatus.dryRun : outcome.status;
+        tally(status);
+        yield ItemEvent(
+          PhotoRow(path: asset.filename, status: status, location: fix),
+        );
+      } on Object catch (e) {
+        tally(PhotoStatus.error);
+        yield ItemEvent(
+          PhotoRow(path: asset.filename, status: PhotoStatus.error, note: '$e'),
+        );
+      }
+      done++;
+      yield ProgressEvent(done: done, total: total);
+    }
+    yield DoneEvent(summary);
+  }
+
+  /// The real GPS-track / Google-history file picker (mobile), behind the
+  /// injectable [_pickTrackFiles] seam. Returns chosen paths, [] when cancelled.
+  // coverage:ignore-start
+  // file_selector's openFiles is plugin-backed and cannot run under
+  // `flutter test`; tests inject a canned picker via the constructor seam.
+  static Future<List<String>> _defaultPickTrackFiles() async {
+    const group = XTypeGroup(
+      label: 'GPS tracks',
+      extensions: ['gpx', 'kml', 'json'],
+    );
+    final files = await openFiles(acceptedTypeGroups: const [group]);
+    return [for (final f in files) f.path];
+  }
+  // coverage:ignore-end
+
+  static bool _isGpx(String path) => path.toLowerCase().endsWith('.gpx');
+  static bool _isKml(String path) => path.toLowerCase().endsWith('.kml');
+  static bool _isJson(String path) => path.toLowerCase().endsWith('.json');
 
   // --- Prune review (preview → select → confirm → execute) -----------------
 
   RawPairing? _pairing;
+
+  /// On Android mobile, the filename-keyed pairing + filename→asset-id lookup
+  /// backing [_pairing], so a trashed filename can be routed to the native
+  /// photo-library delete. Null on desktop and on iOS.
+  MobilePairing? _mobilePairing;
   final Set<String> _selected = {};
   String _pruneFilter = '';
-  // Which pair kinds are visible in the review list. Candidates (orphan RAWs)
-  // are on by default; context rows are off to keep the list focused.
+  // The trash direction: A (orphan RAWs) by default, B (orphan images).
+  PruneDirection _direction = PruneDirection.removeOrphanRaws;
+  // Which pair kinds are visible in the review list. The direction's target
+  // category is on by default; context rows are off to keep the list focused.
   final Set<PairKind> _visibleKinds = {PairKind.orphanRaw};
 
   /// The classified library for the prune review, or null when not reviewing.
   RawPairing? get pairing => _pairing;
 
-  /// The orphan-RAW paths currently selected for trashing.
+  /// The active trash direction (which category is selectable/trashed).
+  PruneDirection get pruneDirection => _direction;
+
+  /// The paths currently selected for trashing (the direction's target kind).
   Set<String> get selectedPaths => Set.unmodifiable(_selected);
 
-  /// Number of orphan RAWs selected for trashing.
+  /// Number of files selected for trashing.
   int get selectedCount => _selected.length;
+
+  /// All trashable candidates under the active direction, in scan order.
+  List<String> get pruneCandidates =>
+      _pairing == null ? const [] : trashCandidates(_pairing!, _direction);
+
+  /// Number of trashable candidates under the active direction.
+  int get pruneCandidateCount => pruneCandidates.length;
 
   /// The current filename filter (case-insensitive substring).
   String get pruneFilter => _pruneFilter;
@@ -861,21 +1512,58 @@ class AppController extends ChangeNotifier {
   /// Whether [kind] rows are shown in the review list.
   bool isKindVisible(PairKind kind) => _visibleKinds.contains(kind);
 
-  /// Classifies the scanned library and pre-selects every orphan RAW.
+  /// Classifies the scanned library and pre-selects the direction's candidates.
   ///
   /// Cheap and pure (no I/O): [classifyPairing] is O(n) over the scan's photo
-  /// paths. Pre-selecting orphans matches the user's default intent while still
-  /// letting them deselect before confirming.
+  /// paths. Resets to direction A and pre-selects its candidates, matching the
+  /// user's default intent while still letting them deselect before confirming.
   void _preparePruneReview() {
     final scan = _scan;
-    _pairing = scan == null ? null : classifyPairing(scan.photos);
-    _selected
-      ..clear()
-      ..addAll(_pairing?.orphanRaws ?? const []);
+    final mobile = _mobileLibrary;
+    if (isMobile) {
+      // Proxies are all `.jpg`, so classifying them finds no RAW. On Android we
+      // pair over the assets' ORIGINAL filenames (RAW + JPEG are separate
+      // MediaStore assets); on iOS RAW pruning is unavailable (see
+      // [supportsRawPruning]) so the pairing stays null and the action warns.
+      if (supportsRawPruning && scan != null && mobile != null) {
+        _mobilePairing = mobile.pairingFromFilenames();
+        _pairing = _mobilePairing!.pairing;
+      } else {
+        _mobilePairing = null;
+        _pairing = null;
+      }
+    } else {
+      _mobilePairing = null;
+      _pairing = scan == null ? null : classifyPairing(scan.photos);
+    }
+    _direction = PruneDirection.removeOrphanRaws;
     _pruneFilter = '';
     _visibleKinds
       ..clear()
-      ..add(PairKind.orphanRaw);
+      ..add(_direction.target);
+    _resetSelectionToCandidates();
+  }
+
+  /// Replaces the selection with every candidate of the active direction.
+  void _resetSelectionToCandidates() {
+    _selected
+      ..clear()
+      ..addAll(pruneCandidates);
+  }
+
+  /// Switches the trash direction, recomputing the selectable category.
+  ///
+  /// Resets the visible-kinds to emphasise the new target and re-selects all of
+  /// its candidates, so the count, description, and trash set all follow the
+  /// chosen direction.
+  void setPruneDirection(PruneDirection direction) {
+    if (_direction == direction) return;
+    _direction = direction;
+    _visibleKinds
+      ..clear()
+      ..add(direction.target);
+    _resetSelectionToCandidates();
+    notifyListeners();
   }
 
   /// The review rows after applying the visible-kind toggles and filename
@@ -910,7 +1598,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggles whether a single orphan-RAW [path] is selected for trashing.
+  /// Toggles whether a single candidate [path] is selected for trashing.
   void toggleSelected(String path, bool selected) {
     if (selected) {
       _selected.add(path);
@@ -920,25 +1608,1113 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Selects ([all] true) or clears every orphan RAW.
-  void selectAllOrphans(bool all) {
+  /// Selects ([all] true) or clears every candidate of the active direction.
+  void selectAllCandidates(bool all) {
     _selected.clear();
-    if (all) _selected.addAll(_pairing?.orphanRaws ?? const []);
+    if (all) _selected.addAll(pruneCandidates);
     notifyListeners();
   }
 
-  /// Trashes the user-selected orphan RAWs after an explicit confirm.
+  /// Trashes the user-selected candidates after an explicit confirm.
   ///
   /// Only reached once the user has reviewed the preview and confirmed — the
   /// destructive-actions-preview-first principle. Sends exactly the selected
   /// paths (plus their sidecars, handled in the engine) to the Trash.
   Future<void> runTrashSelected() {
     if (_selected.isEmpty) return Future.value();
-    final paths = _selected.toList(growable: false);
+    final selected = _selected.toList(growable: false);
+    // On Android mobile [_selected] holds asset FILENAMES (the prune pairing is
+    // filename-keyed); map them to proxy paths so [_trashPaths] resolves them to
+    // asset ids and deletes natively. Desktop sends real file paths as-is.
+    final paths = isMobile ? _proxyPathsForFilenames(selected) : selected;
+    if (paths.isEmpty) return Future.value();
     return _consume(
-      _engine.trashPaths(paths),
-      startMessage: 'Moving ${paths.length} RAW file(s) to Trash…',
+      _trashPaths(paths),
+      owner: LibraryAction.pruneRaw,
+      startMessage: 'Moving ${paths.length} file(s) to Trash…',
       total: paths.length,
+      reviewOnDone: true,
+    );
+  }
+
+  /// Maps selected asset [filenames] (the mobile prune selection) to the proxy
+  /// paths [_trashPaths] understands, dropping any that no longer resolve.
+  List<String> _proxyPathsForFilenames(List<String> filenames) {
+    final pairing = _mobilePairing;
+    final mobile = _mobileLibrary;
+    if (pairing == null || mobile == null) return const [];
+    return [
+      for (final id in pairing.idsFor(filenames))
+        if (mobile.proxyForAsset(id) != null) mobile.proxyForAsset(id)!,
+    ];
+  }
+
+  /// Normalises a heterogeneous mobile shrink selection to proxy paths: a path
+  /// already known as a proxy passes through; otherwise it is treated as an
+  /// asset filename (orphans + redundant-pairs stages) and mapped through the
+  /// mobile pairings to its asset's proxy. Drops anything that no longer
+  /// resolves. Mobile-only; desktop never calls this.
+  List<String> _proxyPathsForStaged(List<String> staged) {
+    final mobile = _mobileLibrary;
+    if (mobile == null) return const [];
+    final idByFilename = <String, String>{
+      ...?_mobilePairing?.idByFilename,
+      ...?_shrinkMobilePairing?.idByFilename,
+    };
+    final out = <String>[];
+    for (final path in staged) {
+      // Already a proxy path the engine scanned.
+      if (mobile.assetForProxy(path) != null) {
+        out.add(path);
+        continue;
+      }
+      // Otherwise an asset filename → asset id → its proxy.
+      final id = idByFilename[path];
+      if (id == null) continue;
+      final proxy = mobile.proxyForAsset(id);
+      if (proxy != null) out.add(proxy);
+    }
+    return out;
+  }
+
+  // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------
+
+  int _similarity = similarityMinPercent;
+  SimilarityMetric _similarityMetric = SimilarityMetric.fast;
+  KeepPipeline _keepPipeline = KeepPipeline.standard;
+  bool _findingDuplicates = false;
+  HashProgress _hashProgress = HashProgress();
+  List<DuplicatePair>? _duplicatePairs;
+  // Set when the user cancels a hashing run so its (unstoppable) result Future
+  // is ignored instead of folded into reviewable pairs.
+  bool _duplicatesCancelled = false;
+  // Set after a Smart run that had to use Fast because no embedding model was
+  // bundled, so the UI can show a small "fell back to Fast" note.
+  bool _smartFellBackToFast = false;
+
+  /// The similarity slider value as a looseness percent (0 = Exact, 100 = Loose,
+  /// always a multiple of 10).
+  int get similarity => _similarity;
+
+  /// The selected duplicate-finder metric: Fast (perceptual hash + colour) or
+  /// Smart (on-device embedding). Persisted.
+  SimilarityMetric get similarityMetric => _similarityMetric;
+
+  /// Whether the Smart (embedding) metric can actually run here (a model is
+  /// bundled). When false the selector still offers Smart, but a Smart run
+  /// transparently falls back to Fast (surfaced via [smartFellBackToFast]).
+  bool get smartMetricAvailable => _engine.smartAvailable;
+
+  /// Whether the last completed find run selected Smart but had to use Fast
+  /// because no embedding model was available. Drives an inline UI note.
+  bool get smartFellBackToFast => _smartFellBackToFast;
+
+  /// Whether duplicate hashing is currently in flight.
+  bool get findingDuplicates => _findingDuplicates;
+
+  /// Files hashed so far in the current/last duplicate run.
+  int get duplicatesHashed => _hashProgress.done;
+
+  /// Total files being hashed in the current/last duplicate run.
+  int get duplicatesTotal => _hashProgress.total;
+
+  /// Live hashing progress (done/total → fraction + label) for the UI.
+  HashProgress get hashProgress => _hashProgress;
+
+  /// The reviewable duplicate pairs (best on the left, candidate on the right),
+  /// or null until a find run completes.
+  List<DuplicatePair>? get duplicatePairs =>
+      _duplicatePairs == null ? null : List.unmodifiable(_duplicatePairs!);
+
+  /// Paths still selected for removal across the reviewed pairs.
+  List<String> get duplicateRemovalPaths => _duplicatePairs == null
+      ? const []
+      : selectedRemovalPaths(_duplicatePairs!);
+
+  /// Number of files the "Remove duplicates" button will trash.
+  int get duplicateRemovalCount => duplicateRemovalPaths.length;
+
+  /// Sets the similarity slider, snapping to the nearest multiple of 10 and
+  /// clamping to 0..100, then persists the choice.
+  void setSimilarity(int value) {
+    final snapped = snapSimilarityPercent(value);
+    if (_similarity == snapped) return;
+    _similarity = snapped;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Selects the duplicate-finder [metric] (Fast vs Smart) and persists it.
+  void setSimilarityMetric(SimilarityMetric metric) {
+    if (_similarityMetric == metric) return;
+    _similarityMetric = metric;
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// The keep-priority pipeline (ordered rules + enabled flags) deciding which
+  /// member of a duplicate group is kept. Order = priority.
+  KeepPipeline get keepPipeline => _keepPipeline;
+
+  /// Moves the keep rule from [oldIndex] to [newIndex] (drag-to-reorder),
+  /// changing its priority, then persists + re-decides the kept side of any
+  /// reviewed pairs so the review reflects the new order live.
+  ///
+  /// Indices are the post-removal slots `ReorderableListView.onReorderItem`
+  /// reports (no manual down-shift adjustment needed).
+  void reorderKeepRule(int oldIndex, int newIndex) {
+    final steps = List<KeepStep>.of(_keepPipeline.steps);
+    if (oldIndex < 0 || oldIndex >= steps.length) return;
+    final target = newIndex.clamp(0, steps.length - 1);
+    if (target == oldIndex) return;
+    final moved = steps.removeAt(oldIndex);
+    steps.insert(target, moved);
+    _keepPipeline = KeepPipeline(steps);
+    _persistPrefs();
+    _reapplyKeepPipeline();
+    notifyListeners();
+  }
+
+  /// Enables or disables the keep [rule], persisting + re-deciding kept sides.
+  void setKeepRuleEnabled(KeepRule rule, bool enabled) {
+    final steps = [
+      for (final step in _keepPipeline.steps)
+        if (step.rule == rule) step.withEnabled(enabled) else step,
+    ];
+    _keepPipeline = KeepPipeline(steps);
+    _persistPrefs();
+    _reapplyKeepPipeline();
+    notifyListeners();
+  }
+
+  /// Re-decides the kept (left) side of every already-reviewed pair using the
+  /// current pipeline, preserving each pair's selection. Pairs the user already
+  /// swapped are regrouped by their kept path, so a live pipeline change updates
+  /// the default keeper without losing the in-progress review.
+  void _reapplyKeepPipeline() {
+    final pairs = _duplicatePairs;
+    if (pairs == null || pairs.isEmpty) return;
+    // Reconstruct each group's members from the flat pairs (every pair in a
+    // group shares the same kept file), then re-choose the keeper.
+    final byKeeper = <String, List<DuplicatePair>>{};
+    for (final pair in pairs) {
+      byKeeper.putIfAbsent(pair.kept.path, () => []).add(pair);
+    }
+    final rebuilt = <DuplicatePair>[];
+    for (final groupPairs in byKeeper.values) {
+      final members = <HashedFile>[
+        groupPairs.first.kept,
+        for (final p in groupPairs) p.other,
+      ];
+      final keeper = chooseKeeper(members, _keepPipeline);
+      for (final member in members) {
+        if (identical(member, keeper)) continue;
+        // Preserve the prior selection for the relationship this member was part
+        // of — the prior pair where it appeared on EITHER side (the keeper may
+        // have flipped, swapping which file is the "other").
+        final prior = groupPairs
+            .where(
+              (p) => identical(p.other, member) || identical(p.kept, member),
+            )
+            .firstOrNull;
+        rebuilt.add(
+          DuplicatePair(
+            kept: keeper,
+            other: member,
+            removeSelected: prior?.removeSelected ?? true,
+          ),
+        );
+      }
+    }
+    _duplicatePairs = rebuilt;
+  }
+
+  /// Hashes every *included* photo off the UI isolate and folds the resulting
+  /// duplicate groups into reviewable pairs at the current similarity.
+  Future<void> runFindDuplicates() async {
+    final scan = _scan;
+    if (scan == null) return;
+    final photos = _included(scan.photos);
+    _findingDuplicates = true;
+    _duplicatesCancelled = false;
+    _hashProgress = HashProgress(total: photos.length);
+    _duplicatePairs = null;
+    _errorMessage = null;
+    // A Smart run with no bundled embedding model transparently uses Fast; note
+    // it so the UI can tell the user. Fast runs never show the note.
+    _smartFellBackToFast =
+        _similarityMetric == SimilarityMetric.smart && !_engine.smartAvailable;
+    _log('Hashing ${photos.length} photo(s) for duplicates…');
+    // A determinate run: the total is known up front, so the card ring tracks
+    // the hashing fraction.
+    _setRunState(
+      LibraryAction.duplicates,
+      ActionRunState.active(progress: photos.isEmpty ? null : 0),
+    );
+    try {
+      final groups = await _engine.findDuplicates(
+        photos,
+        minSimilarity: similarityToThreshold(_similarity),
+        metric: _similarityMetric,
+        onProgress: (done, total) {
+          if (_duplicatesCancelled) return;
+          _hashProgress = HashProgress(done: done, total: total);
+          _setRunState(
+            LibraryAction.duplicates,
+            ActionRunState.active(progress: _hashProgress.fraction),
+          );
+        },
+      );
+      // A run the user cancelled mid-flight discards its result entirely.
+      if (_duplicatesCancelled) return;
+      // On mobile the engine hashed downscaled proxies; substitute each member's
+      // original resolution/size back so keeper selection + display reflect the
+      // real asset, then re-choose the keeper under the pipeline.
+      final resolved = isMobile
+          ? _mobileLibrary!.withOriginalGroups(groups, _keepPipeline)
+          : groups;
+      // The keeper (left side) follows the user's keep-priority pipeline, not
+      // just the engine's default resolution-first choice.
+      _duplicatePairs = pairsFromGroups(resolved, pipeline: _keepPipeline);
+      _log('Found ${groups.length} duplicate group(s)');
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      // Finishing with matches pulses the card's attention badge — unless the
+      // user is watching this action (the results render in-panel) or none were
+      // found, in which case it returns to idle.
+      final watching =
+          _screen == AppScreen.action && _action == LibraryAction.duplicates;
+      _setRunState(
+        LibraryAction.duplicates,
+        (_duplicatePairs!.isEmpty || watching)
+            ? ActionRunState.idle
+            : ActionRunState.review(
+                summary: '${_duplicatePairs!.length} duplicate pair(s)',
+              ),
+      );
+    } on Object catch (e) {
+      if (_duplicatesCancelled) return;
+      _errorMessage = '$e';
+      _duplicatePairs = const [];
+      _log('Duplicate scan failed: $e', level: LogLevel.error);
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      _setRunState(LibraryAction.duplicates, ActionRunState.idle);
+    }
+  }
+
+  /// Toggles whether the right-side file of the pair at [index] is selected for
+  /// removal (deselect = keep both).
+  void setDuplicateRemoval(int index, bool selected) {
+    final pairs = _duplicatePairs;
+    if (pairs == null || index < 0 || index >= pairs.length) return;
+    pairs[index] = pairs[index].withSelected(selected);
+    notifyListeners();
+  }
+
+  /// Swaps which side (kept vs to-remove) of the pair at [index] is which.
+  void swapDuplicatePair(int index) {
+    final pairs = _duplicatePairs;
+    if (pairs == null || index < 0 || index >= pairs.length) return;
+    pairs[index] = pairs[index].swap();
+    notifyListeners();
+  }
+
+  /// Trashes every right-side file still selected for removal, after the
+  /// silly-word confirm gate. A no-op when nothing is selected.
+  Future<void> runTrashDuplicates() {
+    final paths = duplicateRemovalPaths;
+    if (paths.isEmpty) return Future.value();
+    return _consume(
+      _trashPaths(paths),
+      owner: LibraryAction.duplicates,
+      startMessage: 'Moving ${paths.length} duplicate(s) to Trash…',
+      total: paths.length,
+      reviewOnDone: true,
+    );
+  }
+
+  // --- Shrink wizard (cumulative trash set across opt-in stages) -----------
+
+  /// The cumulative trash set the wizard builds across stages (first reason
+  /// wins). Reset each time the wizard is opened idle.
+  StagedSet _staged = StagedSet();
+
+  /// Per-stage opt-in toggles (default: every stage included).
+  final Map<ShrinkStage, bool> _stageIncluded = {
+    for (final s in ShrinkStage.values) s: true,
+  };
+
+  /// The outcome of each stage that has been run (added candidates + tallies +
+  /// running total), keyed by stage. Drives the per-stage review panels.
+  final Map<ShrinkStage, ShrinkStageOutcome> _stageOutcomes = {};
+
+  // Redundant-pairs stage: which side to drop.
+  PairDropSide _shrinkPairDrop = PairDropSide.dropRaw;
+  // Low-quality stage threshold (0..1 composite quality).
+  double _shrinkQualityThreshold = 0.35;
+  // The quality components the low-quality stage scores on (default: all four).
+  Set<QualityParam> _lowQParams = QualityParam.values.toSet();
+  bool _shrinkBusy = false;
+
+  /// The stage whose REAL review page is currently open inside the wizard, or
+  /// null when the user is on the wizard hub (the step list + final review).
+  ///
+  /// When non-null the action panel renders that stage's real review surface in
+  /// "shrink session" mode: its terminal action becomes "Add to shrink list"
+  /// (folding the chosen files into [_staged]) and returns to the hub instead of
+  /// trashing on the spot.
+  ShrinkStage? _shrinkActiveStage;
+
+  // The redundant-pairs review's working selection (paths the user will add),
+  // and the low-quality review's working selection. Populated when the
+  // respective stage page opens; folded into [_staged] on "Add to shrink list".
+  final Set<String> _shrinkPairSelected = {};
+  final Set<String> _shrinkLowQSelected = {};
+
+  // The classified pairing backing the redundant-pairs review page.
+  RawPairing? _shrinkPairing;
+  // On Android mobile, the filename-keyed pairing + filename→asset-id lookup
+  // behind [_shrinkPairing], so a chosen redundant-pair filename can be routed
+  // to the native photo-library delete (proxies are all `.jpg` and lose the RAW
+  // extension). Null on desktop and on iOS.
+  MobilePairing? _shrinkMobilePairing;
+  // The low-quality review's hashed candidates below threshold (path → size),
+  // and the GPS/size info needed to build candidates on add.
+  List<HashedFile> _shrinkLowQHashed = const [];
+  bool _shrinkLowQReviewed = false;
+
+  /// Per-stage snapshot of the working review state (found results + the user's
+  /// selections), so leaving a stage and re-opening it within one shrink session
+  /// restores it instantly — no re-classify, no re-hash, no lost ticks. A stage
+  /// is cached on every leave ([returnToShrinkWizard]/[addActiveStageToShrinkList])
+  /// and restored on re-open; [clearShrinkStage] and a fresh wizard drop it.
+  final Map<ShrinkStage, _ShrinkStageCache> _stageCache = {};
+
+  /// The stage whose real review page is open inside the wizard, or null on the
+  /// wizard hub.
+  ShrinkStage? get shrinkActiveStage => _shrinkActiveStage;
+
+  /// Whether a stage's real review page is open in deferred shrink-session mode
+  /// (the terminal button adds to the staged set and returns, never trashes).
+  bool get inShrinkSession =>
+      _action == LibraryAction.shrink && _shrinkActiveStage != null;
+
+  /// Where the action panel's top back/close affordance should go right now.
+  ///
+  /// Inside a shrink session a stage page was reached FROM the wizard, so its
+  /// back returns to the wizard hub ([ShrinkBackTarget.shrinkWizard]); opened
+  /// standalone from the library it returns to the library hub
+  /// ([ShrinkBackTarget.library]). Pure so the routing is unit-testable.
+  ShrinkBackTarget get backTarget => inShrinkSession
+      ? ShrinkBackTarget.shrinkWizard
+      : ShrinkBackTarget.library;
+
+  /// Routes the top back/close affordance to the correct target for the current
+  /// context: the shrink wizard mid-session, otherwise the library hub.
+  void goBackFromAction() {
+    switch (backTarget) {
+      case ShrinkBackTarget.shrinkWizard:
+        returnToShrinkWizard();
+      case ShrinkBackTarget.library:
+        backToLibrary();
+    }
+  }
+
+  /// The currently-staged candidates across every reviewed stage (cumulative).
+  List<ShrinkCandidate> get shrinkStaged => _staged.all;
+
+  /// The grand total over the currently-selected staged files.
+  ShrinkTally get shrinkTotal => _staged.selectedTally;
+
+  /// Whether [stage] is opted in.
+  bool isShrinkStageIncluded(ShrinkStage stage) =>
+      _stageIncluded[stage] ?? true;
+
+  /// The outcome of [stage] if it has been run, else null.
+  ShrinkStageOutcome? shrinkOutcome(ShrinkStage stage) => _stageOutcomes[stage];
+
+  /// Which side the redundant-pairs stage drops.
+  PairDropSide get shrinkPairDrop => _shrinkPairDrop;
+
+  /// The low-quality stage threshold (0..1 composite quality).
+  double get shrinkQualityThreshold => _shrinkQualityThreshold;
+
+  /// Whether a stage computation is currently in flight (hashing/classifying).
+  bool get shrinkBusy => _shrinkBusy;
+
+  /// Whether [path] is staged AND still selected for deletion.
+  bool isShrinkSelected(String path) => _staged.isSelected(path);
+
+  /// The paths the wizard will trash (staged and not deselected).
+  List<String> get shrinkSelectedPaths => _staged.selectedPaths;
+
+  /// Number of files the wizard will trash.
+  int get shrinkSelectedCount => _staged.selectedPaths.length;
+
+  // --- Redundant-pairs review (stage 3, deferred) --------------------------
+
+  /// The redundant-pairs review's drop-side candidates, in scan order: the side
+  /// of every RAW+photo pair the current [shrinkPairDrop] would drop.
+  List<PairedFile> get shrinkPairCandidates {
+    final pairing = _shrinkPairing;
+    if (pairing == null) return const [];
+    final wantKind = _shrinkPairDrop == PairDropSide.dropRaw
+        ? PairKind.pairedRaw
+        : PairKind.photoWithRaw;
+    return [
+      for (final f in pairing.files)
+        if (f.kind == wantKind) f,
+    ];
+  }
+
+  /// The companion file of redundant-pairs candidate [path] (the file on the
+  /// other side of its RAW+photo pair), or null when no partner is classified.
+  ///
+  /// Matches by same stem (case-insensitive basename without extension) and the
+  /// opposite pair kind, so the big-preview viewer can show kept vs dropped.
+  String? shrinkPairPartner(String path) {
+    final pairing = _shrinkPairing;
+    if (pairing == null) return null;
+    final stem = p.basenameWithoutExtension(path).toLowerCase();
+    final wantKind = _shrinkPairDrop == PairDropSide.dropRaw
+        ? PairKind.photoWithRaw
+        : PairKind.pairedRaw;
+    for (final f in pairing.files) {
+      if (f.kind == wantKind &&
+          p.basenameWithoutExtension(f.path).toLowerCase() == stem) {
+        return f.path;
+      }
+    }
+    return null;
+  }
+
+  /// Whether the redundant-pairs review has [path] selected to add.
+  bool isShrinkPairSelected(String path) => _shrinkPairSelected.contains(path);
+
+  /// Number of redundant-pairs files currently selected to add.
+  int get shrinkPairSelectedCount => _shrinkPairSelected.length;
+
+  /// Selects/deselects a single redundant-pairs candidate.
+  void setShrinkPairSelected(String path, bool selected) {
+    if (selected) {
+      _shrinkPairSelected.add(path);
+    } else {
+      _shrinkPairSelected.remove(path);
+    }
+    notifyListeners();
+  }
+
+  /// Selects ([all] true) or clears every redundant-pairs candidate.
+  void selectAllShrinkPairs(bool all) {
+    _shrinkPairSelected.clear();
+    if (all) {
+      _shrinkPairSelected.addAll(shrinkPairCandidates.map((f) => f.path));
+    }
+    notifyListeners();
+  }
+
+  // --- Low-quality review (stage 4, deferred) ------------------------------
+
+  /// Whether the low-quality review has hashed the library at least once.
+  bool get shrinkLowQReviewed => _shrinkLowQReviewed;
+
+  /// The quality components the low-quality stage treats as defining low
+  /// quality. The candidate filter scores each already-hashed file on ONLY these
+  /// (via [compositeFrom]), so toggling a parameter re-filters without re-hashing.
+  Set<QualityParam> get lowQParams => Set.unmodifiable(_lowQParams);
+
+  /// Whether [param] is currently one of the low-quality criteria.
+  bool isLowQParamEnabled(QualityParam param) => _lowQParams.contains(param);
+
+  /// The hashed files scoring strictly below the current quality threshold when
+  /// scored on only the enabled [lowQParams], in hash order — the low-quality
+  /// review's selectable candidates. Recomputed from the ALREADY-HASHED
+  /// per-component scores, so a toggle change never triggers a re-hash.
+  List<HashedFile> get shrinkLowQCandidates => [
+    for (final h in _shrinkLowQHashed)
+      if (compositeFrom(h.quality, _lowQParams) < _shrinkQualityThreshold) h,
+  ];
+
+  /// Enables or disables a low-quality [param], recomputing the candidate set
+  /// from the already-hashed components (no re-hash) and re-syncing the working
+  /// selection to the new candidate set. Persisted so the choice survives
+  /// restarts.
+  void setLowQParamEnabled(QualityParam param, bool enabled) {
+    final changed = enabled
+        ? _lowQParams.add(param)
+        : _lowQParams.remove(param);
+    if (!changed) return;
+    _syncLowQSelectionToCandidates();
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Re-selects every current candidate, dropping any prior selection that is no
+  /// longer a candidate. Keeps the "all candidates selected" invariant the
+  /// review starts from after the filter set changes.
+  void _syncLowQSelectionToCandidates() {
+    final paths = {for (final h in shrinkLowQCandidates) h.path};
+    _shrinkLowQSelected
+      ..clear()
+      ..addAll(paths);
+  }
+
+  /// Whether the low-quality review has [path] selected to add.
+  bool isShrinkLowQSelected(String path) => _shrinkLowQSelected.contains(path);
+
+  /// Number of low-quality files currently selected to add.
+  int get shrinkLowQSelectedCount => _shrinkLowQSelected.length;
+
+  /// Selects/deselects a single low-quality candidate.
+  void setShrinkLowQSelected(String path, bool selected) {
+    if (selected) {
+      _shrinkLowQSelected.add(path);
+    } else {
+      _shrinkLowQSelected.remove(path);
+    }
+    notifyListeners();
+  }
+
+  /// Selects ([all] true) or clears every low-quality candidate.
+  void selectAllShrinkLowQ(bool all) {
+    _shrinkLowQSelected.clear();
+    if (all) {
+      _shrinkLowQSelected.addAll(shrinkLowQCandidates.map((h) => h.path));
+    }
+    notifyListeners();
+  }
+
+  // --- Shrink-session navigation -------------------------------------------
+
+  /// Opens [stage]'s REAL review page inside the wizard in deferred shrink-
+  /// session mode. The page's terminal button becomes "Add to shrink list" and
+  /// returns here; nothing is trashed until the final confirm.
+  ///
+  /// Re-opening a stage already visited this session RESTORES its cached review
+  /// state (found results + the user's selections) instead of re-priming — no
+  /// re-classify, no re-hash. Only the first visit primes the surface fresh:
+  /// duplicates clears any prior pairs (the page hashes on demand), orphans
+  /// classifies the library for the prune review, redundant-pairs classifies and
+  /// pre-selects the drop side, and low quality resets for an on-demand hash.
+  void openShrinkStage(ShrinkStage stage) {
+    _shrinkActiveStage = stage;
+    _errorMessage = null;
+    final cached = _stageCache[stage];
+    if (cached != null) {
+      _restoreStageCache(stage, cached);
+      notifyListeners();
+      return;
+    }
+    switch (stage) {
+      case ShrinkStage.duplicates:
+        _duplicatePairs = null;
+        _findingDuplicates = false;
+        _hashProgress = HashProgress();
+      case ShrinkStage.orphans:
+        _preparePruneReview();
+      case ShrinkStage.pairs:
+        _prepareShrinkPairing();
+        _shrinkPairSelected
+          ..clear()
+          ..addAll(shrinkPairCandidates.map((f) => f.path));
+      case ShrinkStage.lowQuality:
+        _shrinkLowQHashed = const [];
+        _shrinkLowQReviewed = false;
+        _shrinkLowQSelected.clear();
+        _findingDuplicates = false;
+        _hashProgress = HashProgress();
+    }
+    notifyListeners();
+  }
+
+  /// Classifies the redundant-RAW pairing for the pairs stage.
+  ///
+  /// On desktop (and unchanged there) it classifies over the included proxy/file
+  /// paths. On Android mobile the proxies are all `.jpg` (so classifying them
+  /// finds no RAW); instead it pairs over the assets' ORIGINAL filenames and
+  /// keeps the filename→asset-id lookup so a chosen pair routes to the native
+  /// delete. On iOS RAW pruning is unavailable ([supportsRawPruning] false), so
+  /// the pairing stays null and the stage cleanly shows nothing.
+  void _prepareShrinkPairing() {
+    final scan = _scan;
+    final mobile = _mobileLibrary;
+    if (isMobile) {
+      if (supportsRawPruning && scan != null && mobile != null) {
+        _shrinkMobilePairing = mobile.pairingFromFilenames();
+        _shrinkPairing = _shrinkMobilePairing!.pairing;
+      } else {
+        _shrinkMobilePairing = null;
+        _shrinkPairing = null;
+      }
+      return;
+    }
+    _shrinkMobilePairing = null;
+    _shrinkPairing = scan == null
+        ? null
+        : classifyPairing(_included(scan.photos));
+  }
+
+  /// Snapshots the active [stage]'s working review state into the per-stage cache
+  /// so a later re-open restores it without re-running. Called on every leave.
+  void _cacheActiveStage(ShrinkStage stage) {
+    _stageCache[stage] = switch (stage) {
+      ShrinkStage.duplicates => _ShrinkStageCache(
+        duplicatePairs: _duplicatePairs == null
+            ? null
+            : List<DuplicatePair>.of(_duplicatePairs!),
+      ),
+      ShrinkStage.orphans => _ShrinkStageCache(
+        pairing: _pairing,
+        selected: Set<String>.of(_selected),
+        direction: _direction,
+        visibleKinds: Set<PairKind>.of(_visibleKinds),
+        pruneFilter: _pruneFilter,
+      ),
+      ShrinkStage.pairs => _ShrinkStageCache(
+        shrinkPairing: _shrinkPairing,
+        shrinkMobilePairing: _shrinkMobilePairing,
+        shrinkPairSelected: Set<String>.of(_shrinkPairSelected),
+        shrinkPairDrop: _shrinkPairDrop,
+      ),
+      ShrinkStage.lowQuality => _ShrinkStageCache(
+        shrinkLowQHashed: _shrinkLowQHashed,
+        shrinkLowQSelected: Set<String>.of(_shrinkLowQSelected),
+        shrinkLowQReviewed: _shrinkLowQReviewed,
+        shrinkQualityThreshold: _shrinkQualityThreshold,
+      ),
+    };
+  }
+
+  /// Restores [stage]'s working review state from a [cached] snapshot.
+  void _restoreStageCache(ShrinkStage stage, _ShrinkStageCache cached) {
+    _findingDuplicates = false;
+    _hashProgress = HashProgress();
+    switch (stage) {
+      case ShrinkStage.duplicates:
+        _duplicatePairs = cached.duplicatePairs == null
+            ? null
+            : List<DuplicatePair>.of(cached.duplicatePairs!);
+      case ShrinkStage.orphans:
+        _pairing = cached.pairing;
+        _direction = cached.direction ?? PruneDirection.removeOrphanRaws;
+        _pruneFilter = cached.pruneFilter ?? '';
+        _visibleKinds
+          ..clear()
+          ..addAll(cached.visibleKinds ?? {_direction.target});
+        _selected
+          ..clear()
+          ..addAll(cached.selected ?? const {});
+      case ShrinkStage.pairs:
+        _shrinkPairing = cached.shrinkPairing;
+        _shrinkMobilePairing = cached.shrinkMobilePairing;
+        _shrinkPairDrop = cached.shrinkPairDrop ?? PairDropSide.dropRaw;
+        _shrinkPairSelected
+          ..clear()
+          ..addAll(cached.shrinkPairSelected ?? const {});
+      case ShrinkStage.lowQuality:
+        _shrinkLowQHashed = cached.shrinkLowQHashed ?? const [];
+        _shrinkLowQReviewed = cached.shrinkLowQReviewed ?? false;
+        _shrinkQualityThreshold = cached.shrinkQualityThreshold ?? 0.35;
+        _shrinkLowQSelected
+          ..clear()
+          ..addAll(cached.shrinkLowQSelected ?? const {});
+    }
+  }
+
+  /// Returns to the wizard hub WITHOUT adding anything, caching the stage's
+  /// working state first so re-opening it restores the results and selections.
+  void returnToShrinkWizard() {
+    final stage = _shrinkActiveStage;
+    if (stage != null) _cacheActiveStage(stage);
+    _shrinkActiveStage = null;
+    notifyListeners();
+  }
+
+  /// Folds the active stage's chosen files into the cumulative staged set and
+  /// returns to the wizard hub. Cross-stage dedup (first reason wins) is handled
+  /// by [StagedSet.addStage]; the stage's contribution outcome is recorded for
+  /// the hub's running total. The stage's working state is cached so re-opening
+  /// it restores the prior results and selections.
+  void addActiveStageToShrinkList() {
+    final stage = _shrinkActiveStage;
+    if (stage == null) return;
+    final candidates = _candidatesForActiveStage(stage);
+    _stageOutcomes[stage] = _staged.addStage(stage, candidates);
+    _stageIncluded[stage] = true;
+    _cacheActiveStage(stage);
+    _log('Shrink: ${stage.name} added ${candidates.length} file(s) to list');
+    _shrinkActiveStage = null;
+    notifyListeners();
+  }
+
+  /// Clears ONE stage's contribution: drops every file it added to the
+  /// cumulative [StagedSet], forgets its recorded outcome, and resets its cached
+  /// review state so re-opening it primes fresh. Other stages are untouched and
+  /// the running total updates accordingly.
+  void clearShrinkStage(ShrinkStage stage) {
+    _staged.removeStage(stage);
+    _stageOutcomes.remove(stage);
+    _stageCache.remove(stage);
+    notifyListeners();
+  }
+
+  /// Builds the candidates the active [stage]'s current page selection implies.
+  List<ShrinkCandidate> _candidatesForActiveStage(ShrinkStage stage) {
+    switch (stage) {
+      case ShrinkStage.duplicates:
+        final pairs = _duplicatePairs;
+        if (pairs == null) return const [];
+        return duplicateCandidates(pairs, gpsOf: _gpsOf);
+      case ShrinkStage.orphans:
+        final pairing = _pairing;
+        if (pairing == null) return const [];
+        // Flag both orphan kinds, then keep only the paths the prune review left
+        // selected (its direction toggle + checkboxes decide the chosen side).
+        final all = orphanCandidates(
+          pairing,
+          includeOrphanRaws: true,
+          includeOrphanImages: true,
+          sizeOf: _sizeOf,
+          gpsOf: _gpsOf,
+        );
+        return [
+          for (final c in all)
+            if (_selected.contains(c.path)) c,
+        ];
+      case ShrinkStage.pairs:
+        final pairing = _shrinkPairing;
+        if (pairing == null) return const [];
+        final all = redundantPairCandidates(
+          pairing,
+          side: _shrinkPairDrop,
+          sizeOf: _sizeOf,
+          gpsOf: _gpsOf,
+        );
+        return [
+          for (final c in all)
+            if (_shrinkPairSelected.contains(c.path)) c,
+        ];
+      case ShrinkStage.lowQuality:
+        final scores = {
+          for (final h in shrinkLowQCandidates)
+            h.path: compositeFrom(h.quality, _lowQParams),
+        };
+        final sizes = {
+          for (final h in shrinkLowQCandidates) h.path: h.fileSize,
+        };
+        final all = lowQualityCandidates(
+          scores,
+          threshold: _shrinkQualityThreshold,
+          sizeOf: (path) => sizes[path] ?? 0,
+          gpsOf: _gpsOf,
+        );
+        return [
+          for (final c in all)
+            if (_shrinkLowQSelected.contains(c.path)) c,
+        ];
+    }
+  }
+
+  /// Resets the wizard to a fresh, empty cumulative set (called when opened).
+  void _prepareShrink() {
+    _staged = StagedSet();
+    _stageOutcomes.clear();
+    _stageCache.clear();
+    _shrinkActiveStage = null;
+    _shrinkPairing = null;
+    _shrinkMobilePairing = null;
+    _shrinkPairSelected.clear();
+    _shrinkLowQHashed = const [];
+    _shrinkLowQReviewed = false;
+    _shrinkLowQSelected.clear();
+    for (final s in ShrinkStage.values) {
+      _stageIncluded[s] = true;
+    }
+  }
+
+  /// Opts [stage] in or out. Toggling a stage off rolls its candidates back out
+  /// of the cumulative set; toggling on leaves it un-run until the user runs it.
+  void setShrinkStageIncluded(ShrinkStage stage, bool included) {
+    if ((_stageIncluded[stage] ?? true) == included) return;
+    _stageIncluded[stage] = included;
+    if (!included) {
+      _staged.removeStage(stage);
+      _stageOutcomes.remove(stage);
+    }
+    notifyListeners();
+  }
+
+  /// Sets which side the redundant-pairs stage drops, re-priming the review's
+  /// candidate list and selection when the pairs page is open.
+  void setShrinkPairDrop(PairDropSide side) {
+    if (_shrinkPairDrop == side) return;
+    _shrinkPairDrop = side;
+    if (_shrinkActiveStage == ShrinkStage.pairs) {
+      _shrinkPairSelected
+        ..clear()
+        ..addAll(shrinkPairCandidates.map((f) => f.path));
+    }
+    notifyListeners();
+  }
+
+  /// Sets the low-quality threshold (clamped 0..1), re-syncing the working
+  /// selection to the recomputed candidate set and persisting the choice.
+  void setShrinkQualityThreshold(double value) {
+    _shrinkQualityThreshold = value.clamp(0.0, 1.0);
+    if (_shrinkLowQReviewed) _syncLowQSelectionToCandidates();
+    _persistPrefs();
+    notifyListeners();
+  }
+
+  /// Selects or deselects an already-staged [path] (used in per-stage review and
+  /// the final summary).
+  void setShrinkSelected(String path, bool selected) {
+    _staged.setSelected(path, selected);
+    notifyListeners();
+  }
+
+  /// On-disk size of [path] in bytes, or 0 when it can't be read. Exposed for
+  /// the shrink review pages, which show each candidate's size.
+  int shrinkSizeOf(String path) {
+    // On mobile [path] is a proxy temp file (or an asset filename in the
+    // filename-keyed stages); report the ORIGINAL asset's byte size instead of
+    // the tiny proxy / unreadable filename.
+    if (isMobile) return assetForProxyPath(path)?.byteSize ?? 0;
+    try {
+      return File(path).lengthSync();
+    } on Object {
+      return 0;
+    }
+  }
+
+  /// The original [LibraryAsset] behind a mobile [path], or null on desktop /
+  /// when it does not resolve. [path] may be a proxy temp-file path (the engine
+  /// scanned it) or an asset filename (the filename-keyed prune/pairs stages);
+  /// both are resolved through the mobile library + pairings.
+  LibraryAsset? assetForProxyPath(String path) {
+    final mobile = _mobileLibrary;
+    if (mobile == null) return null;
+    final direct = mobile.assetForProxy(path);
+    if (direct != null) return direct;
+    final id =
+        _mobilePairing?.idByFilename[path] ??
+        _shrinkMobilePairing?.idByFilename[path];
+    if (id == null) return null;
+    return mobile.assetsById[id];
+  }
+
+  /// The filename to display for [path]: the ORIGINAL asset filename on mobile
+  /// (the proxy path is a sanitized `.jpg` temp name), else the path's own
+  /// basename. Used by the duplicate-pair review, the compare info line, and the
+  /// low-quality row so they never surface the proxy name.
+  String displayFilename(String path) {
+    if (isMobile) {
+      final asset = assetForProxyPath(path);
+      if (asset != null) return asset.filename;
+    }
+    return p.basename(path);
+  }
+
+  /// Full-resolution original bytes for the asset behind a mobile proxy [path],
+  /// or null on desktop / when it doesn't resolve. The compare/preview viewer
+  /// shows these instead of the downscaled proxy on mobile.
+  Future<Uint8List>? fullBytesForProxyPath(String path) {
+    final library = _photoLibrary;
+    final asset = assetForProxyPath(path);
+    if (library == null || asset == null) return null;
+    return library.fullBytes(asset.id);
+  }
+
+  /// The ORIGINAL-asset info backing the compare/preview info line on mobile for
+  /// proxy [path]: its real filename, a [FileMeta] carrying the original
+  /// dimensions / capture date / GPS, and its on-disk byte size. Null on desktop
+  /// or when [path] doesn't resolve to an asset (then the desktop info line —
+  /// proxy name + read meta — is used unchanged). The proxy itself is downscaled
+  /// and stripped, so none of this can be read from the file.
+  MobileInfo? mobileInfoForProxyPath(String path) {
+    final asset = assetForProxyPath(path);
+    if (asset == null) return null;
+    return MobileInfo(
+      filename: asset.filename,
+      fileSize: asset.byteSize > 0 ? asset.byteSize : null,
+      meta: FileMeta(
+        path: path,
+        width: asset.width > 0 ? asset.width : null,
+        height: asset.height > 0 ? asset.height : null,
+        date: asset.createdAt,
+        hasGps: asset.hasGps,
+        latitude: asset.latitude,
+        longitude: asset.longitude,
+      ),
+    );
+  }
+
+  int _sizeOf(String path) => shrinkSizeOf(path);
+
+  bool _gpsOf(String path) => _meta[path]?.hasGps ?? false;
+
+  /// Hashes every included photo for the low-quality review (stage 4), reusing
+  /// the composite quality the hasher already computes. Populates the review's
+  /// below-threshold candidates and pre-selects them all; the user reviews and
+  /// then adds the selection to the staged set. Nothing is staged here.
+  Future<void> runShrinkLowQualityHash() async {
+    final scan = _scan;
+    if (scan == null) return;
+    final photos = _included(scan.photos);
+    _shrinkBusy = true;
+    _findingDuplicates = true;
+    _duplicatesCancelled = false;
+    _hashProgress = HashProgress(total: photos.length);
+    _errorMessage = null;
+    _setRunState(
+      LibraryAction.shrink,
+      ActionRunState.active(progress: photos.isEmpty ? null : 0),
+    );
+    notifyListeners();
+    try {
+      final hashed = await _engine.hashFiles(
+        photos,
+        onProgress: (done, total) {
+          if (_duplicatesCancelled) return;
+          _hashProgress = HashProgress(done: done, total: total);
+          _setRunState(
+            LibraryAction.shrink,
+            ActionRunState.active(progress: _hashProgress.fraction),
+          );
+        },
+      );
+      if (_duplicatesCancelled) return;
+      // On mobile the hashes came from downscaled proxies; substitute originals
+      // back so the low-quality review's size column reflects the real asset.
+      _shrinkLowQHashed = isMobile
+          ? _mobileLibrary!.withOriginalDimensions(hashed)
+          : hashed;
+      _shrinkLowQReviewed = true;
+      _shrinkLowQSelected
+        ..clear()
+        ..addAll(shrinkLowQCandidates.map((h) => h.path));
+      _log('Shrink: low-quality review found ${shrinkLowQCandidates.length}');
+    } on Object catch (e) {
+      if (!_duplicatesCancelled) {
+        _errorMessage = '$e';
+        _log('Shrink low-quality failed: $e', level: LogLevel.error);
+      }
+    } finally {
+      _shrinkBusy = false;
+      _findingDuplicates = false;
+      _hashProgress = HashProgress();
+      _setRunState(LibraryAction.shrink, ActionRunState.idle);
+      notifyListeners();
+    }
+  }
+
+  /// Trashes the wizard's selected set after the silly-word confirm gate. A
+  /// no-op when nothing is selected.
+  Future<void> runTrashShrink() {
+    final staged = _staged.selectedPaths;
+    if (staged.isEmpty) return Future.value();
+    // The wizard's staged set is heterogeneous on mobile: duplicate/low-quality
+    // stages hold proxy paths, while the orphans + redundant-pairs stages hold
+    // asset FILENAMES (their pairings are filename-keyed). Normalise every entry
+    // to a proxy path so [_trashAssets] can resolve them all to asset ids.
+    final paths = isMobile ? _proxyPathsForStaged(staged) : staged;
+    if (paths.isEmpty) return Future.value();
+    return _consume(
+      _trashPaths(paths),
+      owner: LibraryAction.shrink,
+      startMessage: 'Moving ${paths.length} file(s) to Trash…',
+      total: paths.length,
+      reviewOnDone: true,
+    );
+  }
+
+  /// Seeds the wizard's staged set directly (tests only), landing on the shrink
+  /// action panel.
+  @visibleForTesting
+  void debugSeedShrink(List<ShrinkCandidate> staged) {
+    _screen = AppScreen.action;
+    _action = LibraryAction.shrink;
+    _staged = StagedSet();
+    for (final stage in ShrinkStage.values) {
+      final byStage = [
+        for (final c in staged)
+          if (reasonsForStage(stage).contains(c.reason)) c,
+      ];
+      if (byStage.isEmpty) continue;
+      _stageOutcomes[stage] = _staged.addStage(stage, byStage);
+    }
+    notifyListeners();
+  }
+
+  /// Forces the wizard into a busy hashing state with the given progress (tests
+  /// only), so the hashing-bar UI can be asserted without spawning isolates.
+  @visibleForTesting
+  void debugSetShrinkBusy({required int total, int done = 0}) {
+    _shrinkBusy = true;
+    _findingDuplicates = true;
+    _hashProgress = HashProgress(done: done, total: total);
+    notifyListeners();
+  }
+
+  /// Routes a trash request for the given engine-facing [proxyPaths] to the
+  /// right backend: on desktop the worker-isolate Pruner+SystemTrash; on mobile
+  /// the photo library's native delete (mapping proxies → asset ids), yielding
+  /// synthesized events so the existing run-state UI works either way.
+  Stream<EngineEvent> _trashPaths(List<String> proxyPaths) {
+    if (!isMobile) return _engine.trashPaths(proxyPaths);
+    return _trashAssets(proxyPaths);
+  }
+
+  /// Deletes the assets behind [proxyPaths] through the photo library, emitting
+  /// one [ItemEvent] per deleted asset plus a [DoneEvent] so [_consume] folds it
+  /// into run-state exactly like a desktop trash run. After a successful delete
+  /// the trashed assets are dropped from the mobile mapping and the synthesized
+  /// scan so the UI stops referencing them.
+  Stream<EngineEvent> _trashAssets(List<String> proxyPaths) async* {
+    final library = _photoLibrary!;
+    final mobile = _mobileLibrary;
+    final ids = mobile?.assetIdsForProxies(proxyPaths) ?? const <String>[];
+    if (ids.isEmpty) {
+      yield const DoneEvent({});
+      return;
+    }
+    try {
+      await library.delete(ids);
+    } on Object catch (e) {
+      yield ErrorEvent('$e');
+      return;
+    }
+    mobile!.removeAssets(ids);
+    _pruneScanPhotos(proxyPaths);
+    for (final path in proxyPaths) {
+      yield ItemEvent(PhotoRow(path: path, status: PhotoStatus.prunedTrashed));
+    }
+    yield DoneEvent({PhotoStatus.prunedTrashed.wire: ids.length});
+  }
+
+  /// Removes [proxyPaths] from the synthesized mobile scan after a delete, so
+  /// re-running an action no longer sees the trashed proxies.
+  void _pruneScanPhotos(List<String> proxyPaths) {
+    final scan = _scan;
+    if (scan == null) return;
+    final gone = proxyPaths.toSet();
+    final kept = [
+      for (final path in scan.photos)
+        if (!gone.contains(path)) path,
+    ];
+    _scan = FolderScanResult(
+      files: kept.length,
+      dirs: scan.dirs,
+      byExtension: scan.byExtension,
+      photos: kept,
+      gpxFiles: scan.gpxFiles,
+      kmlFiles: scan.kmlFiles,
+      googleFiles: scan.googleFiles,
+      unsupported: scan.unsupported,
+      unsupportedByExtension: scan.unsupportedByExtension,
+      unsupportedByCategory: scan.unsupportedByCategory,
+      unsupportedTotal: scan.unsupportedCount,
     );
   }
 
@@ -951,12 +2727,23 @@ class AppController extends ChangeNotifier {
   }
 
   /// Subscribes to [events], resetting run state and folding each event in.
+  ///
+  /// [owner] is the action this run belongs to: its [ActionRunState] is moved to
+  /// running for the card's progress ring, then to idle (or needs-review, when
+  /// [reviewOnDone] is true and the run produced a summary and the user has
+  /// navigated away) when the stream closes.
   Future<void> _consume(
     Stream<EngineEvent> events, {
+    required LibraryAction owner,
     required String startMessage,
     required int total,
+    bool reviewOnDone = false,
   }) async {
-    await _sub?.cancel();
+    // Mark running SYNCHRONOUSLY (before any await) so the card's ring shows the
+    // instant a run starts, then tear down any prior subscription.
+    final prior = _sub;
+    _sub = null;
+    _activeAction = owner;
     _running = true;
     _errorMessage = null;
     _done = 0;
@@ -964,17 +2751,19 @@ class AppController extends ChangeNotifier {
     _rows.clear();
     _lastSummary = null;
     _log(startMessage);
-    notifyListeners();
+    _setRunState(owner, ActionRunState.active(progress: total == 0 ? null : 0));
+    await prior?.cancel();
 
     final completer = Completer<void>();
+    _runCompleter = completer;
     _sub = events.listen(
       _handleEvent,
       onError: (Object e) {
         _errorMessage = '$e';
         _log('$e', level: LogLevel.error);
-        _finish(completer);
+        _finish(completer, owner, reviewOnDone: reviewOnDone);
       },
-      onDone: () => _finish(completer),
+      onDone: () => _finish(completer, owner, reviewOnDone: reviewOnDone),
     );
     return completer.future;
   }
@@ -986,6 +2775,12 @@ class AppController extends ChangeNotifier {
       case ProgressEvent(:final done, :final total):
         _done = done;
         if (total > 0) _total = total;
+        final owner = _activeAction;
+        if (owner != null) {
+          _runStates[owner] = ActionRunState.active(
+            progress: _total == 0 ? null : _done / _total,
+          );
+        }
       case ItemEvent(:final row):
         _rows.insert(0, row);
         if (_rows.length > 200) _rows.removeLast();
@@ -1002,17 +2797,39 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _finish(Completer<void> completer) {
+  void _finish(
+    Completer<void> completer,
+    LibraryAction owner, {
+    bool reviewOnDone = false,
+  }) {
     _running = false;
-    notifyListeners();
+    _activeAction = null;
+    // Only badge a finished run the user has navigated AWAY from: if they are
+    // still on this action's screen they are watching it, so it returns to idle
+    // (the in-panel result table is the review). A run finishing with a summary
+    // while the user is elsewhere pulses the card until they open it.
+    final watching = _screen == AppScreen.action && _action == owner;
+    final wantsReview = reviewOnDone && _lastSummary != null && !watching;
+    _setRunState(
+      owner,
+      wantsReview
+          ? ActionRunState.review(summary: _summaryLine(_lastSummary!))
+          : ActionRunState.idle,
+    );
     if (!completer.isCompleted) completer.complete();
+    _runCompleter = null;
   }
+
+  /// A compact one-line summary ("tagged=3, skipped=1") for the card badge.
+  static String _summaryLine(Map<String, int> summary) =>
+      summary.entries.map((e) => '${e.key}=${e.value}').join(', ');
 
   @override
   void dispose() {
     _scanSub?.cancel();
     _sub?.cancel();
     _metaSub?.cancel();
+    _curatedSub?.cancel();
     _exploreSub?.cancel();
     mcp.dispose();
     super.dispose();
@@ -1052,6 +2869,17 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Seeds the duplicate-review pairs directly on the duplicates action panel
+  /// (tests only), bypassing the isolate-backed hashing.
+  @visibleForTesting
+  void debugSetDuplicatePairs(List<DuplicatePair> pairs) {
+    _screen = AppScreen.action;
+    _action = LibraryAction.duplicates;
+    _duplicatePairs = List.of(pairs);
+    _findingDuplicates = false;
+    notifyListeners();
+  }
+
   /// Seeds the metadata cache for [meta]'s path directly (tests only).
   @visibleForTesting
   void debugSeedMeta(FileMeta meta) {
@@ -1084,4 +2912,66 @@ class AppController extends ChangeNotifier {
     _exploreFocusPath = focusPath;
     notifyListeners();
   }
+}
+
+/// The original-asset info the mobile compare/preview info line shows in place
+/// of the downscaled proxy's: the real [filename], [fileSize], and a [meta]
+/// carrying the original dimensions / date / GPS.
+class MobileInfo {
+  /// Creates the mobile info bundle for one proxy.
+  const MobileInfo({required this.filename, required this.meta, this.fileSize});
+
+  /// The original asset's display filename.
+  final String filename;
+
+  /// The original asset's on-disk byte size, or null when unknown.
+  final int? fileSize;
+
+  /// The original asset's dimensions / date / GPS (path is the proxy's).
+  final FileMeta meta;
+}
+
+/// A snapshot of one shrink stage's working review state (found results + the
+/// user's selections), cached so leaving a stage and re-opening it within one
+/// session restores it without re-classifying or re-hashing. Only the fields
+/// relevant to the cached stage are set; the rest stay null.
+class _ShrinkStageCache {
+  _ShrinkStageCache({
+    this.duplicatePairs,
+    this.pairing,
+    this.selected,
+    this.direction,
+    this.visibleKinds,
+    this.pruneFilter,
+    this.shrinkPairing,
+    this.shrinkMobilePairing,
+    this.shrinkPairSelected,
+    this.shrinkPairDrop,
+    this.shrinkLowQHashed,
+    this.shrinkLowQSelected,
+    this.shrinkLowQReviewed,
+    this.shrinkQualityThreshold,
+  });
+
+  // Duplicates stage.
+  final List<DuplicatePair>? duplicatePairs;
+
+  // Orphans (prune review) stage.
+  final RawPairing? pairing;
+  final Set<String>? selected;
+  final PruneDirection? direction;
+  final Set<PairKind>? visibleKinds;
+  final String? pruneFilter;
+
+  // Redundant-pairs stage.
+  final RawPairing? shrinkPairing;
+  final MobilePairing? shrinkMobilePairing;
+  final Set<String>? shrinkPairSelected;
+  final PairDropSide? shrinkPairDrop;
+
+  // Low-quality stage.
+  final List<HashedFile>? shrinkLowQHashed;
+  final Set<String>? shrinkLowQSelected;
+  final bool? shrinkLowQReviewed;
+  final double? shrinkQualityThreshold;
 }

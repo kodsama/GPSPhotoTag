@@ -16,13 +16,13 @@ void main() {
         fakeScan(photos: const ['/library/a.jpg']),
       );
       expect(r.enabled, isTrue);
-      expect(r.label, '1 photos');
+      expect(r.label(enTr), '1 photos');
     });
 
     test('blocked when there are no photos', () {
       final r = LibraryAction.explore.readiness(fakeScan(photos: const []));
       expect(r.enabled, isFalse);
-      expect(r.label, 'No photos found');
+      expect(r.label(enTr), 'No photos found');
     });
   });
 

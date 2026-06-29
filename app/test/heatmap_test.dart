@@ -5,62 +5,64 @@ import 'package:latlong2/latlong.dart';
 import 'package:stunda/src/explore/explore_model.dart';
 import 'package:stunda/src/explore/heatmap.dart';
 
-MapPoint _point(double lat, double lon, {int count = 1}) => MapPoint(
-  latitude: lat,
-  longitude: lon,
-  photos: [
-    for (var i = 0; i < count; i++)
-      ExplorePhoto(path: '/p$lat$lon$i.jpg', latitude: lat, longitude: lon),
-  ],
-);
+ExplorePhoto _photo(double lat, double lon, [int i = 0]) =>
+    ExplorePhoto(path: '/p$lat$lon$i.jpg', latitude: lat, longitude: lon);
 
 void main() {
   const size = Size(400, 300);
 
   group('computeHeatBlobs', () {
     test('empty input yields no blobs', () {
-      expect(
-        computeHeatBlobs(offsets: const [], counts: const [], size: size),
-        isEmpty,
-      );
+      expect(computeHeatBlobs(offsets: const [], size: size), isEmpty);
     });
 
-    test('one in-view point becomes one splat at its offset', () {
+    test('one in-view photo becomes one splat at its offset', () {
       final blobs = computeHeatBlobs(
         offsets: const [Offset(100, 100)],
-        counts: const [1],
         size: size,
       );
       expect(blobs, hasLength(1));
       expect(blobs.single.offset, const Offset(100, 100));
-      expect(blobs.single.weight, inInclusiveRange(0.0, 1.0));
+      expect(blobs.single.weight, kHeatPointAlpha);
     });
 
-    test('a denser point splats heavier than a sparse one', () {
+    test('every photo splats with the same low peak weight', () {
+      // Heat builds from OVERLAP, not from a per-photo weight: both splats are
+      // identical low-alpha blobs regardless of position.
       final blobs = computeHeatBlobs(
         offsets: const [Offset(50, 50), Offset(200, 200)],
-        counts: const [1, 10],
         size: size,
       );
       expect(blobs, hasLength(2));
-      expect(blobs[1].weight, greaterThan(blobs[0].weight));
-      // Both share the same screen-space radius (weight differs, not radius):
-      // proven by computeHeatBlobs carrying no per-point radius at all.
+      expect(blobs[0].weight, kHeatPointAlpha);
+      expect(blobs[1].weight, kHeatPointAlpha);
     });
 
-    test('points well outside the viewport are culled', () {
+    test('the per-point peak alpha is faint so a lone photo is a glow', () {
+      expect(kHeatPointAlpha, lessThan(0.3));
+    });
+
+    test('many coincident photos each contribute a splat (overlap)', () {
+      // Three photos at the EXACT same coordinate => three overlapping splats
+      // (the field is fed individual photos, never pre-grouped points).
+      final blobs = computeHeatBlobs(
+        offsets: const [Offset(150, 150), Offset(150, 150), Offset(150, 150)],
+        size: size,
+      );
+      expect(blobs, hasLength(3));
+    });
+
+    test('photos well outside the viewport are culled', () {
       final blobs = computeHeatBlobs(
         offsets: const [Offset(-500, -500), Offset(2000, 2000)],
-        counts: const [3, 3],
         size: size,
       );
       expect(blobs, isEmpty);
     });
 
-    test('a point just off-screen within the radius margin is kept', () {
+    test('a photo just off-screen within the radius margin is kept', () {
       final blobs = computeHeatBlobs(
         offsets: const [Offset(-10, 150)],
-        counts: const [1],
         size: size,
         radius: 42,
       );
@@ -77,28 +79,28 @@ void main() {
     });
   });
 
-  group('weightForCount', () {
-    test('a single photo gets the soft floor', () {
-      expect(weightForCount(1), closeTo(0.45, 1e-9));
+  group('gaussianFalloff', () {
+    test('is 1.0 at the centre', () {
+      expect(gaussianFalloff(0), closeTo(1.0, 1e-9));
     });
 
-    test('zero/negative counts are treated as one photo', () {
-      expect(weightForCount(0), closeTo(0.45, 1e-9));
-      expect(weightForCount(-5), closeTo(0.45, 1e-9));
+    test('decays monotonically from centre to rim', () {
+      var prev = double.infinity;
+      for (var i = 0; i <= 10; i++) {
+        final v = gaussianFalloff(i / 10);
+        expect(v, lessThan(prev));
+        prev = v;
+      }
     });
 
-    test('more photos weigh more, with diminishing (log) returns', () {
-      final w1 = weightForCount(1);
-      final w2 = weightForCount(2);
-      final w4 = weightForCount(4);
-      expect(w2, greaterThan(w1));
-      expect(w4, greaterThan(w2));
-      // Log-shaped: the 1→2 jump exceeds the 2→4 jump.
-      expect(w2 - w1, greaterThan(w4 - w2));
+    test('is nearly zero (not a hard plateau) at the rim', () {
+      // A soft fade, not a near-opaque disc that cuts off abruptly.
+      expect(gaussianFalloff(1), lessThan(0.05));
     });
 
-    test('large stacks saturate at 1.0 (clamped)', () {
-      expect(weightForCount(1000), 1.0);
+    test('clamps t outside 0..1', () {
+      expect(gaussianFalloff(-1), gaussianFalloff(0));
+      expect(gaussianFalloff(2), gaussianFalloff(1));
     });
   });
 
@@ -114,15 +116,25 @@ void main() {
       expect(a, 0);
     });
 
-    test('low density is blue-ish', () {
-      final (r, g, b, a) = colorizeIntensity(palette, 0.15);
-      expect(b, greaterThan(r));
-      expect(b, greaterThan(g));
-      expect(a, greaterThan(0));
+    test('has a long transparent cold tail (low density shows the map)', () {
+      // Sparse/lone-photo density (the bottom of the ramp) stays see-through.
+      final (_, _, _, a) = colorizeIntensity(palette, 0.18);
+      expect(a, 0);
+    });
+
+    test('density is hot (opaque) only near the top of the ramp', () {
+      // Just past the transparent tail it is faint, not already red.
+      final (rLow, _, bLow, aLow) = colorizeIntensity(palette, 0.4);
+      expect(aLow, greaterThan(0));
+      expect(aLow, lessThan(150)); // still translucent
+      expect(bLow, greaterThan(rLow)); // blue-ish, not red
+
+      final (_, _, _, aHot) = colorizeIntensity(palette, 1.0);
+      expect(aHot, 255); // opaque only at full density
     });
 
     test('mid density is green-ish', () {
-      final (r, g, b, _) = colorizeIntensity(palette, 0.55);
+      final (r, g, b, _) = colorizeIntensity(palette, 0.65);
       expect(g, greaterThan(r));
       expect(g, greaterThan(b));
     });
@@ -185,8 +197,9 @@ void main() {
     });
 
     test('overlapping splats produce a hotter (more opaque) core', () async {
-      // One splat vs two coincident splats at the same point: the doubled
-      // density must read hotter (a higher palette index / more opaque alpha).
+      // Many coincident faint splats vs one: the piled-up density must read
+      // hotter (a higher palette index / more opaque alpha) — overlap drives
+      // heat, not a single splat.
       Future<int> coreAlpha(List<HeatBlob> blobs) async {
         final image = (await renderHeatmapImage(
           blobs: blobs,
@@ -200,17 +213,40 @@ void main() {
         return bytes[(y * 400 + x) * 4 + 3];
       }
 
-      const one = [HeatBlob(offset: Offset(200, 150), weight: 0.5)];
-      const two = [
-        HeatBlob(offset: Offset(200, 150), weight: 0.5),
-        HeatBlob(offset: Offset(200, 150), weight: 0.5),
+      const one = [HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha)];
+      const many = [
+        HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha),
+        HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha),
+        HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha),
+        HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha),
+        HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha),
       ];
-      expect(await coreAlpha(two), greaterThan(await coreAlpha(one)));
+      expect(await coreAlpha(many), greaterThan(await coreAlpha(one)));
+    });
+
+    test('a single faint splat stays in the transparent cold tail', () async {
+      // One lone photo => its centre alpha must be (near) fully transparent,
+      // i.e. it reads as a faint glow, not a solid coloured disc.
+      final image = (await renderHeatmapImage(
+        blobs: const [
+          HeatBlob(offset: Offset(200, 150), weight: kHeatPointAlpha),
+        ],
+        size: size,
+        palette: palette,
+      ))!;
+      final bytes = (await image.toByteData())!.buffer.asUint8List();
+      image.dispose();
+      const x = 200, y = 150;
+      final coreAlpha = bytes[(y * 400 + x) * 4 + 3];
+      expect(coreAlpha, lessThan(60)); // faint, not opaque
     });
   });
 
   group('HeatmapLayer widget', () {
-    Future<void> pumpLayer(WidgetTester tester, List<MapPoint> points) async {
+    Future<void> pumpLayer(
+      WidgetTester tester,
+      List<ExplorePhoto> photos,
+    ) async {
       tester.view.physicalSize = const Size(600, 600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -223,7 +259,7 @@ void main() {
                 initialCenter: LatLng(42.5, 18.1),
                 initialZoom: 6,
               ),
-              children: [HeatmapLayer(points: points)],
+              children: [HeatmapLayer(photos: photos)],
             ),
           ),
         ),
@@ -235,8 +271,11 @@ void main() {
     ) async {
       await tester.runAsync(() async {
         await pumpLayer(tester, [
-          _point(42.5, 18.1, count: 3),
-          _point(42.6, 18.2),
+          // Several individual photos, some coincident (overlap → heat).
+          _photo(42.5, 18.1, 0),
+          _photo(42.5, 18.1, 1),
+          _photo(42.5, 18.1, 2),
+          _photo(42.6, 18.2),
         ]);
         // Let the real async two-pass render (toImage → toByteData → decode)
         // complete, then the setState swaps the image in and repaints.
@@ -252,10 +291,10 @@ void main() {
       tester,
     ) async {
       await tester.runAsync(() async {
-        await pumpLayer(tester, [_point(42.5, 18.1)]);
-        // Rebuild with different points before the first render resolves, so the
-        // in-flight render becomes stale and its image is discarded on arrival.
-        await pumpLayer(tester, [_point(42.7, 18.3, count: 4)]);
+        await pumpLayer(tester, [_photo(42.5, 18.1)]);
+        // Rebuild with different photos before the first render resolves, so
+        // the in-flight render becomes stale and its image is discarded.
+        await pumpLayer(tester, [_photo(42.7, 18.3), _photo(42.7, 18.3, 1)]);
         await Future<void>.delayed(const Duration(milliseconds: 100));
         await tester.pump();
       });
@@ -263,7 +302,7 @@ void main() {
       expect(find.byType(HeatmapLayer), findsOneWidget);
     });
 
-    testWidgets('an empty point list paints nothing without error', (
+    testWidgets('an empty photo list paints nothing without error', (
       tester,
     ) async {
       await pumpLayer(tester, const []);

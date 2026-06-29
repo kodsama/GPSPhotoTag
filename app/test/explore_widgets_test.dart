@@ -14,6 +14,7 @@ import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/screens/workspace_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/widgets/content_panel.dart';
+import 'package:stunda/src/widgets/image_compare_viewer.dart';
 
 import 'support/fakes.dart';
 
@@ -119,7 +120,9 @@ void main() {
       expect([prev, next, expanded, closed], [1, 1, 1, 1]);
     });
 
-    testWidgets('expand opens a fullscreen InteractiveViewer', (tester) async {
+    testWidgets('expand opens the single-mode big-preview viewer', (
+      tester,
+    ) async {
       final selection = DetailSelection(
         point: MapPoint(
           latitude: 1,
@@ -138,12 +141,7 @@ void main() {
                   onPrev: () {},
                   onNext: () {},
                   onClose: () {},
-                  onExpand: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          const FullscreenImageView(path: '/library/shot.heic'),
-                    ),
-                  ),
+                  onExpand: () => openFullscreen(context, '/library/shot.heic'),
                 ),
               ),
             ),
@@ -152,22 +150,18 @@ void main() {
       );
       await tester.tap(find.byIcon(Icons.open_in_full));
       await tester.pumpAndSettle();
-      expect(find.byType(InteractiveViewer), findsOneWidget);
-      // No extractable preview (fake returns null) -> placeholder fullscreen.
-      expect(find.text('HEIC'), findsOneWidget);
-    });
-  });
-
-  group('FullscreenImageView', () {
-    testWidgets('decodable path uses an Image inside InteractiveViewer', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: FullscreenImageView(path: '/library/pic.jpg')),
+      expect(find.byType(ImageCompareViewer), findsOneWidget);
+      // No extractable preview (fake returns null) -> the viewer's placeholder
+      // is shown (the underlying panel's miniature placeholder is also present).
+      expect(
+        find.descendant(
+          of: find.byType(ImageCompareViewer),
+          matching: find.text('HEIC'),
+        ),
+        findsOneWidget,
       );
-      expect(find.byType(InteractiveViewer), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-      expect(find.text('pic.jpg'), findsOneWidget);
+      // Single mode: no compare-layout button.
+      expect(find.byIcon(Icons.splitscreen), findsNothing);
     });
   });
 
@@ -241,10 +235,10 @@ void main() {
         expect(find.text('4032 × 3024'), findsOneWidget);
         expect(find.text('2023-07-15 09:04'), findsOneWidget);
 
-        // The expand control opens the fullscreen view.
+        // The expand control opens the single-mode big-preview viewer.
         await tester.tap(find.byIcon(Icons.open_in_full));
         await tester.pumpAndSettle();
-        expect(find.byType(FullscreenImageView), findsOneWidget);
+        expect(find.byType(ImageCompareViewer), findsOneWidget);
       },
     );
 
@@ -438,30 +432,54 @@ void main() {
       expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
       expect(find.text('RAF'), findsOneWidget);
     });
-  });
 
-  group('FullscreenImageView — RAW preview extraction', () {
-    testWidgets('extracts the full-size preview for a RAF', (tester) async {
-      final dir = Directory.systemTemp.createTempSync('raw_full');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final jpeg = p.join(dir.path, 'full.jpg');
-      File(
-        jpeg,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 16, height: 16)));
+    testWidgets(
+      'under unbounded width the decode width falls back to the height',
+      (tester) async {
+        // A horizontal scroll view gives the thumbnail UNBOUNDED width, so its
+        // LayoutBuilder takes `!constraints.hasBoundedWidth` and the decode
+        // width basis falls back to `height`. The downstream cover Image can't
+        // lay out at infinite width (it asserts), but the LayoutBuilder branch
+        // we care about has already run — we assert on the computed decode width
+        // captured at first build, then clear the expected layout assertion.
+        final dir = Directory.systemTemp.createTempSync('raw_unbounded');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final jpeg = p.join(dir.path, 'extracted.jpg');
+        File(
+          jpeg,
+        ).writeAsBytesSync(img.encodeJpg(img.Image(width: 64, height: 64)));
+        final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
+        final c = AppController(runner: fake);
 
-      final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
-      final c = AppController(runner: fake);
+        await tester.pumpWidget(
+          _wrap(
+            const SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: PhotoThumbnail(path: '/library/shot.raf', height: 100),
+            ),
+            controller: c,
+          ),
+        );
+        await tester.pump(); // build the LayoutBuilder (spinner phase)
+        // The cover image asserts on the infinite width it inherits; that is
+        // expected and proves we reached the unbounded layout. Drain it.
+        final spinnerError = tester.takeException();
+        expect(spinnerError, isNotNull);
 
-      await tester.pumpWidget(
-        _wrap(
-          const FullscreenImageView(path: '/library/shot.raf'),
-          controller: c,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(InteractiveViewer), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-    });
+        // Let the extraction future complete so the real Image with its
+        // height-derived cacheWidth is built (still under unbounded width).
+        await tester.idle();
+        await tester.pump();
+        tester.takeException(); // the cover image asserts again — drain it.
+
+        // Decode width derives from height (100) * dpr (3) * 2 = 600, proving
+        // the unbounded fallback path was taken (LayoutBuilder used `height`,
+        // not a finite maxWidth).
+        final image = tester.widget<Image>(find.byType(Image));
+        final resize = image.image as ResizeImage;
+        expect(resize.width, 600);
+      },
+    );
   });
 
   group('explore markers', () {
@@ -553,36 +571,6 @@ void main() {
     );
   });
 
-  group('FullscreenImageView fallbacks', () {
-    testWidgets('a non-decodable path shows the typed placeholder', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: FullscreenImageView(path: '/library/doc.pdf')),
-      );
-      await tester.pump();
-      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
-      expect(find.text('PDF'), findsOneWidget);
-      expect(find.byType(Image), findsNothing);
-    });
-
-    testWidgets('a decodable but missing file falls back to the placeholder', (
-      tester,
-    ) async {
-      await tester.runAsync(() async {
-        await tester.pumpWidget(
-          const MaterialApp(
-            home: FullscreenImageView(path: '/no/such/photo.jpg'),
-          ),
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pump();
-      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
-      expect(find.text('JPG'), findsOneWidget);
-    });
-  });
-
   group('showPhotoPreviewDialog', () {
     testWidgets('the close button pops the dialog', (tester) async {
       final c = AppController(runner: FakeEngineRunner());
@@ -631,16 +619,17 @@ void main() {
           height: 80,
           date: DateTime(2023, 1, 2, 3, 4),
         ),
+        enTr,
       );
       expect(lines, ['2023-01-02 03:04', '100 × 80', '42.50000, 18.10000']);
     });
 
     test('omits coordinates for a non-GPS photo and null meta', () {
       expect(
-        previewMetaLines('/a.jpg', const FileMeta(path: '/a.jpg')),
+        previewMetaLines('/a.jpg', const FileMeta(path: '/a.jpg'), enTr),
         isEmpty,
       );
-      expect(previewMetaLines('/a.jpg', null), isEmpty);
+      expect(previewMetaLines('/a.jpg', null, enTr), isEmpty);
     });
   });
 

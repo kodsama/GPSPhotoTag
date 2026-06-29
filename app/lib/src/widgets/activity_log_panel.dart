@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
 import '../state/log_entry.dart';
@@ -73,16 +74,25 @@ class _Panel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 18, 12, 12),
             child: Row(
               children: [
-                Text('Activity log', style: text.titleMedium),
+                Text(context.tr('activity_log_title'), style: text.titleMedium),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.close), onPressed: onClose),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: context.tr('file_close'),
+                  onPressed: onClose,
+                ),
               ],
             ),
           ),
           Container(height: 1, color: scheme.outline),
           Expanded(
             child: entries.isEmpty
-                ? Center(child: Text('No activity yet.', style: text.bodySmall))
+                ? Center(
+                    child: Text(
+                      context.tr('activity_no_activity'),
+                      style: text.bodySmall,
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: entries.length,

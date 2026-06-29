@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
+import '../i18n/app_localizations.dart';
 import '../state/controller_scope.dart';
+import '../state/library_action.dart' show Translator;
 import '../theme/app_theme.dart';
+import '../widgets/image_compare_viewer.dart';
 import 'detail_selection.dart';
 import 'explore_model.dart';
 
@@ -31,17 +34,34 @@ Future<void> showPhotoPreviewDialog(
         path: path,
         meta: meta,
         onClose: () => Navigator.of(dialogContext).pop(),
-        onExpand: () => openFullscreen(dialogContext, path),
+        onExpand: () => openFullscreen(dialogContext, path, meta: meta),
       ),
     ),
   );
 }
 
-/// Pushes the [FullscreenImageView] for [path].
-void openFullscreen(BuildContext context, String path) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => FullscreenImageView(path: path)),
-  );
+/// Opens [path] full-screen in the single-mode [ImageCompareViewer] (the big
+/// preview: zoom/pan + reset + a one-line info strip), carrying [meta] for the
+/// info line and the on-disk file size when readable.
+void openFullscreen(BuildContext context, String path, {FileMeta? meta}) {
+  openImageCompare(context, [
+    ComparePane(path: path, meta: meta, fileSize: fileSizeOf(path)),
+  ]);
+}
+
+/// The on-disk size of [path] in bytes, or null when it can't be read. Used to
+/// fill the viewer's info line; a missing/unreadable file simply omits the size.
+int? fileSizeOf(String path) {
+  try {
+    return File(path).statSync().size;
+    // coverage:ignore-start
+    // File.statSync never throws — a missing/unreadable path returns a FileStat
+    // with type notFound (size -1), not a FileSystemException — so this guard is
+    // a defensive belt-and-braces that cannot be triggered under `flutter test`.
+  } on FileSystemException {
+    return null;
+  }
+  // coverage:ignore-end
 }
 
 /// The reusable photo preview: a [PhotoThumbnail], the metadata (filename,
@@ -109,13 +129,13 @@ class PhotoPreview extends StatelessWidget {
                     ...trailing,
                     RoundIconButton(
                       icon: Icons.open_in_full,
-                      tooltip: 'View fullscreen',
+                      tooltip: context.tr('preview_fullscreen'),
                       onPressed: onExpand,
                     ),
                     if (onClose != null)
                       RoundIconButton(
                         icon: Icons.close,
-                        tooltip: 'Close',
+                        tooltip: context.tr('preview_close'),
                         onPressed: onClose!,
                       ),
                   ],
@@ -134,7 +154,7 @@ class PhotoPreview extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
-                for (final line in previewMetaLines(path, meta))
+                for (final line in previewMetaLines(path, meta, context.tr))
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
@@ -158,7 +178,7 @@ class PhotoPreview extends StatelessWidget {
 ///
 /// Coordinates are included only when the meta carries GPS. Pure, so the line
 /// formatting is unit testable.
-List<String> previewMetaLines(String path, FileMeta? meta) {
+List<String> previewMetaLines(String path, FileMeta? meta, Translator tr) {
   final lines = <String>[];
   final date = meta?.date;
   if (date != null) {
@@ -169,7 +189,9 @@ List<String> previewMetaLines(String path, FileMeta? meta) {
     );
   }
   if (meta?.width != null && meta?.height != null) {
-    lines.add('${meta!.width} × ${meta.height}');
+    lines.add(
+      tr('preview_dimensions', {'width': meta!.width, 'height': meta.height}),
+    );
   }
   final lat = meta?.latitude, lon = meta?.longitude;
   if (meta?.hasGps == true && lat != null && lon != null) {
@@ -230,7 +252,7 @@ class PhotoDetailPanel extends StatelessWidget {
           if (selection.isMulti) ...[
             RoundIconButton(
               icon: Icons.chevron_left,
-              tooltip: 'Previous',
+              tooltip: context.tr('preview_prev'),
               onPressed: onPrev,
             ),
             Container(
@@ -250,7 +272,7 @@ class PhotoDetailPanel extends StatelessWidget {
             ),
             RoundIconButton(
               icon: Icons.chevron_right,
-              tooltip: 'Next',
+              tooltip: context.tr('preview_next'),
               onPressed: onNext,
             ),
           ],
@@ -467,43 +489,6 @@ class RoundIconButton extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       icon: Icon(icon),
-    );
-  }
-}
-
-/// A fullscreen view of [path] in an [InteractiveViewer] for pinch/scroll zoom,
-/// with a close affordance. Non-decodable files show the typed placeholder.
-class FullscreenImageView extends StatelessWidget {
-  /// Creates the fullscreen view for [path].
-  const FullscreenImageView({super.key, required this.path});
-
-  /// The image file path.
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(p.basename(path)),
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 6,
-          child: needsPreviewExtraction(path)
-              ? _ExtractedImage(path: path, full: true, height: 240)
-              : isDecodableImage(path)
-              ? Image.file(
-                  File(path),
-                  errorBuilder: (context, _, _) =>
-                      _Placeholder(label: fileTypeLabel(path), height: 240),
-                )
-              : _Placeholder(label: fileTypeLabel(path), height: 240),
-        ),
-      ),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:path/path.dart' as p;
 
+import '../i18n/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'status_pill.dart';
@@ -49,14 +50,14 @@ class RunProgress extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Text(
-              '$done/$total',
+              context.tr('run_progress', {'done': done, 'total': total}),
               style: text.bodyMedium?.copyWith(fontFeatures: AppTheme.tabular),
             ),
           ],
         ),
         if (rows.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('Recent results', style: text.titleMedium),
+          Text(context.tr('run_recent_results'), style: text.titleMedium),
           const SizedBox(height: 8),
           _ResultsList(rows: rows),
         ],
@@ -186,7 +187,7 @@ class ResultSummaryTable extends StatelessWidget {
           for (final entry in summary.entries)
             _row(text, entry.key.replaceAll('_', ' '), '${entry.value}'),
           Container(height: 1, color: scheme.outline),
-          _row(text, 'total', '$total', bold: true),
+          _row(text, context.tr('summary_total'), '$total', bold: true),
         ],
       ),
     );

@@ -78,34 +78,6 @@ void main() {
     expect(b.existsSync(), isTrue);
   });
 
-  test('map runs the worker and reaches a terminal event', () async {
-    final jpg = await writeJpegWithDate(
-      tmp,
-      'g.jpg',
-      dateTimeOriginal: DateTime(2026, 1, 1, 9),
-    );
-    await const JpegExifBackend().writeGps(
-      jpg,
-      latitude: 42.5,
-      longitude: 18.1,
-    );
-
-    // The map service reads GPS via exiftool; without it the worker fails fast
-    // with a missing_toolkit error. Either way the worker plumbing runs and the
-    // stream terminates cleanly (no hang, single sentinel close).
-    final out = '${tmp.path}/heatmap.png';
-    const runner = IsolateRunner(exiftoolAvailable: false);
-    final events = await runner
-        .map(
-          photos: [jpg],
-          options: MapOptions(outputPng: out),
-        )
-        .toList();
-
-    final err = events.whereType<ErrorEvent>();
-    expect(err.single.code, 'missing_toolkit');
-  });
-
   test('fixDates runs on a worker and reports a result per file', () async {
     final jpg = await writeJpegWithDate(
       tmp,
@@ -254,6 +226,102 @@ void main() {
     // One FileMeta per requested path (workers merge into a single stream).
     expect(metas.length, paths.length);
     expect(metas.every((m) => m.path == jpg), isTrue);
+  });
+
+  test('readCuratedExif returns empty stream for no paths', () async {
+    const runner = IsolateRunner();
+    final out = await runner.readCuratedExif(const []).toList();
+    expect(out, isEmpty);
+  });
+
+  test('readCuratedExif reads each photo on a single worker', () async {
+    final jpgs = [
+      for (var i = 0; i < 3; i++)
+        await writeJpegWithDate(
+          tmp,
+          'e$i.jpg',
+          dateTimeOriginal: DateTime(2026, 1, 1, i + 1),
+        ),
+    ];
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final out = await runner.readCuratedExif(jpgs).toList();
+    expect(out.map((e) => e.path).toSet(), jpgs.toSet());
+  });
+
+  test('readCuratedExif fans out across workers for many paths', () async {
+    final jpg = await writeJpegWithDate(
+      tmp,
+      'bige.jpg',
+      dateTimeOriginal: DateTime(2026, 2, 2, 2),
+    );
+    final paths = List<String>.filled(70, jpg);
+    const runner = IsolateRunner(exiftoolAvailable: false);
+    final out = await runner.readCuratedExif(paths).toList();
+    expect(out.length, paths.length);
+    expect(out.every((e) => e.path == jpg), isTrue);
+  });
+
+  test('findDuplicates returns empty for no paths', () async {
+    const runner = IsolateRunner();
+    expect(await runner.findDuplicates(const [], minSimilarity: 1), isEmpty);
+  });
+
+  test('findDuplicates hashes on workers and groups identical JPEGs', () async {
+    // Two byte-identical JPEGs (same pixels) → identical signatures → one group;
+    // a visually different third file stays out.
+    final a = await writeJpegWithDate(tmp, 'a.jpg');
+    final bBytes = File(a).readAsBytesSync();
+    final b = '${tmp.path}/b.jpg';
+    File(b).writeAsBytesSync(bBytes); // exact copy of a
+    final c = await writeJpegWithDate(tmp, 'c.jpg'); // same tiny content too
+
+    const runner = IsolateRunner();
+    final ticks = <int>[];
+    var lastTotal = 0;
+    final groups = await runner.findDuplicates(
+      [a, b, c],
+      minSimilarity: 1,
+      onProgress: (done, total) {
+        ticks.add(done);
+        lastTotal = total;
+      },
+    );
+
+    // All three are 8×8 blank JPEGs, so they hash equal and form one group.
+    expect(groups, hasLength(1));
+    expect(groups.single.size, 3);
+    // Progress reported the fixed total and counted up to every file hashed.
+    expect(lastTotal, 3);
+    expect(ticks, isNotEmpty);
+    expect(ticks.last, 3);
+    // The running count is monotonically non-decreasing.
+    for (var i = 1; i < ticks.length; i++) {
+      expect(ticks[i], greaterThanOrEqualTo(ticks[i - 1]));
+    }
+  });
+
+  test('smartAvailable is false when no embedding bundle is configured', () {
+    const runner = IsolateRunner(); // no onnxBundleDir
+    expect(runner.smartAvailable, isFalse);
+    const missing = IsolateRunner(onnxBundleDir: '/no/such/onnx/bundle');
+    expect(missing.smartAvailable, isFalse);
+  });
+
+  test('a Smart run with no model bundled falls back to Fast grouping', () async {
+    // Two byte-identical JPEGs: with no embedding model the Smart metric has no
+    // vectors, so findDuplicates degrades to Fast and still groups the copies.
+    final a = await writeJpegWithDate(tmp, 'a.jpg');
+    final b = '${tmp.path}/b.jpg';
+    File(b).writeAsBytesSync(File(a).readAsBytesSync());
+
+    const runner = IsolateRunner(); // smartAvailable == false here
+    final groups = await runner.findDuplicates(
+      [a, b],
+      minSimilarity: 1,
+      metric: SimilarityMetric.smart,
+    );
+    expect(groups, hasLength(1));
+    expect(groups.single.size, 2);
   });
 
   test('scan runs on a worker isolate and reports the tree', () async {

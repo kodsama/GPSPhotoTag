@@ -5,59 +5,54 @@ library;
 
 import 'package:flutter/material.dart';
 
-const _gpl = '''Stunda
-Copyright (C) 2026 Kodsama
-
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-Full text: the LICENSE file in the repository.''';
+import '../i18n/app_localizations.dart';
 
 /// One attached component (listed once, by component).
 class _Component {
-  const _Component(this.name, this.license, this.role);
+  const _Component(this.name, this.license, this.roleKey);
 
-  /// Component name.
+  /// Component name (a proper noun/package name; not localized).
   final String name;
 
-  /// License identifier(s).
+  /// License identifier(s) (SPDX-style; not localized).
   final String license;
 
-  /// What the component does for Stunda.
-  final String role;
+  /// Localization key for what the component does for Stunda.
+  final String roleKey;
 }
 
 const _attached = <_Component>[
-  _Component(
-    'ExifTool',
-    'Artistic / GPL',
-    'RAW/HEIC metadata read & GPS embed (bundled)',
-  ),
-  _Component('Flutter & Dart', 'BSD-3-Clause', 'App framework & language'),
+  _Component('ExifTool', 'Artistic / GPL', 'lic_role_exiftool'),
+  _Component('Flutter & Dart', 'BSD-3-Clause', 'lic_role_flutter'),
   _Component(
     'flutter_map + OpenStreetMap tiles',
     'BSD-3 / © OpenStreetMap contributors',
-    'Interactive map',
+    'lic_role_map',
   ),
   _Component(
     'flutter_map_marker_cluster + latlong2',
     'MIT / BSD',
-    'Map clustering & coordinates',
+    'lic_role_cluster',
   ),
-  _Component('image', 'Apache-2.0', 'JPEG/PNG decode & encode'),
-  _Component('xml', 'MIT', 'GPX/KML parsing'),
-  _Component('http', 'BSD-3', 'Map tiles & geocoding'),
-  _Component('archive', 'MIT / Apache', 'Takeout zip'),
+  _Component('image', 'Apache-2.0', 'lic_role_image'),
+  _Component('ONNX Runtime', 'MIT', 'lic_role_onnxruntime'),
+  _Component(
+    'SSD-MobileNet v1 (ONNX Model Zoo)',
+    'Apache-2.0',
+    'lic_role_ssd_mobilenet',
+  ),
+  _Component(
+    'MobileNetV2 (ONNX Model Zoo)',
+    'Apache-2.0',
+    'lic_role_mobilenet_embed',
+  ),
+  _Component('xml', 'MIT', 'lic_role_xml'),
+  _Component('http', 'BSD-3', 'lic_role_http'),
+  _Component('archive', 'MIT / Apache', 'lic_role_archive'),
   _Component(
     'file_selector · url_launcher · path_provider',
     'BSD / MIT',
-    'File picking, links, app storage',
+    'lic_role_files',
   ),
 ];
 
@@ -78,13 +73,13 @@ class LicensesPage extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Licenses')),
+      appBar: AppBar(title: Text(context.tr('licenses_title'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text('Stunda', style: text.headlineSmall),
+          Text(context.tr('licenses_app_name'), style: text.headlineSmall),
           const SizedBox(height: 4),
-          Text('Licensed under GPL-3.0-or-later', style: text.bodySmall),
+          Text(context.tr('licenses_app_license'), style: text.bodySmall),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
@@ -94,18 +89,14 @@ class LicensesPage extends StatelessWidget {
               border: Border.all(color: scheme.outline),
             ),
             child: SelectableText(
-              _gpl,
+              context.tr('licenses_gpl'),
               style: text.bodySmall?.copyWith(height: 1.5),
             ),
           ),
           const SizedBox(height: 24),
-          Text('Attached software', style: text.titleLarge),
+          Text(context.tr('licenses_attached'), style: text.titleLarge),
           const SizedBox(height: 4),
-          Text(
-            'The libraries and tools Stunda bundles or builds on — listed once '
-            'each, by component.',
-            style: text.bodySmall,
-          ),
+          Text(context.tr('licenses_attached_desc'), style: text.bodySmall),
           const SizedBox(height: 12),
           for (final c in _attached)
             Padding(
@@ -132,7 +123,7 @@ class LicensesPage extends StatelessWidget {
                             ),
                           ],
                         ),
-                        Text(c.role, style: text.bodySmall),
+                        Text(context.tr(c.roleKey), style: text.bodySmall),
                       ],
                     ),
                   ),

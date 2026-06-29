@@ -1,20 +1,41 @@
 #!/usr/bin/env bash
 #
-# Populates app/assets/exiftool/ with the exiftool Perl distribution (the
-# `exiftool` script + its `lib/Image/...` modules) so it gets bundled into the
-# app at `flutter build` time. Kept out of git (~39MB) and regenerated here.
+# Populates app/assets/exiftool/ with the exiftool distribution(s) so they get
+# bundled into the app at `flutter build` time. Kept out of git (~39MB) and
+# regenerated here. Run before `flutter build` (CI does this).
 #
-# Run before `flutter build` (CI does this). Strategy:
-#   1. If a system exiftool is installed, vendor its real distribution.
-#   2. Otherwise download the official tarball from exiftool.org.
+# Two distributions, because Windows has no Perl:
+#   - macOS/Linux: the Perl distribution (the `exiftool` script + its
+#     `lib/Image/...` modules) under assets/exiftool/, invoked via the system
+#     `perl`. Strategy:
+#       1. If a system exiftool is installed, vendor its real distribution.
+#       2. Otherwise download the official tarball from exiftool.org.
+#   - Windows: the official self-contained ExifTool (`exiftool.exe` plus its
+#     `exiftool_files/` dir, which embeds a Perl interpreter) under
+#     assets/exiftool/windows/, invoked directly (no `perl`). Fetched from the
+#     `--windows` flag (or STUNDA_FETCH_WINDOWS_EXIFTOOL=1); skipped by default
+#     so macOS/Linux dev/CI hosts don't pull the Windows zip needlessly.
 #
-# macOS/Linux invoke the vendored script via the system `perl`. Windows builds
-# should instead drop the official self-contained exiftool.exe here (TODO).
+# The app resolver picks the right dir per OS (see exiftool_bundle.dart) and the
+# engine picks the right launcher per OS (see exiftool_runner.dart).
 
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$REPO_ROOT/app/assets/exiftool"
+WIN_DEST="$DEST/windows"
 PUBSPEC="$REPO_ROOT/app/pubspec.yaml"
+
+# Opt-in: vendor the Windows exe too. The Windows CI job passes --windows; other
+# hosts skip it (the macOS/Linux Perl distribution is always vendored below).
+FETCH_WINDOWS="${STUNDA_FETCH_WINDOWS_EXIFTOOL:-}"
+# Mobile builds bundle no exiftool (the engine uses the device photo library, not
+# exiftool, on Android/iOS): --no-exiftool clears the vendored tree and empties
+# the pubspec asset block so ~39MB of Perl distribution stays out of the app.
+SKIP_EXIFTOOL="${STUNDA_SKIP_EXIFTOOL:-}"
+for arg in "$@"; do
+  [ "$arg" = "--windows" ] && FETCH_WINDOWS=1
+  [ "$arg" = "--no-exiftool" ] && SKIP_EXIFTOOL=1
+done
 
 # Rewrites the marked block in app/pubspec.yaml with one `- assets/exiftool/<d>/`
 # entry per subdirectory that contains files. Flutter's `assets:` is
@@ -44,8 +65,81 @@ regenerate_pubspec_assets() {
   echo "regenerated exiftool asset list in $PUBSPEC"
 }
 
+# Vendor the official self-contained Windows ExifTool into $WIN_DEST as
+# `exiftool.exe` + `exiftool_files/`. The download is the
+# `exiftool-<ver>_64.zip` distribution, which contains `exiftool(-k).exe` (the
+# `-k` keeps the console window open on double-click; renamed to `exiftool.exe`
+# for direct invocation) alongside `exiftool_files/`. Mirrors the macOS/Linux
+# download fallback order: exiftool.org first, then the GitHub release mirror.
+vendor_windows_exe() {
+  if [ -f "$WIN_DEST/exiftool.exe" ] && [ -d "$WIN_DEST/exiftool_files" ]; then
+    echo "windows exiftool already vendored at $WIN_DEST"
+    return 0
+  fi
+  command -v unzip >/dev/null 2>&1 || {
+    echo "ERROR: 'unzip' is required to vendor the Windows exiftool" >&2
+    return 1
+  }
+  local ver workdir zip got u src exe
+  ver="$(curl -fsSL https://exiftool.org/ver.txt 2>/dev/null || true)"
+  workdir="$(mktemp -d)"
+  zip="$workdir/et-win.zip"
+  local urls=()
+  if [ -n "$ver" ]; then
+    # exiftool.org only hosts the CURRENT version's Windows zip (older 404s) and
+    # GitHub ships no Windows .exe — SourceForge archives every version, so it's
+    # the reliable source.
+    urls+=("https://exiftool.org/exiftool-${ver}_64.zip")
+    urls+=("https://downloads.sourceforge.net/project/exiftool/exiftool-${ver}_64.zip")
+  fi
+  got=""
+  for u in "${urls[@]}"; do
+    # Retry transient failures (the SourceForge mirror occasionally times out or
+    # 503s in CI); exiftool.org 404s for non-hosted versions and falls through.
+    if curl -fsSL --retry 4 --retry-delay 3 --connect-timeout 30 "$u" -o "$zip"; then
+      echo "downloaded $u"
+      got=1
+      break
+    fi
+  done
+  [ -n "$got" ] || { echo "ERROR: could not download Windows exiftool" >&2; return 1; }
+  unzip -q -o "$zip" -d "$workdir"
+  # The distribution root holds `exiftool(-k).exe` + `exiftool_files/`. Locate it
+  # generically (the zip nests under exiftool-<ver>_64/ in current releases).
+  src="$(dirname "$(find "$workdir" -name 'exiftool_files' -type d | head -1)")"
+  [ -n "$src" ] && [ -d "$src/exiftool_files" ] || {
+    echo "ERROR: exiftool_files/ not found in the Windows zip" >&2; return 1; }
+  exe="$(find "$src" -maxdepth 1 -iname 'exiftool*.exe' -type f | head -1)"
+  [ -n "$exe" ] || { echo "ERROR: exiftool exe not found in the Windows zip" >&2; return 1; }
+  # The Windows zip's Perl lib is read-only; make any prior copy writable so the
+  # re-vendor rm can't fail (idempotent local runs; fresh on CI).
+  chmod -R u+w "$WIN_DEST" 2>/dev/null || true
+  rm -rf "$WIN_DEST" 2>/dev/null || true
+  mkdir -p "$WIN_DEST"
+  cp "$exe" "$WIN_DEST/exiftool.exe"
+  cp -R "$src/exiftool_files/." "$WIN_DEST/exiftool_files/"
+  # Make the copied tree writable (so future cleanups/git ops don't trip).
+  chmod -R u+w "$WIN_DEST" 2>/dev/null || true
+  # Best-effort temp cleanup: never let a failed rm abort the script (set -e).
+  chmod -R u+w "$workdir" 2>/dev/null || true
+  rm -rf "$workdir" 2>/dev/null || true
+  echo "vendored Windows exiftool at $WIN_DEST"
+  return 0
+}
+
+# Mobile: don't vendor exiftool at all. Clear any vendored tree and regenerate
+# the pubspec asset block empty so nothing exiftool-related is bundled.
+if [ -n "$SKIP_EXIFTOOL" ]; then
+  rm -rf "$DEST"
+  mkdir -p "$DEST"
+  regenerate_pubspec_assets
+  echo "skipped exiftool vendoring (mobile build); exiftool assets cleared"
+  exit 0
+fi
+
 if [ -f "$DEST/lib/Image/ExifTool.pm" ]; then
-  echo "exiftool already vendored at $DEST"
+  echo "exiftool (perl) already vendored at $DEST"
+  if [ -n "$FETCH_WINDOWS" ]; then vendor_windows_exe; fi
   regenerate_pubspec_assets
   exit 0
 fi
@@ -87,7 +181,7 @@ vendor_from_download() {
   urls+=("https://github.com/exiftool/exiftool/archive/refs/heads/master.tar.gz")
   got=""
   for u in "${urls[@]}"; do
-    if curl -fsSL "$u" -o "$tar"; then echo "downloaded $u"; got=1; break; fi
+    if curl -fsSL --retry 4 --retry-delay 3 --connect-timeout 30 "$u" -o "$tar"; then echo "downloaded $u"; got=1; break; fi
   done
   [ -n "$got" ] || return 1
   tar xzf "$tar" -C "$workdir"
@@ -118,5 +212,7 @@ else
   echo "ERROR: vendored exiftool does not run via 'perl'" >&2
   exit 1
 fi
+
+if [ -n "$FETCH_WINDOWS" ]; then vendor_windows_exe; fi
 
 regenerate_pubspec_assets

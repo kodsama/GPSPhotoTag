@@ -31,13 +31,17 @@ GPS); when you don't, your Google location history covers you. Stunda writes
 accurate GPS EXIF into your photos by matching each photo's capture time against
 the first source that has a fix — GPX first (most precise), then Google.
 
-It also: renders a **density heatmap** of where photos were taken, **prunes**
-RAW files that have no JPG/HEIC companion, and **fixes dates** between EXIF and
-the filesystem.
+From there it helps you **see** and **tidy** the whole library: explore your
+geotagged photos on an interactive map, find visually-similar duplicates, match
+images to their RAWs, compare any two shots side by side, and run a guided
+"shrink" wizard that reclaims space. Everything is **review-first** — nothing is
+changed or deleted until you confirm, and deletions go to the Trash.
 
 Two front-ends, one engine:
 
-- **Desktop app** (macOS / Linux / Windows) — a guided, stepped walkthrough.
+- **Desktop app** (macOS / Linux / Windows) — a guided GUI, localized into
+  **9 languages** (English, Français, Svenska, 中文, 日本語, Deutsch, Português,
+  Español, Dansk), with an in-app **Help** section.
 - **CLI** — scriptable, with a JSON event stream and a self-describing `schema`
   command for agents.
 
@@ -57,22 +61,40 @@ always works with no external tools.
 
 ## The desktop app
 
-A stepped, collapsible walkthrough — one step open at a time, auto-advancing,
-completed steps collapse with a check and stay tappable:
+Open a photo library — pick a folder, or **drag and drop** several folders
+and/or individual photos and GPS files onto the window — and Stunda scans them
+into one library, then shows a Review summary of what it found. From the
+workspace you choose an action:
 
-1. **Toolkit** — checks exiftool / libheif / your package manager, with Install
-   buttons; never claims "ready" when it isn't.
-2. **Photos** — native folder picker, plus an **Add folder** affordance and
-   **drag-and-drop**: combine several folders and/or individual photos and GPS
-   files into one library, then review the parsed summary over the whole set.
-3. **Review** — per-format include/exclude checklist.
-4. **Options** — every option, smart defaults pre-selected.
-5. **Output** — in place, or copy to a destination folder.
-6. **Run** — global + per-item progress; errors surfaced in the UI.
-7. **Result** — summary, plus one-click **heatmap**, **prune RAW**, **fix dates**.
+- **Tag with GPS** — write location from GPX / Google Timeline / KML; sidecar or
+  embed for RAW, optional timezone, in place or copy. Existing coordinates are
+  never overwritten unless you allow it; a dry run previews without writing.
+- **Explore on map** — pan/zoom your geotagged photos, with clusters that open
+  into pins. Switch between **Numbers / Heatmap / Both**, filter by a
+  **Timeline** date range, **Fit to photos**, and **Save the view as PNG**. Map
+  tiles are cached for offline and repeat viewing.
+- **Match Images to RAW** — remove orphan RAWs, or orphan images (both
+  directions), after reviewing the list.
+- **Find duplicates** — pick a **matching method**: *Fast* (perceptual hash +
+  colour, instant, best for near-identical copies) or *Smart* (an on-device AI
+  embedding that understands crops, rotations and recolours). A similarity slider
+  (Exact ↔ Loose) with a live example tunes whichever method is selected, plus a
+  **Keep priority** pipeline (Resolution → Quality → People & animals,
+  reorderable and toggleable). Review pairs, swap, or deselect; nothing is
+  deleted until you confirm. Smart degrades to Fast when no model is bundled.
+- **Comparison viewer** — open any image full-screen, with a vertical/horizontal
+  curtain or side-by-side synced zoom, plus an info line (name, resolution,
+  size, time, GPS, EXIF).
+- **Shrink picture library** — a staged wizard (Duplicates → Orphans →
+  RAW + photo pairs → Low quality) building one cumulative trash list, with
+  selectable low-quality criteria (blurriness / histogram / colour / exposure)
+  and a final review showing the space to free.
 
-A floating activity-log button (bottom-right) opens a panel with the full event
-log. Heavy work runs in **worker isolates**, so the UI stays responsive.
+**Settings** cover language, light/dark, a custom background image with
+intensity, and the live MCP server status. A **Help** entry in the settings menu
+opens an in-app, localized guide to every feature. An activity-log button opens
+the full event log, and heavy work runs in **worker isolates** so the UI stays
+responsive.
 
 ```bash
 cd app
@@ -140,12 +162,52 @@ app/               Flutter desktop GUI over the engine (+ always-on MCP server)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
+## Duplicate detection & the people keep-rule
+
+Duplicates are grouped with one of two **similarity metrics**, chosen at the top
+of the Find-duplicates screen and persisted:
+
+- **Fast** — a 256-bit perceptual DCT hash (pHash) blended with a coarse HSV
+  colour signature. Instant, computed for every file; best for near-identical
+  copies and re-saves. Pure maths, fully unit-tested.
+- **Smart** — an on-device **image embedding**: a small Apache-2.0
+  **MobileNetV2** (ONNX Model Zoo, ~14 MB) runs over the same decoded thumbnail
+  through the bundled **ONNX Runtime** via `dart:ffi`, producing an L2-normalized
+  vector per image; pairs are compared by cosine similarity mapped to 0..1. This
+  is engine-wide (app worker isolates **and** headless `dart run`), and is far
+  more robust to crops, rotations and recolours. When the embedding model or
+  runtime isn't available, Smart **degrades to Fast** (surfaced in the UI).
+
+When grouping near-duplicates, Stunda picks which copy to **keep** with an
+ordered keep-rule cascade (resolution → quality → people). The `people` rule
+favours the candidate that most looks like it contains a person or pet, in two
+tiers:
+
+- **Tier 1 (metadata)** — face regions, person names, and subject/keyword hints
+  read from the file's existing metadata (no extra work).
+- **Tier 2 (on-device detection)** — when metadata is silent, a small
+  Apache-2.0 **SSD-MobileNet** COCO model runs over the thumbnail through a
+  bundled **ONNX Runtime** via `dart:ffi`. This is engine-wide: it works in the
+  desktop app's worker isolates **and** headlessly from plain `dart run`
+  (CLI/MCP), with no Flutter dependency. When the model isn't bundled, the rule
+  cleanly degrades to Tier-1-only.
+
+The ONNX Runtime library and the model are vendored at build time (kept out of
+git), exactly like exiftool:
+
+```bash
+bash tool/fetch-exiftool.sh           # exiftool + lib into app/assets/exiftool/
+bash tool/fetch-onnx.sh               # ORT lib + SSD-MobileNet + MobileNetV2 into app/assets/onnx/
+```
+
 ## Development
 
 ```bash
 flutter pub get                       # resolves the whole workspace
-dart analyze packages                 # engine + cli
-dart test packages/engine packages/cli
+bash tool/fetch-exiftool.sh           # vendor exiftool (bundled assets)
+bash tool/fetch-onnx.sh               # vendor ONNX Runtime + detector model
+dart analyze packages                 # engine + cli + mcp
+dart test packages/engine packages/cli packages/mcp
 cd app && flutter analyze && flutter test
 ```
 
@@ -154,3 +216,7 @@ cd app && flutter analyze && flutter test
 Copyright © 2026 Kodsama (Alexandre Martins). Stunda is free software under
 the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see
 [LICENSE](LICENSE). It comes with no warranty, to the extent permitted by law.
+
+Bundled at build time: **exiftool** (Artistic/GPL), **ONNX Runtime** (MIT), and
+the **SSD-MobileNet v1** detector and **MobileNetV2** embedding models from the
+ONNX Model Zoo (both **Apache-2.0**).

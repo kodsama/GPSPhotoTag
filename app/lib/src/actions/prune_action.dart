@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:path/path.dart' as p;
 
+import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
+import '../state/prune_direction.dart';
+import '../widgets/help.dart';
 import '../widgets/run_view.dart';
+import 'shrink_action.dart' show ShrinkAddButton;
 
-/// The Remove-orphan-RAWs flow.
+/// The Match-Images-to-RAW flow.
 ///
 /// Destructive actions preview first, then confirm: opening this action does
 /// NOT delete anything. It shows a reviewable, filterable, selectable list of
-/// every classified photo (orphan RAWs pre-selected), and only after the user
-/// confirms a dialog does it move the selected files to the Trash. Live
-/// progress and a result summary follow, then a back-to-library affordance.
+/// every classified photo, with a direction toggle choosing which orphans are
+/// trashable (orphan RAWs, or orphan images). Only after the user confirms a
+/// dialog does it move the selected files to the Trash. Live progress and a
+/// result summary follow, then a back-to-library affordance.
 class PruneAction extends StatelessWidget {
   /// Creates the prune action body.
   const PruneAction({super.key});
@@ -20,6 +25,18 @@ class PruneAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
+
+    // RAW/JPEG pairing needs the RAW and its companion to be separate items.
+    // Android (MediaStore) exposes them as separate assets, so it works there;
+    // iOS (PHPhotoLibrary) fuses RAW+JPEG into one asset (and a stand-alone
+    // ProRAW is the only copy), so the action is unavailable on iOS and explains
+    // why. On desktop and Android it shows the normal review.
+    if (controller.isMobile && !controller.supportsRawPruning) {
+      return Text(
+        context.tr('prune_mobile_unavailable'),
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
 
     if (controller.lastSummary != null && !controller.running) {
       return _Done(controller: controller);
@@ -45,8 +62,8 @@ class PruneAction extends StatelessWidget {
   }
 }
 
-/// The preview/review surface: summary header, filter row, scrollable list, and
-/// the confirm-gated primary button.
+/// The preview/review surface: direction toggle, summary header, filter row,
+/// scrollable list, and the confirm-gated primary button.
 class _Review extends StatelessWidget {
   const _Review({required this.controller});
 
@@ -57,7 +74,7 @@ class _Review extends StatelessWidget {
     final pairing = controller.pairing;
     final text = Theme.of(context).textTheme;
     if (pairing == null) {
-      return Text('No library scanned.', style: text.bodyMedium);
+      return Text(context.tr('prune_no_library'), style: text.bodyMedium);
     }
 
     final filtered = controller.filteredPairing;
@@ -68,17 +85,24 @@ class _Review extends StatelessWidget {
           ErrorBanner(message: controller.errorMessage!),
           const SizedBox(height: 14),
         ],
+        HelpTarget(
+          topic: HelpTopic.match,
+          child: _DirectionToggle(controller: controller),
+        ),
+        const SizedBox(height: 12),
         Text(
-          'Nothing is removed until you review the list below and confirm. '
-          'RAW files with no JPG/HEIC companion anywhere in the library are '
-          'pre-selected.',
+          context.tr('prune_review_intro', {
+            'description': context.tr(controller.pruneDirection.descriptionKey),
+          }),
           style: text.bodyMedium,
         ),
         const SizedBox(height: 12),
         Text(
-          '${pairing.orphanCount} orphan RAWs · '
-          '${pairing.pairedRawCount} RAWs with a JPG · '
-          '${pairing.photoWithoutRawCount} photos without a RAW',
+          context.tr('prune_summary', {
+            'orphans': pairing.orphanCount,
+            'paired': pairing.pairedRawCount,
+            'photos': pairing.photoWithoutRawCount,
+          }),
           style: text.titleMedium,
         ),
         const SizedBox(height: 16),
@@ -90,6 +114,35 @@ class _Review extends StatelessWidget {
         const SizedBox(height: 20),
         _ConfirmButton(controller: controller),
       ],
+    );
+  }
+}
+
+/// The A/B direction selector: which orphans are selectable and trashed.
+class _DirectionToggle extends StatelessWidget {
+  const _DirectionToggle({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<PruneDirection>(
+      segments: [
+        ButtonSegment(
+          value: PruneDirection.removeOrphanRaws,
+          label: Text(context.tr('prune_dir_orphan_raws')),
+          icon: const Icon(Icons.raw_on, size: 18),
+          tooltip: context.tr('tt_prune_dir_orphan_raws'),
+        ),
+        ButtonSegment(
+          value: PruneDirection.removeOrphanImages,
+          label: Text(context.tr('prune_dir_orphan_images')),
+          icon: const Icon(Icons.image_outlined, size: 18),
+          tooltip: context.tr('tt_prune_dir_orphan_images'),
+        ),
+      ],
+      selected: {controller.pruneDirection},
+      onSelectionChanged: (s) => controller.setPruneDirection(s.first),
     );
   }
 }
@@ -107,11 +160,11 @@ class _FilterRow extends StatelessWidget {
       children: [
         TextField(
           onChanged: controller.setPruneFilter,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            prefixIcon: Icon(Icons.search, size: 18),
-            hintText: 'Filter by filename',
-            border: OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.search, size: 18),
+            hintText: context.tr('prune_filter_hint'),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 10),
@@ -119,9 +172,10 @@ class _FilterRow extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            // Orphan RAWs — the selectable deletion candidates (default on).
+            // Orphan RAWs — selectable deletion candidates in direction A.
             FilterChip(
-              label: const Text('Orphan RAWs'),
+              label: Text(context.tr('prune_chip_orphan_raws')),
+              tooltip: context.tr('tt_prune_chip'),
               selected: controller.isKindVisible(PairKind.orphanRaw),
               onSelected: (v) =>
                   controller.setKindVisible(PairKind.orphanRaw, v),
@@ -129,7 +183,8 @@ class _FilterRow extends StatelessWidget {
             // One chip for the RAW+JPG pairing: shows both the paired RAFs and
             // their JPG twins (was two chips describing the same pairing).
             FilterChip(
-              label: const Text('Paired (RAW + JPG)'),
+              label: Text(context.tr('prune_chip_paired')),
+              tooltip: context.tr('tt_prune_chip'),
               selected:
                   controller.isKindVisible(PairKind.pairedRaw) &&
                   controller.isKindVisible(PairKind.photoWithRaw),
@@ -138,8 +193,10 @@ class _FilterRow extends StatelessWidget {
                 controller.setKindVisible(PairKind.photoWithRaw, v);
               },
             ),
+            // Orphan images — selectable deletion candidates in direction B.
             FilterChip(
-              label: const Text('Photos without RAW'),
+              label: Text(context.tr('prune_chip_photos_no_raw')),
+              tooltip: context.tr('tt_prune_chip'),
               selected: controller.isKindVisible(PairKind.photoWithoutRaw),
               onSelected: (v) =>
                   controller.setKindVisible(PairKind.photoWithoutRaw, v),
@@ -151,7 +208,7 @@ class _FilterRow extends StatelessWidget {
   }
 }
 
-/// A "select all / none" affordance for the orphan candidates.
+/// A "select all / none" affordance for the active direction's candidates.
 class _SelectAll extends StatelessWidget {
   const _SelectAll({required this.controller});
 
@@ -159,26 +216,29 @@ class _SelectAll extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orphans = controller.pairing?.orphanCount ?? 0;
+    final candidates = controller.pruneCandidateCount;
     final selected = controller.selectedCount;
     final text = Theme.of(context).textTheme;
+    final key = controller.pruneDirection == PruneDirection.removeOrphanRaws
+        ? 'prune_selected_orphan_raws'
+        : 'prune_selected_orphan_images';
     return Row(
       children: [
         Checkbox(
-          value: orphans == 0
+          value: candidates == 0
               ? false
-              : selected == orphans
+              : selected == candidates
               ? true
               : selected == 0
               ? false
               : null,
           tristate: true,
-          onChanged: orphans == 0
+          onChanged: candidates == 0
               ? null
-              : (_) => controller.selectAllOrphans(selected != orphans),
+              : (_) => controller.selectAllCandidates(selected != candidates),
         ),
         Text(
-          '$selected of $orphans orphan RAWs selected',
+          context.tr(key, {'selected': selected, 'candidates': candidates}),
           style: text.bodySmall,
         ),
       ],
@@ -206,7 +266,7 @@ class _FileList extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: scheme.outline),
         ),
-        child: Text('No files match.', style: text.bodySmall),
+        child: Text(context.tr('prune_no_files_match'), style: text.bodySmall),
       );
     }
     return Container(
@@ -226,7 +286,7 @@ class _FileList extends StatelessWidget {
   }
 }
 
-/// One review row: filename, a small kind tag, and (for orphans) a checkbox.
+/// One review row: filename, a small kind tag, and (for targets) a checkbox.
 class _FileRow extends StatelessWidget {
   const _FileRow({required this.controller, required this.file});
 
@@ -236,15 +296,15 @@ class _FileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final isOrphan = file.kind == PairKind.orphanRaw;
+    final isTarget = file.kind == controller.pruneDirection.target;
     final selected = controller.selectedPaths.contains(file.path);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Row(
         children: [
-          // Only orphan RAWs are selectable; context rows show a placeholder so
-          // names stay aligned.
-          if (isOrphan)
+          // Only the active direction's candidates are selectable; context rows
+          // show a placeholder so names stay aligned.
+          if (isTarget)
             Checkbox(
               value: selected,
               onChanged: (v) =>
@@ -260,23 +320,24 @@ class _FileRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _KindTag(kind: file.kind),
+          _KindTag(kind: file.kind, emphasised: isTarget),
         ],
       ),
     );
   }
 }
 
-/// A small coloured tag naming a [PairKind].
+/// A small coloured tag naming a [PairKind]; the [emphasised] target is red.
 class _KindTag extends StatelessWidget {
-  const _KindTag({required this.kind});
+  const _KindTag({required this.kind, required this.emphasised});
 
   final PairKind kind;
+  final bool emphasised;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = kind == PairKind.orphanRaw ? scheme.error : scheme.outline;
+    final color = emphasised ? scheme.error : scheme.outline;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -285,7 +346,7 @@ class _KindTag extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
-        _kindTags[kind]!,
+        context.tr(_kindTagKeys[kind]!),
         style: TextStyle(
           color: color,
           fontSize: 11,
@@ -305,10 +366,16 @@ class _ConfirmButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = controller.selectedCount;
-    return FilledButton.icon(
-      onPressed: n == 0 ? null : () => _confirm(context),
-      icon: const Icon(Icons.delete_outline),
-      label: Text('Move $n selected to Trash'),
+    // In a deferred shrink session the chosen orphans are added to the shrink
+    // list and we return; standalone they move to Trash behind a confirm.
+    if (controller.inShrinkSession) return ShrinkAddButton(count: n);
+    return Tooltip(
+      message: context.tr('tt_prune_move_selected'),
+      child: FilledButton.icon(
+        onPressed: n == 0 ? null : () => _confirm(context),
+        icon: const Icon(Icons.delete_outline),
+        label: Text(context.tr('prune_move_selected', {'count': n})),
+      ),
     );
   }
 
@@ -317,16 +384,16 @@ class _ConfirmButton extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Move $n RAW files to the Trash?'),
-        content: const Text('You can restore them from the Trash.'),
+        title: Text(context.tr('prune_confirm_title', {'count': n})),
+        content: Text(context.tr('prune_confirm_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.tr('prune_cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Move to Trash'),
+            child: Text(context.tr('prune_move_to_trash')),
           ),
         ],
       ),
@@ -359,16 +426,16 @@ class _Done extends StatelessWidget {
         FilledButton.icon(
           onPressed: controller.backToLibrary,
           icon: const Icon(Icons.check),
-          label: const Text('Done — back to library'),
+          label: Text(context.tr('done_back_to_library')),
         ),
       ],
     );
   }
 }
 
-const Map<PairKind, String> _kindTags = {
-  PairKind.orphanRaw: 'Orphan',
-  PairKind.pairedRaw: 'Paired',
-  PairKind.photoWithoutRaw: 'No RAW',
-  PairKind.photoWithRaw: 'Has RAW',
+const Map<PairKind, String> _kindTagKeys = {
+  PairKind.orphanRaw: 'prune_kind_orphan',
+  PairKind.pairedRaw: 'prune_kind_paired',
+  PairKind.photoWithoutRaw: 'prune_kind_no_raw',
+  PairKind.photoWithRaw: 'prune_kind_has_raw',
 };
