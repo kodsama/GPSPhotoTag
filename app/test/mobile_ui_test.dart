@@ -12,25 +12,28 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import 'support/fakes.dart';
 
-LibraryAsset _asset(String id, {double? lat, double? lng}) => LibraryAsset(
-  id: id,
-  filename: '$id.jpg',
-  width: 100,
-  height: 100,
-  byteSize: 1,
-  latitude: lat,
-  longitude: lng,
-);
+LibraryAsset _asset(String id, {String? filename, double? lat, double? lng}) =>
+    LibraryAsset(
+      id: id,
+      filename: filename ?? '$id.jpg',
+      width: 100,
+      height: 100,
+      byteSize: 1,
+      latitude: lat,
+      longitude: lng,
+    );
 
 AppController _mobile(
   FakePhotoLibrary lib, {
   bool granted = true,
+  bool rawPruning = false,
   Future<List<String>> Function()? pickTracks,
 }) => AppController(
   runner: FakeEngineRunner(),
   photoLibrary: lib,
   requestPhotoAccess: () async => granted,
   pickTrackFiles: pickTracks,
+  mobileRawPruning: rawPruning,
 );
 
 Future<void> _pump(WidgetTester tester, AppController controller) async {
@@ -114,14 +117,32 @@ void main() {
     expect(find.text('Preview 1 photos'), findsOneWidget);
   });
 
-  testWidgets('mobile prune action shows the unavailable message', (
-    tester,
-  ) async {
+  testWidgets('iOS prune action shows the explanatory warning', (tester) async {
+    // iOS (rawPruning false): the Photos library fuses RAW+JPEG, so warn.
     final c = _mobile(FakePhotoLibrary([_asset('a')]));
     await c.scanLibrary();
     c.openAction(LibraryAction.pruneRaw);
     await _pump(tester, c);
     expect(find.byType(PruneAction), findsOneWidget);
-    expect(find.textContaining("isn't available on mobile"), findsOneWidget);
+    expect(find.textContaining('not on iPhone'), findsOneWidget);
+  });
+
+  testWidgets('Android prune action shows the review, not the warning', (
+    tester,
+  ) async {
+    // Android (rawPruning true): RAW + JPEG are separate assets that pair.
+    final c = _mobile(
+      FakePhotoLibrary([
+        _asset('raw1', filename: 'IMG_1.DNG'),
+        _asset('raw2', filename: 'IMG_2.DNG'),
+      ]),
+      rawPruning: true,
+    );
+    await c.scanLibrary();
+    c.openAction(LibraryAction.pruneRaw);
+    await _pump(tester, c);
+    expect(find.byType(PruneAction), findsOneWidget);
+    expect(find.textContaining('not on iPhone'), findsNothing);
+    expect(c.pruneCandidates, ['IMG_1.DNG', 'IMG_2.DNG']);
   });
 }

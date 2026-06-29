@@ -406,5 +406,5 @@
   "tag_mobile_tracks_help": "Wähle GPX/KML-Tracks oder Google-Timeline-Exporte; die Koordinaten werden der Aufnahmezeit jedes Fotos zugeordnet und in deine Mediathek zurückgeschrieben.",
   "tag_mobile_pick_tracks": "GPS-Track-Dateien auswählen",
   "tag_mobile_clear_tracks": "Track-Dateien entfernen",
-  "prune_mobile_unavailable": "Das Zuordnen von Bildern zu RAW ist auf Mobilgeräten noch nicht verfügbar — die Fotomediathek stellt RAW-Dateien nicht als separate Elemente bereit."
+  "prune_mobile_unavailable": "Das Zuordnen von Fotos zu RAW funktioniert unter Android, aber nicht auf iPhone oder iPad: Die Fotomediathek speichert ein RAW und sein JPEG als ein Element, und ein eigenständiges RAW ist deine einzige Kopie — hier lässt sich also nichts gefahrlos zuordnen oder entfernen."
 }

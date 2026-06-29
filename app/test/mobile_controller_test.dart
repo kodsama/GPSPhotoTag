@@ -42,12 +42,14 @@ AppController _mobile(
   FakePhotoLibrary lib, {
   FakeEngineRunner? runner,
   bool granted = true,
+  bool rawPruning = false,
   Future<List<String>> Function()? pickTracks,
 }) => AppController(
   runner: runner ?? FakeEngineRunner(),
   photoLibrary: lib,
   requestPhotoAccess: () async => granted,
   pickTrackFiles: pickTracks,
+  mobileRawPruning: rawPruning,
 );
 
 void main() {
@@ -296,5 +298,67 @@ void main() {
     c.openExplore();
     expect(c.explorePhotos, isEmpty);
     expect(c.exploreLoading, isFalse);
+  });
+
+  group('Prune RAW (Android implements, iOS warns)', () {
+    test('supportsRawPruning: desktop true, Android true, iOS false', () {
+      expect(AppController().supportsRawPruning, isTrue); // desktop
+      expect(
+        _mobile(
+          FakePhotoLibrary(const []),
+          rawPruning: true,
+        ).supportsRawPruning,
+        isTrue, // Android
+      );
+      expect(
+        _mobile(
+          FakePhotoLibrary(const []),
+          rawPruning: false,
+        ).supportsRawPruning,
+        isFalse, // iOS
+      );
+    });
+
+    test(
+      'Android pairs by original filename and trashes the orphan RAW',
+      () async {
+        // IMG_1 has a RAW+JPEG pair; IMG_2 is an orphan RAW (the candidate).
+        final lib = FakePhotoLibrary([
+          _asset('raw1', filename: 'IMG_1.DNG'),
+          _asset('jpg1', filename: 'IMG_1.JPG'),
+          _asset('raw2', filename: 'IMG_2.DNG'),
+        ]);
+        final c = _mobile(lib, rawPruning: true);
+        await c.scanLibrary();
+        c.openAction(LibraryAction.pruneRaw);
+
+        // Only the companionless RAW is a deletion candidate, keyed by filename.
+        expect(c.pairing, isNotNull);
+        expect(c.pruneCandidates, ['IMG_2.DNG']);
+
+        await c.runTrashSelected();
+        // The orphan RAW's asset id is what reaches the native delete.
+        expect(lib.deletedIds, ['raw2']);
+        // Its proxy is gone from the scan; the pair survives.
+        expect(c.scan!.photos, contains(FakePhotoLibrary.proxyPathFor('raw1')));
+        expect(c.scan!.photos, contains(FakePhotoLibrary.proxyPathFor('jpg1')));
+        expect(
+          c.scan!.photos,
+          isNot(contains(FakePhotoLibrary.proxyPathFor('raw2'))),
+        );
+      },
+    );
+
+    test(
+      'iOS leaves the pairing null so the action shows the warning',
+      () async {
+        final lib = FakePhotoLibrary([_asset('raw2', filename: 'IMG_2.DNG')]);
+        final c = _mobile(lib, rawPruning: false);
+        await c.scanLibrary();
+        c.openAction(LibraryAction.pruneRaw);
+        expect(c.pairing, isNull);
+        expect(c.pruneCandidates, isEmpty);
+      },
+    );
   });
 }

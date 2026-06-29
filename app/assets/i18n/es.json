@@ -406,5 +406,5 @@
   "tag_mobile_tracks_help": "Elige tracks GPX/KML o exportaciones de Google Timeline; las coordenadas se asocian a la hora de cada foto y se escriben de vuelta en tu biblioteca.",
   "tag_mobile_pick_tracks": "Elegir archivos de track GPS",
   "tag_mobile_clear_tracks": "Borrar archivos de track",
-  "prune_mobile_unavailable": "Asociar imágenes con RAW aún no está disponible en móvil: la fototeca no expone los archivos RAW como elementos separados."
+  "prune_mobile_unavailable": "Asociar fotos con RAW funciona en Android, pero no en iPhone o iPad: la fototeca guarda un RAW y su JPEG como un solo elemento, y un RAW independiente es tu única copia, así que aquí no hay nada que emparejar o eliminar de forma segura."
 }

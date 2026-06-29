@@ -53,6 +53,9 @@ Future<void> main() async {
       prefs: prefs,
       tileProvider: CachingTileProvider(cache: tileCache),
       photoLibrary: photoLibrary,
+      // RAW/JPEG pairing only maps cleanly on Android (separate MediaStore
+      // assets); iOS fuses RAW+JPEG into one asset, so it's disabled there.
+      mobileRawPruning: Platform.isAndroid,
     ),
   );
 }
@@ -73,6 +76,7 @@ class StundaApp extends StatefulWidget {
     this.prefs,
     this.tileProvider,
     this.photoLibrary,
+    this.mobileRawPruning = false,
   });
 
   /// The controller to use; a fresh one is created when null.
@@ -99,6 +103,11 @@ class StundaApp extends StatefulWidget {
   /// (ignored when [controller] is injected).
   final DevicePhotoLibrary? photoLibrary;
 
+  /// Whether RAW pruning is available on this mobile platform (Android only;
+  /// see [AppController.supportsRawPruning]). Ignored when [controller] is
+  /// injected.
+  final bool mobileRawPruning;
+
   @override
   State<StundaApp> createState() => _StundaAppState();
 }
@@ -112,6 +121,7 @@ class _StundaAppState extends State<StundaApp> {
         prefs: widget.prefs,
         photoLibrary: widget.photoLibrary,
         requestPhotoAccess: widget.photoLibrary?.requestAccess,
+        mobileRawPruning: widget.mobileRawPruning,
       );
 
   /// Drives the close-while-running guard's warning SnackBar (the [AppShell]

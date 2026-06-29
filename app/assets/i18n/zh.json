@@ -406,5 +406,5 @@
   "tag_mobile_tracks_help": "选择 GPX/KML 轨迹或 Google 时间线导出文件；坐标会根据每张照片的时间进行匹配并写回到图库。",
   "tag_mobile_pick_tracks": "选择 GPS 轨迹文件",
   "tag_mobile_clear_tracks": "清除轨迹文件",
-  "prune_mobile_unavailable": "在移动设备上暂不支持将图像与 RAW 匹配——照片图库不会将 RAW 文件作为独立项目提供。"
+  "prune_mobile_unavailable": "将照片与 RAW 匹配在 Android 上可用，但在 iPhone 或 iPad 上不可用：照片图库会将 RAW 及其 JPEG 作为单个项目保存，而独立的 RAW 是你唯一的副本——因此这里没有可安全配对或删除的内容。"
 }

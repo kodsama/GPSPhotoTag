@@ -187,7 +187,7 @@ const Map<String, String> kEnglishStrings = {
   'done_back_to_library': 'Done — back to library',
   'prune_no_library': 'No library scanned.',
   'prune_mobile_unavailable':
-      'Matching images to RAW isn\'t available on mobile yet — the photo library doesn\'t expose RAW files as separate items.',
+      'Matching photos to RAW works on Android but not on iPhone or iPad: the Photos library keeps a RAW and its JPEG as one item, and a stand-alone RAW is your only copy — so there\'s nothing safe to pair or remove here.',
   'prune_review_intro':
       'Nothing is removed until you review the list below and confirm. {description}',
   'prune_summary':

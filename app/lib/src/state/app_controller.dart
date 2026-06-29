@@ -46,7 +46,9 @@ class AppController extends ChangeNotifier {
     PhotoLibrary? photoLibrary,
     Future<bool> Function()? requestPhotoAccess,
     Future<List<String>> Function()? pickTrackFiles,
+    bool mobileRawPruning = false,
   }) : _pickTrackFiles = pickTrackFiles ?? _defaultPickTrackFiles,
+       _rawPruningOnMobile = mobileRawPruning,
        // Public params mapping to private fields can't be initializing formals
        // (that would expose the private names as the param names).
        // ignore: prefer_initializing_formals
@@ -127,6 +129,17 @@ class AppController extends ChangeNotifier {
   /// than the desktop filesystem. Every mobile-only code path is guarded by
   /// this; when false the existing desktop logic runs exactly as before.
   bool get isMobile => _photoLibrary != null;
+
+  /// Whether RAW pruning is viable on this mobile platform (set by `main` to
+  /// `Platform.isAndroid`). Android exposes a RAW and its JPEG as separate
+  /// MediaStore assets that pair by filename; iOS fuses RAW+JPEG into one Photos
+  /// asset (and a stand-alone ProRAW is the only copy), so there is nothing safe
+  /// to pair or delete there. Ignored on desktop.
+  final bool _rawPruningOnMobile;
+
+  /// Whether the Match-Images-to-RAW feature is available: always on desktop,
+  /// and on Android mobile; not on iOS (see [_rawPruningOnMobile]).
+  bool get supportsRawPruning => !isMobile || _rawPruningOnMobile;
 
   /// Whether a bundled exiftool is present on disk.
   bool get hasBundledExiftool => _exiftoolBundleDir != null;
@@ -1426,6 +1439,11 @@ class AppController extends ChangeNotifier {
   // --- Prune review (preview → select → confirm → execute) -----------------
 
   RawPairing? _pairing;
+
+  /// On Android mobile, the filename-keyed pairing + filename→asset-id lookup
+  /// backing [_pairing], so a trashed filename can be routed to the native
+  /// photo-library delete. Null on desktop and on iOS.
+  MobilePairing? _mobilePairing;
   final Set<String> _selected = {};
   String _pruneFilter = '';
   // The trash direction: A (orphan RAWs) by default, B (orphan images).
@@ -1466,7 +1484,23 @@ class AppController extends ChangeNotifier {
   /// user's default intent while still letting them deselect before confirming.
   void _preparePruneReview() {
     final scan = _scan;
-    _pairing = scan == null ? null : classifyPairing(scan.photos);
+    final mobile = _mobileLibrary;
+    if (isMobile) {
+      // Proxies are all `.jpg`, so classifying them finds no RAW. On Android we
+      // pair over the assets' ORIGINAL filenames (RAW + JPEG are separate
+      // MediaStore assets); on iOS RAW pruning is unavailable (see
+      // [supportsRawPruning]) so the pairing stays null and the action warns.
+      if (supportsRawPruning && scan != null && mobile != null) {
+        _mobilePairing = mobile.pairingFromFilenames();
+        _pairing = _mobilePairing!.pairing;
+      } else {
+        _mobilePairing = null;
+        _pairing = null;
+      }
+    } else {
+      _mobilePairing = null;
+      _pairing = scan == null ? null : classifyPairing(scan.photos);
+    }
     _direction = PruneDirection.removeOrphanRaws;
     _pruneFilter = '';
     _visibleKinds
@@ -1553,7 +1587,12 @@ class AppController extends ChangeNotifier {
   /// paths (plus their sidecars, handled in the engine) to the Trash.
   Future<void> runTrashSelected() {
     if (_selected.isEmpty) return Future.value();
-    final paths = _selected.toList(growable: false);
+    final selected = _selected.toList(growable: false);
+    // On Android mobile [_selected] holds asset FILENAMES (the prune pairing is
+    // filename-keyed); map them to proxy paths so [_trashPaths] resolves them to
+    // asset ids and deletes natively. Desktop sends real file paths as-is.
+    final paths = isMobile ? _proxyPathsForFilenames(selected) : selected;
+    if (paths.isEmpty) return Future.value();
     return _consume(
       _trashPaths(paths),
       owner: LibraryAction.pruneRaw,
@@ -1561,6 +1600,18 @@ class AppController extends ChangeNotifier {
       total: paths.length,
       reviewOnDone: true,
     );
+  }
+
+  /// Maps selected asset [filenames] (the mobile prune selection) to the proxy
+  /// paths [_trashPaths] understands, dropping any that no longer resolve.
+  List<String> _proxyPathsForFilenames(List<String> filenames) {
+    final pairing = _mobilePairing;
+    final mobile = _mobileLibrary;
+    if (pairing == null || mobile == null) return const [];
+    return [
+      for (final id in pairing.idsFor(filenames))
+        if (mobile.proxyForAsset(id) != null) mobile.proxyForAsset(id)!,
+    ];
   }
 
   // --- Duplicate finder (hash → review → swap/deselect → confirm) ----------

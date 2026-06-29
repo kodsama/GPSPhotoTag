@@ -406,5 +406,5 @@
   "tag_mobile_tracks_help": "GPX/KML トラックまたは Google タイムラインのエクスポートを選択すると、各写真の時刻に座標が照合され、ライブラリに書き戻されます。",
   "tag_mobile_pick_tracks": "GPS トラックファイルを選択",
   "tag_mobile_clear_tracks": "トラックファイルをクリア",
-  "prune_mobile_unavailable": "画像と RAW の対応付けはモバイルではまだ利用できません。フォトライブラリは RAW ファイルを個別の項目として公開しません。"
+  "prune_mobile_unavailable": "写真と RAW の対応付けは Android では使えますが、iPhone や iPad では使えません。写真ライブラリは RAW とその JPEG を 1 つの項目として保持し、単体の RAW は唯一のコピーであるため、ここで安全に対応付けや削除ができるものはありません。"
 }

@@ -26,10 +26,12 @@ class PruneAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
 
-    // RAW/JPEG pairing relies on real file extensions, but mobile proxies are
-    // all `.jpg` (the photo library does not expose RAW companions as separate
-    // assets here), so this action is not available on mobile yet.
-    if (controller.isMobile) {
+    // RAW/JPEG pairing needs the RAW and its companion to be separate items.
+    // Android (MediaStore) exposes them as separate assets, so it works there;
+    // iOS (PHPhotoLibrary) fuses RAW+JPEG into one asset (and a stand-alone
+    // ProRAW is the only copy), so the action is unavailable on iOS and explains
+    // why. On desktop and Android it shows the normal review.
+    if (controller.isMobile && !controller.supportsRawPruning) {
       return Text(
         context.tr('prune_mobile_unavailable'),
         style: Theme.of(context).textTheme.bodyMedium,
