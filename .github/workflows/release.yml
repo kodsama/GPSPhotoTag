@@ -344,10 +344,14 @@ jobs:
           flutter build linux --release
           --obfuscate --split-debug-info=build/symbols/linux
 
-      # flutter_distributor produces .AppImage, .deb and .rpm from
-      # distribute_options.yaml (which references the .desktop + icon metadata).
+      # flutter_distributor produces .AppImage, .deb and .rpm from the per-target
+      # configs at app/linux/packaging/<target>/make_config.yaml (icon path is
+      # resolved relative to this working dir). APPIMAGE_EXTRACT_AND_RUN lets
+      # appimagetool run without FUSE, which GitHub runners don't provide.
       - name: Build AppImage / deb / rpm (flutter_distributor)
         working-directory: app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
           dart pub global activate flutter_distributor
           export PATH="$PATH:$HOME/.pub-cache/bin"

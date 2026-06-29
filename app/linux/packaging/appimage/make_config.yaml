@@ -1,6 +1,6 @@
 # flutter_distributor AppImage config.
 display_name: Stunda
-icon: ../../../../packaging/linux/icon_256.png
+icon: ../packaging/linux/icon_256.png
 keywords:
   - GPS
   - EXIF

@@ -5,7 +5,7 @@ maintainer:
   name: Kodsama
   email: support@kodsama.ai
 dependencies: []
-icon: ../../../../packaging/linux/icon_256.png
+icon: ../packaging/linux/icon_256.png
 generic_name: Photo GPS Tagger
 keywords:
   - GPS

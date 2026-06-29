@@ -3,7 +3,7 @@ display_name: Stunda
 package_name: stunda
 license: GPLv3+
 url: https://github.com/kodsama/Stunda
-icon: ../../../../packaging/linux/icon_256.png
+icon: ../packaging/linux/icon_256.png
 generic_name: Photo GPS Tagger
 keywords:
   - GPS
