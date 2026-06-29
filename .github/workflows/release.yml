@@ -344,6 +344,15 @@ jobs:
           flutter build linux --release
           --obfuscate --split-debug-info=build/symbols/linux
 
+      # flutter_distributor shells out to `appimagetool`, which isn't preinstalled
+      # on the runner — fetch it onto PATH (it's itself an AppImage, run without
+      # FUSE via APPIMAGE_EXTRACT_AND_RUN below).
+      - name: Install appimagetool
+        run: |
+          sudo wget -qO /usr/local/bin/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo chmod +x /usr/local/bin/appimagetool
+
       # flutter_distributor produces .AppImage, .deb and .rpm from the per-target
       # configs at app/linux/packaging/<target>/make_config.yaml (icon path is
       # resolved relative to this working dir). APPIMAGE_EXTRACT_AND_RUN lets
