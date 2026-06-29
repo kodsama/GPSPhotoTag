@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:stunda_engine/stunda_engine.dart';
@@ -375,8 +376,31 @@ class _PaneImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = ControllerScope.of(context);
+    // On mobile the path is a downscaled proxy; load the ORIGINAL full-resolution
+    // bytes from the photo library and render them with Image.memory, showing the
+    // proxy file as an instant placeholder while the full bytes load.
+    final fullBytes = controller.fullBytesForProxyPath(path);
+    if (fullBytes != null) {
+      return FutureBuilder<Uint8List>(
+        future: fullBytes,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done &&
+              snapshot.hasData &&
+              snapshot.data!.isNotEmpty) {
+            return Image.memory(
+              snapshot.data!,
+              fit: BoxFit.contain,
+              errorBuilder: (context, _, _) => _proxyPlaceholder(),
+            );
+          }
+          // While loading (or on empty/failed full bytes) show the proxy as a
+          // decodable placeholder so the viewer is never blank.
+          return _proxyPlaceholder();
+        },
+      );
+    }
     if (needsPreviewExtraction(path)) {
-      final controller = ControllerScope.of(context);
       return FutureBuilder<String?>(
         future: controller.previewImageFor(path, full: true),
         builder: (context, snapshot) {
@@ -409,6 +433,14 @@ class _PaneImage extends StatelessWidget {
       errorBuilder: (context, _, _) => _Placeholder(label: fileTypeLabel(path)),
     );
   }
+
+  /// The downscaled proxy JPEG, shown on mobile as an instant placeholder while
+  /// the full-resolution original bytes load (and as the fallback if they fail).
+  Widget _proxyPlaceholder() => Image.file(
+    File(path),
+    fit: BoxFit.contain,
+    errorBuilder: (context, _, _) => _Placeholder(label: fileTypeLabel(path)),
+  );
 }
 
 /// The non-decodable placeholder: a muted icon + file-type tag.
@@ -446,11 +478,15 @@ class _InfoLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ControllerScope.of(context);
-    final name = pane.path.split(RegExp(r'[/\\]')).last;
+    // On mobile the pane path is a downscaled, stripped proxy; show the ORIGINAL
+    // asset's filename / size / dimensions / date / GPS instead. Falls back to
+    // the desktop path (proxy/file name + read meta) when it doesn't resolve.
+    final info = controller.mobileInfoForProxyPath(pane.path);
+    final name = info?.filename ?? pane.path.split(RegExp(r'[/\\]')).last;
     final segments = compareInfoSegments(
       name: name,
-      fileSize: pane.fileSize,
-      meta: pane.meta,
+      fileSize: info?.fileSize ?? pane.fileSize,
+      meta: info?.meta ?? pane.meta,
       exif: controller.curatedExif(pane.path),
       tr: context.tr,
     );

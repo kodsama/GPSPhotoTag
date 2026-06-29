@@ -356,6 +356,10 @@ class FakePhotoLibrary implements PhotoLibrary {
   /// When set, [writeGps] throws this (simulating a native GPS-write failure).
   Object? writeGpsError;
 
+  /// Full-resolution bytes returned by [fullBytes], keyed by asset id; an absent
+  /// id yields empty bytes (so the viewer shows the proxy placeholder).
+  final Map<String, Uint8List> fullBytesById = {};
+
   /// The fake proxy path for an asset id (the engine-facing temp path).
   static String proxyPathFor(String id) => '/proxies/$id.jpg';
 
@@ -372,7 +376,8 @@ class FakePhotoLibrary implements PhotoLibrary {
   Future<Uint8List> thumbnail(String id, int edge) async => Uint8List(0);
 
   @override
-  Future<Uint8List> fullBytes(String id) async => Uint8List(0);
+  Future<Uint8List> fullBytes(String id) async =>
+      fullBytesById[id] ?? Uint8List(0);
 
   @override
   Future<void> writeGps(String id, double latitude, double longitude) async {

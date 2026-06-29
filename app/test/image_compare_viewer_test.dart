@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -279,6 +280,77 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('RAF'), findsOneWidget);
+    });
+  });
+
+  group('mobile (proxy → original)', () {
+    LibraryAsset asset(
+      String id, {
+      required String filename,
+      int width = 4000,
+      int height = 3000,
+      int byteSize = 5000000,
+    }) => LibraryAsset(
+      id: id,
+      filename: filename,
+      width: width,
+      height: height,
+      byteSize: byteSize,
+    );
+
+    Future<AppController> mobile(FakePhotoLibrary lib) async {
+      final c = AppController(
+        runner: FakeEngineRunner(),
+        photoLibrary: lib,
+        requestPhotoAccess: () async => true,
+      );
+      await c.scanLibrary();
+      return c;
+    }
+
+    testWidgets('info line shows the ORIGINAL filename, size, and dimensions', (
+      tester,
+    ) async {
+      final lib = FakePhotoLibrary([
+        asset(
+          'a',
+          filename: 'DSC_0001.NEF',
+          width: 6000,
+          height: 4000,
+          byteSize: 2 * 1024 * 1024,
+        ),
+      ]);
+      final c = await mobile(lib);
+      final proxy = FakePhotoLibrary.proxyPathFor('a');
+      await tester.pumpWidget(_host(c, [ComparePane(path: proxy)]));
+      await tester.pump();
+      await tester.pump();
+
+      // The proxy basename (a.jpg) must NOT appear; the original does.
+      expect(find.text('DSC_0001.NEF'), findsOneWidget);
+      expect(find.text('a.jpg'), findsNothing);
+      expect(find.text('6000 × 4000'), findsOneWidget);
+      expect(find.text('2.0 MB'), findsOneWidget);
+    });
+
+    testWidgets('renders the ORIGINAL full bytes via Image.memory', (
+      tester,
+    ) async {
+      final lib = FakePhotoLibrary([asset('a', filename: 'orig.heic')])
+        ..fullBytesById['a'] = Uint8List.fromList(
+          img.encodeJpg(img.Image(width: 16, height: 16)),
+        );
+      final c = await mobile(lib);
+      final proxy = FakePhotoLibrary.proxyPathFor('a');
+      await tester.runAsync(() async {
+        await tester.pumpWidget(_host(c, [ComparePane(path: proxy)]));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+      await tester.pump();
+      // An Image (memory-backed) renders rather than the HEIC placeholder.
+      expect(find.byType(Image), findsWidgets);
+      expect(find.text('HEIC'), findsNothing);
     });
   });
 

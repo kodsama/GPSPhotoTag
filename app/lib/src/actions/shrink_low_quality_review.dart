@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
 import '../explore/photo_detail_panel.dart';
@@ -301,7 +300,7 @@ class _LowQRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              p.basename(file.path),
+              controller.displayFilename(file.path),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: text.bodyMedium,
