@@ -114,7 +114,12 @@ class _ScreenBody extends StatelessWidget {
         AppScreen.scanning => const ScanningScreen(),
         AppScreen.workspace => const WorkspaceScreen(),
         AppScreen.action => const ActionScreen(),
+        // coverage:ignore-start
+        // Unreachable: the explore screen is intercepted above (returns
+        // ExploreMapScreen) before this switch; this arm exists only to keep
+        // the switch exhaustive.
         AppScreen.explore => const SizedBox.shrink(),
+        // coverage:ignore-end
       },
     );
   }

@@ -250,6 +250,11 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
 
   /// Opens the native save panel and returns the chosen path (null on cancel).
   /// The only genuinely-untestable shell of the save flow.
+  // coverage:ignore-start
+  // Pure native-panel shell: getSaveLocation drives the platform file_selector
+  // dialog (a plugin channel) that has no implementation under `flutter test`.
+  // The pick→write→report logic around it lives in AppController.savePng, which
+  // IS unit-tested with an injected pickPath.
   Future<String?> _pickSavePath() async {
     final png = XTypeGroup(
       label: context.tr('explore_png_image'),
@@ -261,6 +266,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     );
     return location?.path;
   }
+  // coverage:ignore-end
 
   /// Renders the captured map [RepaintBoundary] to PNG bytes at the screen's
   /// device pixel ratio, or null when the boundary isn't laid out yet or the

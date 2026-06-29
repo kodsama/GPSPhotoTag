@@ -74,6 +74,43 @@ void main() {
       await tester.pump();
       expect(find.byType(ImageCompareViewer), findsOneWidget);
     });
+
+    testWidgets(
+      'mobile: undecodable full bytes AND a missing proxy fall back to the '
+      'typed placeholder via both errorBuilders',
+      (tester) async {
+        // A mobile controller whose full bytes for the proxy are NON-empty but
+        // undecodable garbage. The viewer takes the Image.memory branch; its
+        // errorBuilder fires (bad bytes) -> _proxyPlaceholder, whose Image.file
+        // errorBuilder ALSO fires (the proxy path is not a real file) -> the
+        // typed _Placeholder. Exercises both errorBuilder callbacks at once.
+        final proxy = FakePhotoLibrary.proxyPathFor('a');
+        final lib = FakePhotoLibrary([
+          LibraryAsset(
+            id: 'a',
+            filename: 'a.jpg',
+            width: 10,
+            height: 10,
+            byteSize: 100,
+          ),
+        ])..fullBytesById['a'] = Uint8List.fromList(const [1, 2, 3, 4, 5]);
+        final c = AppController(
+          runner: FakeEngineRunner(),
+          photoLibrary: lib,
+          requestPhotoAccess: () async => true,
+        );
+        await tester.runAsync(() async {
+          await c.scanLibrary();
+          await tester.pumpWidget(_host(c, [ComparePane(path: proxy)]));
+          // Let the fullBytes future + decode attempts settle.
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        });
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        // Both decode paths failed, so the typed placeholder is shown.
+        expect(find.text('JPG'), findsOneWidget);
+      },
+    );
   });
 
   group('compare mode', () {

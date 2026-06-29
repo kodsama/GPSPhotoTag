@@ -287,6 +287,20 @@ void main() {
     },
   );
 
+  testWidgets('a locale override drives MaterialApp.locale (non-null branch)', (
+    tester,
+  ) async {
+    // With a language override set, StundaApp.build feeds a concrete Locale to
+    // MaterialApp (the `Locale(localeCode!)` arm), not the system-follow null.
+    final controller = AppController(runner: FakeEngineRunner())
+      ..debugSetToolkit([_tool('exiftool')])
+      ..setLocaleCode('sv');
+    await _pumpApp(tester, controller);
+
+    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(materialApp.locale, const Locale('sv'));
+  });
+
   testWidgets('MCP status no longer lives in the header', (tester) async {
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);

@@ -77,6 +77,24 @@ void main() {
     expect(service.error, contains('no free port'));
   });
 
+  test('a bundled exiftool dir routes the server through the bundle', () async {
+    // With a bundleDir set, the server isolate builds an ExiftoolRunner around
+    // the bundled invocation (the `cfg.bundleDir != null` arm) and treats
+    // exiftool as available without probing PATH. The server still binds.
+    final service = McpService(exiftoolBundleDir: '/some/bundle/dir');
+    addTearDown(service.stop);
+    await service.start(base: 18880);
+
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(service.error, isNull, reason: 'startup error: ${service.error}');
+    expect(service.running, isTrue);
+    expect(service.port, inInclusiveRange(18880, 18889));
+    await service.stop();
+  });
+
   test('dispose stops the running server', () async {
     final service = McpService();
     await service.start(base: 18860);

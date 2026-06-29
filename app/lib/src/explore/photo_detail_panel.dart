@@ -54,9 +54,14 @@ void openFullscreen(BuildContext context, String path, {FileMeta? meta}) {
 int? fileSizeOf(String path) {
   try {
     return File(path).statSync().size;
+    // coverage:ignore-start
+    // File.statSync never throws — a missing/unreadable path returns a FileStat
+    // with type notFound (size -1), not a FileSystemException — so this guard is
+    // a defensive belt-and-braces that cannot be triggered under `flutter test`.
   } on FileSystemException {
     return null;
   }
+  // coverage:ignore-end
 }
 
 /// The reusable photo preview: a [PhotoThumbnail], the metadata (filename,

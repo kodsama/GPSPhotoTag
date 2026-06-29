@@ -16,6 +16,11 @@ import 'package:stunda_engine/stunda_engine.dart';
 /// FFI load time, so only the models need to be materialised here.
 Future<String?> prepareMobileOnnxBundle(String supportDir) async {
   if (!Platform.isAndroid && !Platform.isIOS) return null;
+  // coverage:ignore-start
+  // Mobile-only: reachable only when Platform.isAndroid/isIOS is true AND the
+  // two .onnx models are present in the asset bundle (rootBundle). Neither holds
+  // under `flutter test` on the desktop host, so this copy step can't execute
+  // here; it is exercised by the Android/iOS build/run, not the unit suite.
   final dir = Directory(p.join(supportDir, 'onnx'));
   if (!dir.existsSync()) dir.createSync(recursive: true);
   for (final name in const [kOnnxModelFileName, kEmbeddingModelFileName]) {
@@ -28,6 +33,7 @@ Future<String?> prepareMobileOnnxBundle(String supportDir) async {
     );
   }
   return dir.path;
+  // coverage:ignore-end
 }
 
 /// Locates the bundled ONNX Runtime library + detector model inside the built

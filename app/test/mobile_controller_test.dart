@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/explore/explore_model.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/duplicates_model.dart';
@@ -361,6 +362,30 @@ void main() {
     expect(c.explorePhotos, isEmpty);
     expect(c.exploreLoading, isFalse);
   });
+
+  test(
+    'explore-from-assets resets to empty when the mobile library is not built '
+    'yet (scan present, library absent)',
+    () {
+      // A mobile controller whose scan was seeded WITHOUT a corresponding
+      // mobile library (the rebuild hasn't happened). Opening Explore must take
+      // the guard branch in _loadExploreFromAssets: clear points + counters and
+      // stop loading rather than dereference the missing library.
+      final c = _mobile(FakePhotoLibrary([_asset('a', lat: 1, lng: 2)]));
+      // Pre-seed a phantom point so we can prove the reset CLEARS it.
+      c.debugSetExplore(const [
+        ExplorePhoto(path: '/old.jpg', latitude: 9, longitude: 9),
+      ], loading: true);
+      // Seed a scan WITHOUT rebuilding the mobile library (debugSetScan never
+      // touches _mobileLibrary), so _loadExploreFromAssets sees a null library.
+      c.debugSetScan(fakeScan(photos: const ['/proxies/a.jpg']));
+      c.openExplore();
+      expect(c.explorePhotos, isEmpty);
+      expect(c.exploreLoaded, 0);
+      expect(c.exploreTotal, 0);
+      expect(c.exploreLoading, isFalse);
+    },
+  );
 
   group('Prune RAW (Android implements, iOS warns)', () {
     test('supportsRawPruning: desktop true, Android true, iOS false', () {

@@ -31,7 +31,11 @@ Future<void> main() async {
   // library is loader-resolved on mobile and bundle-relative on desktop.
   final isMobile = Platform.isAndroid || Platform.isIOS;
   final onnxBundleDir = isMobile
+      // coverage:ignore-start
+      // Mobile-only arm; the desktop test host always takes the
+      // locateBundledOnnx() branch below, never this one.
       ? await prepareMobileOnnxBundle(support.path)
+      // coverage:ignore-end
       : locateBundledOnnx();
 
   // Resolve the tile cache dir ONCE here (never per tile), build the persistent
@@ -44,7 +48,11 @@ Future<void> main() async {
   // On mobile the app drives the device photo library directly (enumerate +
   // export proxies + native trash/GPS-write); on desktop there is none and the
   // controller stays in its filesystem mode.
+  // coverage:ignore-start
+  // Mobile-only construct; desktop (the test host) takes the null arm, and
+  // DevicePhotoLibrary is plugin-backed (untestable under `flutter test`).
   final photoLibrary = isMobile ? DevicePhotoLibrary() : null;
+  // coverage:ignore-end
 
   runApp(
     StundaApp(
