@@ -28,8 +28,13 @@ PUBSPEC="$REPO_ROOT/app/pubspec.yaml"
 # Opt-in: vendor the Windows exe too. The Windows CI job passes --windows; other
 # hosts skip it (the macOS/Linux Perl distribution is always vendored below).
 FETCH_WINDOWS="${STUNDA_FETCH_WINDOWS_EXIFTOOL:-}"
+# Mobile builds bundle no exiftool (the engine uses the device photo library, not
+# exiftool, on Android/iOS): --no-exiftool clears the vendored tree and empties
+# the pubspec asset block so ~39MB of Perl distribution stays out of the app.
+SKIP_EXIFTOOL="${STUNDA_SKIP_EXIFTOOL:-}"
 for arg in "$@"; do
   [ "$arg" = "--windows" ] && FETCH_WINDOWS=1
+  [ "$arg" = "--no-exiftool" ] && SKIP_EXIFTOOL=1
 done
 
 # Rewrites the marked block in app/pubspec.yaml with one `- assets/exiftool/<d>/`
@@ -121,6 +126,16 @@ vendor_windows_exe() {
   echo "vendored Windows exiftool at $WIN_DEST"
   return 0
 }
+
+# Mobile: don't vendor exiftool at all. Clear any vendored tree and regenerate
+# the pubspec asset block empty so nothing exiftool-related is bundled.
+if [ -n "$SKIP_EXIFTOOL" ]; then
+  rm -rf "$DEST"
+  mkdir -p "$DEST"
+  regenerate_pubspec_assets
+  echo "skipped exiftool vendoring (mobile build); exiftool assets cleared"
+  exit 0
+fi
 
 if [ -f "$DEST/lib/Image/ExifTool.pm" ]; then
   echo "exiftool (perl) already vendored at $DEST"

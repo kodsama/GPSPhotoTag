@@ -267,13 +267,14 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      # Vendor exiftool (host flavour) + the ONNX models so the declared assets
-      # exist; fetch-*.sh also regenerates the pubspec asset list to match.
-      - name: Vendor bundled exiftool
-        run: bash tool/fetch-exiftool.sh
+      # Mobile bundles no exiftool (engine uses the device photo library) and no
+      # desktop ONNX dylibs (Android AAR / iOS pod provide the runtime) — only
+      # the .onnx models. This trims ~40-55MB from the app vs. the desktop set.
+      - name: Clear exiftool assets (not bundled on mobile)
+        run: bash tool/fetch-exiftool.sh --no-exiftool
 
-      - name: Vendor ONNX Runtime + detector model
-        run: bash tool/fetch-onnx.sh
+      - name: Vendor ONNX models only (no desktop libraries)
+        run: bash tool/fetch-onnx.sh --models-only
 
       - name: Build Android APK
         if: matrix.target == 'apk'

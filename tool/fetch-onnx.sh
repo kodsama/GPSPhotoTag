@@ -28,6 +28,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$REPO_ROOT/app/assets/onnx"
 
 ORT_VER="${ORT_VERSION:-1.27.0}"
+# Mobile builds get the ONNX Runtime library from the Android AAR / iOS CocoaPod,
+# not a bundled desktop dylib: --models-only fetches just the shared .onnx models
+# (and creates the empty platform dirs the pubspec declares), keeping the desktop
+# libraries (~15MB each) out of the mobile app.
+MODELS_ONLY="${STUNDA_ONNX_MODELS_ONLY:-}"
+for arg in "$@"; do
+  [ "$arg" = "--models-only" ] && MODELS_ONLY=1
+done
 MODEL_FILE="ssd_mobilenet_v1_12.onnx"
 MODEL_URL="https://huggingface.co/onnxmodelzoo/ssd_mobilenet_v1_12/resolve/main/${MODEL_FILE}"
 # Apache-2.0 MobileNetV2-12 (ONNX Model Zoo): the image-embedding model behind
@@ -56,6 +64,18 @@ if [ ! -s "$DEST/$EMBED_FILE" ]; then
   curl -fsSL "$EMBED_URL" -o "$DEST/$EMBED_FILE"
 fi
 echo "embed model: $DEST/$EMBED_FILE ($(wc -c < "$DEST/$EMBED_FILE") bytes)"
+
+# Mobile: models + empty platform dirs are enough; skip the desktop ORT libs.
+# Clear any previously-vendored desktop libraries so a re-run (or a dirty tree)
+# never leaves a dylib/so/dll behind to be bundled.
+if [ -n "$MODELS_ONLY" ]; then
+  for plat in osx-arm64 osx-x64 linux-x64 win-x64; do
+    rm -rf "${DEST:?}/$plat"
+    mkdir -p "$DEST/$plat"
+  done
+  echo "models-only (mobile build): skipping desktop ONNX Runtime libraries"
+  exit 0
+fi
 
 # --- ONNX Runtime native library, per platform. ----------------------------
 # $1 = ORT release suffix (e.g. osx-arm64), $2 = our platform dir (osx-arm64),
