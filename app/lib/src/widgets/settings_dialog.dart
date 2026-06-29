@@ -77,7 +77,9 @@ class SettingsDialog extends StatelessWidget {
     return AlertDialog(
       title: Text(context.tr('settings_title')),
       content: SizedBox(
-        width: 460,
+        // Cap at 460 on desktop but shrink to fit narrow phone screens (the
+        // dialog's own insets take ~80px) so the content never overflows.
+        width: (MediaQuery.of(context).size.width - 80).clamp(0.0, 460.0),
         child: ListenableBuilder(
           listenable: controller,
           builder: (context, _) => HelpTarget(

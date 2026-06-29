@@ -1,5 +1,7 @@
 name: stunda
-description: Stunda desktop app — GPS photo tagging on macOS, Linux, Windows.
+description: >-
+  Stunda — GPS photo tagging, map exploring, duplicate finding, and library
+  shrinking on macOS, Linux, Windows, Android, and iOS.
 publish_to: 'none'
 version: 2.0.0+1
 resolution: workspace
@@ -122,6 +124,11 @@ flutter:
 
 flutter_launcher_icons:
   image_path: assets/icon_1024.png
+  android: true
+  ios: true
+  # iOS disallows alpha in the app icon; flatten onto a solid background.
+  remove_alpha_ios: true
+  background_color_ios: "#000000"
   macos:
     generate: true
     image_path: assets/icon_1024.png

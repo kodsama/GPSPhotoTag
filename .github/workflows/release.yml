@@ -44,8 +44,10 @@ jobs:
 
       - run: flutter --version
       - run: flutter pub get
-      # Vendor exiftool so the app's declared bundle asset exists for the build.
-      - run: bash tool/fetch-exiftool.sh
+      # Mobile bundles no exiftool (the engine uses the device photo library) and
+      # no desktop ONNX dylibs (the AAR provides the runtime) — only the models.
+      - run: bash tool/fetch-exiftool.sh --no-exiftool
+      - run: bash tool/fetch-onnx.sh --models-only
 
       - name: Build APK (obfuscated)
         working-directory: app
@@ -98,9 +100,14 @@ jobs:
           channel: stable
 
       - run: flutter --version
+      # ONNX Runtime ships only as a CocoaPod (no Swift Package), so iOS must use
+      # CocoaPods integration rather than Flutter's default SPM.
+      - run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
-      # Vendor exiftool so the app's declared bundle asset exists for the build.
-      - run: bash tool/fetch-exiftool.sh
+      # Mobile bundles no exiftool (the engine uses the device photo library) and
+      # no desktop ONNX dylibs (the pod provides the runtime) — only the models.
+      - run: bash tool/fetch-exiftool.sh --no-exiftool
+      - run: bash tool/fetch-onnx.sh --models-only
 
       - name: Build IPA (unsigned, obfuscated)
         working-directory: app

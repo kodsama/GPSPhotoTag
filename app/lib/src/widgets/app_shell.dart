@@ -59,21 +59,22 @@ class _AppShellState extends State<AppShell> {
       ],
     );
     if (helpMode) {
-      body = MouseRegion(
-        cursor: SystemMouseCursors.help,
-        child: Focus(
-          autofocus: true,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              controller.exitHelpMode();
-              return KeyEventResult.handled;
-            }
-            return KeyEventResult.ignored;
-          },
-          child: body,
-        ),
+      body = Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.exitHelpMode();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: body,
       );
+      // The help cursor only means something with a pointer — skip it on mobile.
+      if (!controller.isMobile) {
+        body = MouseRegion(cursor: SystemMouseCursors.help, child: body);
+      }
     }
     return Scaffold(
       backgroundColor: Colors.transparent,
