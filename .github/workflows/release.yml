@@ -345,18 +345,23 @@ jobs:
           --obfuscate --split-debug-info=build/symbols/linux
 
       # flutter_distributor shells out to `appimagetool`, which isn't preinstalled
-      # on the runner — fetch it onto PATH (it's itself an AppImage, run without
-      # FUSE via APPIMAGE_EXTRACT_AND_RUN below).
+      # on the runner. Pin a specific immutable release and verify its SHA-256
+      # (no moving `continuous` tag), then run it FUSE-less via
+      # APPIMAGE_EXTRACT_AND_RUN below.
       - name: Install appimagetool
         run: |
           sudo wget -qO /usr/local/bin/appimagetool \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage
+          echo "46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1  /usr/local/bin/appimagetool" \
+            | sha256sum -c -
           sudo chmod +x /usr/local/bin/appimagetool
 
       # flutter_distributor produces .AppImage, .deb and .rpm from the per-target
       # configs at app/linux/packaging/<target>/make_config.yaml (icon path is
       # resolved relative to this working dir). APPIMAGE_EXTRACT_AND_RUN lets
-      # appimagetool run without FUSE, which GitHub runners don't provide.
+      # appimagetool run without FUSE, which GitHub runners don't provide. Each
+      # target runs independently so one format's failure can't drop the others
+      # (the .AppImage is the universal Linux GUI installer).
       - name: Build AppImage / deb / rpm (flutter_distributor)
         working-directory: app
         env:
@@ -364,8 +369,9 @@ jobs:
         run: |
           dart pub global activate flutter_distributor
           export PATH="$PATH:$HOME/.pub-cache/bin"
-          flutter_distributor package --platform linux --targets appimage,deb,rpm
-        continue-on-error: true
+          flutter_distributor package --platform linux --targets appimage || true
+          flutter_distributor package --platform linux --targets deb || true
+          flutter_distributor package --platform linux --targets rpm || true
 
       - name: Compile Dart CLI/MCP binaries (linux x64)
         run: |
@@ -373,11 +379,14 @@ jobs:
           dart compile exe packages/cli/bin/stunda.dart -o app/dist/bin/stunda-linux-x64
           dart compile exe packages/mcp/bin/stunda_mcp.dart -o app/dist/bin/stunda_mcp-linux-x64
 
+      # flutter_distributor writes installers under app/dist/<version>/; lift them
+      # to app/dist/ (top level) so the upload glob below picks them up.
       - name: Collect distributor outputs
         run: |
           mkdir -p app/dist
-          find app/dist/dist -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
+          find app/dist -mindepth 2 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
             -exec cp {} app/dist/ \; 2>/dev/null || true
+          ls -la app/dist
 
       - uses: actions/upload-artifact@v4
         with:
