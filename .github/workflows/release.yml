@@ -351,8 +351,8 @@ jobs:
       - name: Install appimagetool
         run: |
           sudo wget -qO /usr/local/bin/appimagetool \
-            https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage
-          echo "46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1  /usr/local/bin/appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  /usr/local/bin/appimagetool" \
             | sha256sum -c -
           sudo chmod +x /usr/local/bin/appimagetool
 
