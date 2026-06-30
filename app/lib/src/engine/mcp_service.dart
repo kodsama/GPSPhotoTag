@@ -5,16 +5,31 @@ import 'package:flutter/foundation.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda_mcp/stunda_mcp.dart';
 
+/// Signature matching [Isolate.spawn] for the worker that runs the MCP server.
+/// Injected in tests to induce the spawn-failure error path.
+typedef _IsolateSpawner = Future<Isolate> Function(
+  void Function(_Config) entry,
+  _Config message, {
+  String? debugName,
+});
+
 /// Runs the MCP server on a localhost TCP socket in a dedicated worker isolate,
 /// started automatically when the app launches — so an LLM always has a live
 /// endpoint while Stunda is open, without ever touching the UI isolate.
 class McpService extends ChangeNotifier {
   /// Creates the service. [exiftoolBundleDir] is the on-disk dir of the bundled
   /// exiftool, forwarded into the server isolate so its tools use it.
-  McpService({this.exiftoolBundleDir});
+  ///
+  /// [spawn] is an optional seam used in tests to replace [Isolate.spawn].
+  /// Production callers omit it and get the real implementation.
+  // ignore: library_private_types_in_public_api
+  McpService({this.exiftoolBundleDir, _IsolateSpawner? spawn})
+    : _spawn = spawn ?? Isolate.spawn;
 
   /// On-disk dir of the bundled exiftool, or null to use `PATH`.
   final String? exiftoolBundleDir;
+
+  final _IsolateSpawner _spawn;
 
   /// Whether the server is currently listening.
   bool get running => _port != null;
@@ -37,19 +52,16 @@ class McpService extends ChangeNotifier {
     _receive = ReceivePort();
     _receive!.listen(_onMessage);
     try {
-      _isolate = await Isolate.spawn(
+      _isolate = await _spawn(
         _serverEntry,
         _Config(_receive!.sendPort, base, exiftoolBundleDir),
         debugName: 'mcp-server',
       );
     } on Object catch (e) {
-      // coverage:ignore-start
-      // Reached only if Isolate.spawn itself throws (a process-level failure to
-      // create the worker). Not inducible under `flutter test` with a valid
-      // top-level entry, so this guard can't be exercised by the unit suite.
+      // Reached when the spawner itself throws (e.g., a process-level failure
+      // to create the worker isolate). Exercised in tests via the [spawn] seam.
       _error = '$e';
       notifyListeners();
-      // coverage:ignore-end
     }
   }
 
