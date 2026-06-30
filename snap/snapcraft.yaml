@@ -1,6 +1,12 @@
 name: stunda
 base: core22
 version: '2.0.0'
+title: Stunda
+license: GPL-3.0-or-later
+contact: kodsama@protonmail.com
+issues: https://github.com/kodsama/Stunda/issues
+source-code: https://github.com/kodsama/Stunda
+website: https://github.com/kodsama/Stunda
 summary: Tag photos with GPS coordinates from GPX or Google location history
 description: |
   Stunda writes GPS EXIF coordinates into your photos by matching their

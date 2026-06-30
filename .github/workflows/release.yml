@@ -431,6 +431,12 @@ jobs:
           name: linux-bundle
           path: build/linux/x64/release/bundle
 
+      # GitHub artifacts don't preserve the executable bit, so the unpacked
+      # binary is rw-r--r-- and snapcraft refuses to pack a non-executable
+      # command ("should be world-readable and executable"). Restore +x.
+      - name: Restore executable bit on the app binary
+        run: chmod +x build/linux/x64/release/bundle/stunda
+
       - name: Build snap
         id: snapcraft
         uses: snapcore/action-build@v1
@@ -466,6 +472,11 @@ jobs:
         with:
           name: linux-bundle
           path: app/build/linux/x64/release/bundle
+
+      # Artifacts drop the executable bit; without it the packaged app can't
+      # launch. Restore +x before flatpak-builder copies the bundle in.
+      - name: Restore executable bit on the app binary
+        run: chmod +x app/build/linux/x64/release/bundle/stunda
 
       - name: Build flatpak bundle
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
