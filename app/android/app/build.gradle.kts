@@ -52,5 +52,5 @@ dependencies {
     // ONNX Runtime native library (libonnxruntime.so per ABI), loaded by the
     // engine via dart:ffi DynamicLibrary.open("libonnxruntime.so") for the
     // people/animal detector and the Smart duplicate-metric embedder.
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.26.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
 }
