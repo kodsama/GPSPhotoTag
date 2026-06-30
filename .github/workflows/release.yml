@@ -73,8 +73,8 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          cp app/build/app/outputs/flutter-apk/*.apk dist/ || true
-          cp app/build/app/outputs/bundle/release/*.aab dist/ || true
+          cp app/build/app/outputs/flutter-apk/app-release.apk dist/
+          cp app/build/app/outputs/bundle/release/app-release.aab dist/
 
       - uses: actions/upload-artifact@v4
         with:
