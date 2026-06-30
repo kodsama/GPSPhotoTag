@@ -46,19 +46,27 @@ Future<ServerSocket> serveTcp(
     onLog?.call('client connected: ${client.remoteAddress.address}');
     const splitter = LineSplitter();
     var buffer = '';
+    // Serialise async processing: chain each complete line onto tail so that
+    // responses are written in arrival order even when processLine awaits.
+    var tail = Future<void>.value();
     utf8.decoder
         .bind(client)
         .listen(
-          (chunk) async {
+          (chunk) {
+            // Buffer management is synchronous — no await here — so the shared
+            // buffer is never mutated concurrently.
             buffer += chunk;
-            // Process every complete line; keep the trailing partial in the buffer.
             final parts = buffer.split('\n');
             buffer = parts.removeLast();
             for (final raw in parts) {
               for (final line in splitter.convert(raw)) {
                 if (line.trim().isEmpty) continue;
-                final response = await processLine(server, line);
-                if (response != null) client.writeln(jsonEncode(response));
+                // Capture line in a local so the closure is safe across iterations.
+                final captured = line;
+                tail = tail.then((_) async {
+                  final response = await processLine(server, captured);
+                  if (response != null) client.writeln(jsonEncode(response));
+                });
               }
             }
           },

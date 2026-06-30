@@ -259,5 +259,98 @@ void main() {
       expect(logs.any((l) => l.contains('listening')), isTrue);
       expect(logs.any((l) => l.contains('client connected')), isTrue);
     });
+
+    // C-02: concurrent-chunk race — the first tool deliberately delays so a
+    // second chunk arriving while the first await is suspended can corrupt the
+    // shared buffer and/or reorder responses.  The fix (future-chain tail)
+    // ensures both lines parse correctly and responses arrive in request-id order.
+    test(
+      'C-02: pipelined requests arriving as rapid chunks respond in order',
+      () async {
+        // Build a server with one slow tool (id=1) and one instant tool (id=2).
+        final slowDone = Completer<void>();
+        final slowTool = McpTool(
+          name: 'slow',
+          description: 'deliberate delay',
+          inputSchema: {
+            'type': 'object',
+            'properties': <String, Object?>{},
+          },
+          run: (_) async {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            return {'ok': true, 'tool': 'slow'};
+          },
+        );
+        final fastTool = McpTool(
+          name: 'fast',
+          description: 'instant',
+          inputSchema: {
+            'type': 'object',
+            'properties': <String, Object?>{},
+          },
+          run: (_) async => {'ok': true, 'tool': 'fast'},
+        );
+        final server = McpServer(
+          tools: [slowTool, fastTool],
+        );
+
+        final s = await serveTcp(server, port: 0);
+        addTearDown(() => s.close());
+
+        final socket = await Socket.connect('127.0.0.1', s.port);
+        addTearDown(() => socket.destroy());
+
+        final responses = <Map<String, Object?>>[];
+        final gotTwo = Completer<void>();
+        utf8.decoder.bind(socket).transform(const LineSplitter()).listen((line) {
+          if (line.trim().isEmpty) return;
+          responses.add(jsonDecode(line) as Map<String, Object?>);
+          if (responses.length == 2 && !gotTwo.isCompleted) {
+            gotTwo.complete();
+          }
+        });
+
+        // Send both requests as TWO separate TCP chunks without awaiting between
+        // them — this is the pipelining scenario.  The slow tool's 100 ms delay
+        // means its async callback is suspended while the second chunk arrives.
+        final req1 = jsonEncode({
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'tools/call',
+          'params': {'name': 'slow', 'arguments': <String, Object?>{}},
+        });
+        final req2 = jsonEncode({
+          'jsonrpc': '2.0',
+          'id': 2,
+          'method': 'tools/call',
+          'params': {'name': 'fast', 'arguments': <String, Object?>{}},
+        });
+        socket.writeln(req1); // chunk 1 — starts a slow await
+        await socket.flush();
+        // Yield to the event loop so the server starts processing req1 and
+        // suspends at its Future.delayed before req2 arrives.
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        socket.writeln(req2); // chunk 2 — races with the first in buggy code
+        await socket.flush();
+
+        await gotTwo.future.timeout(const Duration(seconds: 5));
+        slowDone.complete();
+
+        // Both requests must have been parsed correctly (not corrupted).
+        expect(responses, hasLength(2));
+        final ids = responses.map((r) => r['id']).toList();
+        // Responses MUST arrive in request order (id=1 first, then id=2).
+        expect(ids[0], 1, reason: 'slow tool response must come first');
+        expect(ids[1], 2, reason: 'fast tool response must come second');
+
+        final r1 = (responses[0]['result'] as Map<String, Object?>);
+        final sc1 = r1['structuredContent'] as Map<String, Object?>;
+        expect(sc1['tool'], 'slow');
+
+        final r2 = (responses[1]['result'] as Map<String, Object?>);
+        final sc2 = r2['structuredContent'] as Map<String, Object?>;
+        expect(sc2['tool'], 'fast');
+      },
+    );
   });
 }
