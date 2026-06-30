@@ -19,7 +19,7 @@ coverage.xml
 venv/
 env/
 
-# AI assistant / coding-agent artifacts (never commit these)
+# Local tooling artifacts
 .zed/
 .mcp.json
 

@@ -135,7 +135,8 @@ Two ways to drive it as an LLM:
 - **MCP server** — a standard Model Context Protocol server (JSON-RPC 2.0) with
   tools `tag_photos`, `render_heatmap`, `prune_raw`, `fix_dates`,
   `check_toolkit`, `get_capabilities`. Runs over **stdio** (build
-  `packages/mcp/bin/stunda_mcp.dart`), **and** the desktop app keeps an **always-on TCP** endpoint at
+  `packages/mcp/bin/stunda_mcp.dart`), **and** the desktop app keeps an
+  **always-on TCP** endpoint at
   `127.0.0.1:8787` whenever it's open.
 - **CLI JSON contract** — `--json` emits one JSON event per line; `schema`
   describes every command, option, event, and exit code.

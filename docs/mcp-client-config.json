@@ -1,5 +1,5 @@
 {
-  "_comment": "Drop this into your MCP client config (the client's config file). Build the binary first: dart compile exe packages/mcp/bin/stunda_mcp.dart -o stunda_mcp, then point 'command' at it.",
+  "_comment": "Drop this into your MCP client's config. Build the binary first: dart compile exe packages/mcp/bin/stunda_mcp.dart -o stunda_mcp, then point 'command' at it.",
   "mcpServers": {
     "stunda": {
       "command": "/absolute/path/to/stunda_mcp"
