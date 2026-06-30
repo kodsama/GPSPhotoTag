@@ -116,24 +116,39 @@ class OrtSession {
       );
       final env = envPP.value;
 
-      final optsPP = arena<Pointer<Void>>();
-      api.check(api.createSessionOptions(optsPP));
-      final opts = optsPP.value;
-      api.setIntraOpNumThreads(opts, 1);
-      api.setSessionGraphOptimizationLevel(opts, _ortEnableAll);
-      api.setSessionExecutionMode(opts, 0);
+      // All work after env creation is wrapped in try/finally so the env (and
+      // any session/opts allocated below) is released if a later native call
+      // throws. Without this the env handle leaks on partial-open failures.
+      Pointer<Void>? session;
+      Pointer<Void>? opts;
+      try {
+        final optsPP = arena<Pointer<Void>>();
+        api.check(api.createSessionOptions(optsPP));
+        opts = optsPP.value;
+        api.setIntraOpNumThreads(opts, 1);
+        api.setSessionGraphOptimizationLevel(opts, _ortEnableAll);
+        api.setSessionExecutionMode(opts, 0);
 
-      final sessPP = arena<Pointer<Void>>();
-      api.check(api.createSession(env, _cstr(modelPath, arena), opts, sessPP));
-      final session = sessPP.value;
-      api.releaseSessionOptions(opts);
+        final sessPP = arena<Pointer<Void>>();
+        api.check(
+          api.createSession(env, _cstr(modelPath, arena), opts, sessPP),
+        );
+        session = sessPP.value;
+        api.releaseSessionOptions(opts);
+        opts = null; // released
 
-      final allocPP = arena<Pointer<Void>>();
-      api.check(api.getAllocatorWithDefaultOptions(allocPP));
-      final alloc = allocPP.value;
-      final inputName = api.inputName(session, alloc, arena);
+        final allocPP = arena<Pointer<Void>>();
+        api.check(api.getAllocatorWithDefaultOptions(allocPP));
+        final alloc = allocPP.value;
+        final inputName = api.inputName(session, alloc, arena);
 
-      return OrtSession._(api, env, session, inputName);
+        return OrtSession._(api, env, session, inputName);
+      } catch (_) {
+        if (opts != null) api.releaseSessionOptions(opts);
+        if (session != null) api.releaseSession(session);
+        api.releaseEnv(env);
+        rethrow;
+      }
     });
   }
 
@@ -170,57 +185,65 @@ class OrtSession {
       );
       final inputVal = inputValPP.value;
 
-      final outCountP = arena<Size>();
-      _api.check(_api.sessionGetOutputCount(_session, outCountP));
-      final outCount = outCountP.value;
-      final outNames = <String>[
-        for (var i = 0; i < outCount; i++)
-          _api.outputName(_session, i, _allocator(arena), arena),
-      ];
+      // Wrap post-allocation native work in try/finally so inputVal, memInfo,
+      // and any output values are released even when _api.run or readFloats
+      // throws. Without this they leak on every failing inference call.
+      final outValsArr = arena<Pointer<Void>>(0); // overwritten below
+      int outCount = 0;
+      try {
+        final outCountP = arena<Size>();
+        _api.check(_api.sessionGetOutputCount(_session, outCountP));
+        outCount = outCountP.value;
+        final outNames = <String>[
+          for (var i = 0; i < outCount; i++)
+            _api.outputName(_session, i, _allocator(arena), arena),
+        ];
 
-      final inNamesArr = arena<Pointer<Utf8>>(1);
-      inNamesArr[0] = _cstr(_inputName, arena);
-      final inValsArr = arena<Pointer<Void>>(1);
-      inValsArr[0] = inputVal;
-      final outNamesArr = arena<Pointer<Utf8>>(outCount);
-      for (var i = 0; i < outCount; i++) {
-        outNamesArr[i] = _cstr(outNames[i], arena);
+        final inNamesArr = arena<Pointer<Utf8>>(1);
+        inNamesArr[0] = _cstr(_inputName, arena);
+        final inValsArr = arena<Pointer<Void>>(1);
+        inValsArr[0] = inputVal;
+        final outNamesArr = arena<Pointer<Utf8>>(outCount);
+        for (var i = 0; i < outCount; i++) {
+          outNamesArr[i] = _cstr(outNames[i], arena);
+        }
+        final outVals = arena<Pointer<Void>>(outCount);
+        for (var i = 0; i < outCount; i++) {
+          outVals[i] = nullptr;
+        }
+
+        _api.check(
+          _api.run(
+            _session,
+            nullptr,
+            inNamesArr,
+            inValsArr,
+            1,
+            outNamesArr,
+            outCount,
+            outVals,
+          ),
+        );
+
+        final byName = <String, List<double>>{};
+        for (var i = 0; i < outCount; i++) {
+          byName[outNames[i]] = _api.readFloats(outVals[i], arena);
+          _api.releaseValue(outVals[i]);
+        }
+
+        final scores = byName['detection_scores'] ?? const <double>[];
+        final classes = byName['detection_classes'] ?? const <double>[];
+        final numList = byName['num_detections'] ?? const <double>[];
+        final num = numList.isEmpty ? scores.length : numList.first.round();
+        return OrtDetectionOutputs(
+          scores: scores,
+          classes: classes,
+          numDetections: num,
+        );
+      } finally {
+        _api.releaseValue(inputVal);
+        _api.releaseMemoryInfo(memInfo);
       }
-      final outValsArr = arena<Pointer<Void>>(outCount);
-      for (var i = 0; i < outCount; i++) {
-        outValsArr[i] = nullptr;
-      }
-
-      _api.check(
-        _api.run(
-          _session,
-          nullptr,
-          inNamesArr,
-          inValsArr,
-          1,
-          outNamesArr,
-          outCount,
-          outValsArr,
-        ),
-      );
-
-      final byName = <String, List<double>>{};
-      for (var i = 0; i < outCount; i++) {
-        byName[outNames[i]] = _api.readFloats(outValsArr[i], arena);
-        _api.releaseValue(outValsArr[i]);
-      }
-      _api.releaseValue(inputVal);
-      _api.releaseMemoryInfo(memInfo);
-
-      final scores = byName['detection_scores'] ?? const <double>[];
-      final classes = byName['detection_classes'] ?? const <double>[];
-      final numList = byName['num_detections'] ?? const <double>[];
-      final num = numList.isEmpty ? scores.length : numList.first.round();
-      return OrtDetectionOutputs(
-        scores: scores,
-        classes: classes,
-        numDetections: num,
-      );
     });
   }
 
@@ -259,47 +282,53 @@ class OrtSession {
       );
       final inputVal = inputValPP.value;
 
-      final outCountP = arena<Size>();
-      _api.check(_api.sessionGetOutputCount(_session, outCountP));
-      final outCount = outCountP.value;
-      final outNames = <String>[
-        for (var i = 0; i < outCount; i++)
-          _api.outputName(_session, i, _allocator(arena), arena),
-      ];
+      // Wrap post-allocation native work in try/finally so inputVal, memInfo,
+      // and any output values are released even when _api.run or readFloats
+      // throws. Without this they leak on every failing embedding call.
+      try {
+        final outCountP = arena<Size>();
+        _api.check(_api.sessionGetOutputCount(_session, outCountP));
+        final outCount = outCountP.value;
+        final outNames = <String>[
+          for (var i = 0; i < outCount; i++)
+            _api.outputName(_session, i, _allocator(arena), arena),
+        ];
 
-      final inNamesArr = arena<Pointer<Utf8>>(1);
-      inNamesArr[0] = _cstr(_inputName, arena);
-      final inValsArr = arena<Pointer<Void>>(1);
-      inValsArr[0] = inputVal;
-      final outNamesArr = arena<Pointer<Utf8>>(outCount);
-      for (var i = 0; i < outCount; i++) {
-        outNamesArr[i] = _cstr(outNames[i], arena);
-      }
-      final outValsArr = arena<Pointer<Void>>(outCount);
-      for (var i = 0; i < outCount; i++) {
-        outValsArr[i] = nullptr;
-      }
+        final inNamesArr = arena<Pointer<Utf8>>(1);
+        inNamesArr[0] = _cstr(_inputName, arena);
+        final inValsArr = arena<Pointer<Void>>(1);
+        inValsArr[0] = inputVal;
+        final outNamesArr = arena<Pointer<Utf8>>(outCount);
+        for (var i = 0; i < outCount; i++) {
+          outNamesArr[i] = _cstr(outNames[i], arena);
+        }
+        final outVals = arena<Pointer<Void>>(outCount);
+        for (var i = 0; i < outCount; i++) {
+          outVals[i] = nullptr;
+        }
 
-      _api.check(
-        _api.run(
-          _session,
-          nullptr,
-          inNamesArr,
-          inValsArr,
-          1,
-          outNamesArr,
-          outCount,
-          outValsArr,
-        ),
-      );
+        _api.check(
+          _api.run(
+            _session,
+            nullptr,
+            inNamesArr,
+            inValsArr,
+            1,
+            outNamesArr,
+            outCount,
+            outVals,
+          ),
+        );
 
-      final result = _api.readFloats(outValsArr[0], arena);
-      for (var i = 0; i < outCount; i++) {
-        _api.releaseValue(outValsArr[i]);
+        final result = _api.readFloats(outVals[0], arena);
+        for (var i = 0; i < outCount; i++) {
+          _api.releaseValue(outVals[i]);
+        }
+        return result;
+      } finally {
+        _api.releaseValue(inputVal);
+        _api.releaseMemoryInfo(memInfo);
       }
-      _api.releaseValue(inputVal);
-      _api.releaseMemoryInfo(memInfo);
-      return result;
     });
   }
 
