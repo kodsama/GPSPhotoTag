@@ -82,5 +82,4 @@ class PngExifBackend implements ExifBackend {
     exif.write(out);
     image.addTextData({_kExifTextKey: base64.encode(out.getBytes())});
   }
-
 }

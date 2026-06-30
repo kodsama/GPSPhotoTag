@@ -102,7 +102,9 @@ void main() {
         expect(c.screen, AppScreen.scanning);
 
         // Deliver a progress event to prove the subscription is live.
-        scanCtrl.add(const ScanProgressEvent(ScanProgress(files: 1, photos: 1)));
+        scanCtrl.add(
+          const ScanProgressEvent(ScanProgress(files: 1, photos: 1)),
+        );
         await Future<void>.value();
 
         // Abandon the in-flight scan — changeLibrary() must cancel _scanSub.

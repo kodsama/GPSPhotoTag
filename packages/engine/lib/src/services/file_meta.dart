@@ -178,5 +178,3 @@ List<TimedPoint> _parseFor(String path, String content) {
   if (lower.endsWith('.kml')) return parseGoogleKml(content);
   return parseGoogleAuto(content);
 }
-
-

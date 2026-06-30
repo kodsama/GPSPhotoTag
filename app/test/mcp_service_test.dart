@@ -114,24 +114,34 @@ void main() {
   // Exercising this required the IsolateSpawner seam; before the seam existed,
   // the catch block was guarded by coverage:ignore-start and had no test because
   // Isolate.spawn cannot be made to throw under `flutter test` without injection.
-  test('T-02_happy: spawner throws → error set, listener notified, not running',
-      () async {
-    var notified = false;
-    final service = McpService(
-      spawn: (_, _, {debugName}) => throw StateError('boom'),
-    );
-    addTearDown(service.dispose);
+  test(
+    'T-02_happy: spawner throws → error set, listener notified, not running',
+    () async {
+      var notified = false;
+      final service = McpService(
+        spawn: (_, _, {debugName}) => throw StateError('boom'),
+      );
+      addTearDown(service.dispose);
 
-    service.addListener(() => notified = true);
+      service.addListener(() => notified = true);
 
-    await service.start(base: 18900);
+      await service.start(base: 18900);
 
-    expect(
-      service.error,
-      contains('boom'),
-      reason: 'error field must capture the thrown StateError',
-    );
-    expect(notified, isTrue, reason: 'ChangeNotifier must fire when spawn fails');
-    expect(service.running, isFalse, reason: 'service must not be running after spawn failure');
-  });
+      expect(
+        service.error,
+        contains('boom'),
+        reason: 'error field must capture the thrown StateError',
+      );
+      expect(
+        notified,
+        isTrue,
+        reason: 'ChangeNotifier must fire when spawn fails',
+      );
+      expect(
+        service.running,
+        isFalse,
+        reason: 'service must not be running after spawn failure',
+      );
+    },
+  );
 }

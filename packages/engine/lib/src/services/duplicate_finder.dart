@@ -862,4 +862,3 @@ Future<HashedFile> _withEmbedding(
   if (vector == null || vector.isEmpty) return file;
   return file.withEmbedding(vector);
 }
-

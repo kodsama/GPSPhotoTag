@@ -7,11 +7,12 @@ import 'package:stunda_mcp/stunda_mcp.dart';
 
 /// Signature matching [Isolate.spawn] for the worker that runs the MCP server.
 /// Injected in tests to induce the spawn-failure error path.
-typedef _IsolateSpawner = Future<Isolate> Function(
-  void Function(_Config) entry,
-  _Config message, {
-  String? debugName,
-});
+typedef _IsolateSpawner =
+    Future<Isolate> Function(
+      void Function(_Config) entry,
+      _Config message, {
+      String? debugName,
+    });
 
 /// Runs the MCP server on a localhost TCP socket in a dedicated worker isolate,
 /// started automatically when the app launches — so an LLM always has a live

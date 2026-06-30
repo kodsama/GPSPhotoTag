@@ -272,10 +272,7 @@ void main() {
         final slowTool = McpTool(
           name: 'slow',
           description: 'deliberate delay',
-          inputSchema: {
-            'type': 'object',
-            'properties': <String, Object?>{},
-          },
+          inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
           run: (_) async {
             await Future<void>.delayed(const Duration(milliseconds: 100));
             return {'ok': true, 'tool': 'slow'};
@@ -284,15 +281,10 @@ void main() {
         final fastTool = McpTool(
           name: 'fast',
           description: 'instant',
-          inputSchema: {
-            'type': 'object',
-            'properties': <String, Object?>{},
-          },
+          inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
           run: (_) async => {'ok': true, 'tool': 'fast'},
         );
-        final server = McpServer(
-          tools: [slowTool, fastTool],
-        );
+        final server = McpServer(tools: [slowTool, fastTool]);
 
         final s = await serveTcp(server, port: 0);
         addTearDown(() => s.close());
@@ -302,7 +294,9 @@ void main() {
 
         final responses = <Map<String, Object?>>[];
         final gotTwo = Completer<void>();
-        utf8.decoder.bind(socket).transform(const LineSplitter()).listen((line) {
+        utf8.decoder.bind(socket).transform(const LineSplitter()).listen((
+          line,
+        ) {
           if (line.trim().isEmpty) return;
           responses.add(jsonDecode(line) as Map<String, Object?>);
           if (responses.length == 2 && !gotTwo.isCompleted) {

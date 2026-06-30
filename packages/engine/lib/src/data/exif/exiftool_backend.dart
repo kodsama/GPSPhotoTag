@@ -16,8 +16,7 @@ class ExiftoolBackend implements ExifBackend {
   /// [extensions] overrides the default supported set (RAW + HEIC/HEIF +
   /// WebP); pass it lower-cased and without leading dots.
   ExiftoolBackend(this._runner, {Set<String>? extensions})
-    : _extensions =
-          extensions ?? {...PhotoFormats.raw, 'heic', 'heif', 'webp'};
+    : _extensions = extensions ?? {...PhotoFormats.raw, 'heic', 'heif', 'webp'};
 
   final ProcessRunner _runner;
   final Set<String> _extensions;
@@ -99,5 +98,4 @@ class ExiftoolBackend implements ExifBackend {
     final minutes = int.parse(match.group(3)!);
     return Duration(hours: sign * hours, minutes: sign * minutes);
   }
-
 }
