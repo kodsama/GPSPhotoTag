@@ -264,30 +264,6 @@ class MobilePairing {
   ];
 }
 
-/// Resolves each [photo]'s coordinates from a [SourcePool] using the pure
-/// [Locator] (the same resolution the engine's TagService uses), returning the
-/// located fixes ready to write back via [PhotoLibrary.writeGps].
-///
-/// Photos with no usable capture date, or with no source coordinate within
-/// [maxTimeDiff], are skipped — exactly the engine's `no_timestamp` / `no_gps`
-/// outcomes. Pure: no I/O, no plugin, so the resolution is unit-testable.
-List<LocatedAsset> resolveAssetLocations(
-  Iterable<MobileTagPhoto> photos,
-  SourcePool pool, {
-  required Duration maxTimeDiff,
-}) {
-  final locator = Locator(gpx: pool.track, google: pool.google);
-  final out = <LocatedAsset>[];
-  for (final photo in photos) {
-    final date = photo.date;
-    if (date == null) continue;
-    final fix = locator.locate(date, maxTimeDiff);
-    if (fix == null) continue;
-    out.add(LocatedAsset(assetId: photo.assetId, location: fix));
-  }
-  return out;
-}
-
 /// Classifies the tag outcome for EVERY [photo], mirroring the desktop
 /// `TagService` per-photo decision exactly so the mobile summary tallies the
 /// same status vocabulary (noTimestamp / alreadyTagged / noGps / tagged /
@@ -387,18 +363,6 @@ class MobileTagPhoto {
 
   /// Whether the asset already has coordinates.
   final bool hasGps;
-}
-
-/// A resolved coordinate for one asset, ready for [PhotoLibrary.writeGps].
-class LocatedAsset {
-  /// Creates a located result.
-  const LocatedAsset({required this.assetId, required this.location});
-
-  /// The platform asset id.
-  final String assetId;
-
-  /// The resolved coordinate (lat/lng + provenance).
-  final LocationResult location;
 }
 
 /// Lower-cased basename without its extension — the RAW-companion match key,

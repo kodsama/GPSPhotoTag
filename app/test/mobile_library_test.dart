@@ -172,29 +172,4 @@ void main() {
       expect(mp.idsFor(['unknown.dng']), isEmpty);
     });
   });
-
-  group('resolveAssetLocations', () {
-    test('resolves from the pool by capture time, skipping null dates', () {
-      final t = DateTime.utc(2021, 6, 1, 12);
-      final pool = SourcePool(
-        track: [TimedPoint(time: t, latitude: 50, longitude: 8)],
-        google: const [],
-      );
-      final photos = [
-        MobileTagPhoto(assetId: 'a', date: t),
-        const MobileTagPhoto(assetId: 'b', date: null),
-        MobileTagPhoto(
-          assetId: 'c',
-          date: DateTime.utc(2000), // far from any point → no fix
-        ),
-      ];
-      final located = resolveAssetLocations(
-        photos,
-        pool,
-        maxTimeDiff: const Duration(seconds: 60),
-      );
-      expect(located.map((l) => l.assetId), ['a']);
-      expect(located.single.location.latitude, 50);
-    });
-  });
 }

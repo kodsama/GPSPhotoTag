@@ -1362,7 +1362,7 @@ class AppController extends ChangeNotifier {
   /// The engine's exiftool writer is absent on mobile, so the resolution runs
   /// app-side: it pools the picked track files into a [SourcePool], resolves
   /// each asset's coordinates from its capture date via the pure [Locator]
-  /// ([resolveAssetLocations]), then writes each fix back through the photo
+  /// ([classifyTagOutcomes]), then writes each fix back through the photo
   /// library's native GPS write. Assets that already carry GPS are skipped
   /// unless [replace] is on. Streams synthesized events so the existing run-
   /// state UI works. A no-op on desktop or with no tracks picked.
