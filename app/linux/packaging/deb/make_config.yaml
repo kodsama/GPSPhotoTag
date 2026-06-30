@@ -4,7 +4,12 @@ package_name: stunda
 maintainer:
   name: Kodsama
   email: support@kodsama.ai
-dependencies: []
+# Flutter Linux links against system GTK3 at runtime. A real value is also
+# required: an empty list renders a valueless "Depends:" line that dpkg-deb
+# rejects ("end of file before value of field 'Depends'") — the maker only
+# omits the field when it is null, not when it is empty.
+dependencies:
+  - libgtk-3-0
 # Advisory disk-usage metadata (KiB). Required as a non-null int by
 # flutter_app_packager's MakeDebConfig.fromJson — omitting it crashes the deb
 # target with "type 'Null' is not a subtype of type 'int'". ~256 MB covers the
