@@ -188,12 +188,10 @@ class OrtSession {
       // Wrap post-allocation native work in try/finally so inputVal, memInfo,
       // and any output values are released even when _api.run or readFloats
       // throws. Without this they leak on every failing inference call.
-      final outValsArr = arena<Pointer<Void>>(0); // overwritten below
-      int outCount = 0;
       try {
         final outCountP = arena<Size>();
         _api.check(_api.sessionGetOutputCount(_session, outCountP));
-        outCount = outCountP.value;
+        final outCount = outCountP.value;
         final outNames = <String>[
           for (var i = 0; i < outCount; i++)
             _api.outputName(_session, i, _allocator(arena), arena),
