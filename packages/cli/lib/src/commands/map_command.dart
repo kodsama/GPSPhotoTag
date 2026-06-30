@@ -27,7 +27,7 @@ class MapCommand extends Command<int> {
       ..addOption(
         'dpi',
         defaultsTo: '200',
-        help: 'Output resolution (clamped 30..1200).',
+        help: 'Output resolution in DPI (must be > 0; canvas and marker size are bounded internally).',
       )
       ..addFlag(
         'names',
