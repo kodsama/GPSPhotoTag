@@ -8,10 +8,11 @@
   product.wixobj to emit Stunda-windows-x64.msi. The exact command is in
   docs/RELEASE.md and the release.yml "Build .msi (WiX v3)" step.
 
-  IMPORTANT: replace the UpgradeCode GUID below with a stable, project-owned
-  GUID before the first real release, and KEEP IT CONSTANT across versions so
-  upgrades work. The Product Id="*" auto-generates per build (correct for
-  versioned releases). These GUIDs are placeholders.
+  The UpgradeCode and MainExecutable Guid below are PERMANENT project-owned
+  GUIDs. They must NEVER be changed — Windows Installer uses UpgradeCode to
+  identify the product across versions (in-place upgrades via MajorUpgrade),
+  and a different GUID would create a second Add/Remove Programs entry.
+  The Product Id="*" auto-generates per build (correct for versioned releases).
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
@@ -19,7 +20,7 @@
            Language="1033"
            Version="2.0.0.0"
            Manufacturer="Kodsama"
-           UpgradeCode="A1B2C3D4-E5F6-47A8-9B0C-1D2E3F405162">
+           UpgradeCode="8A12A9FB-2887-443B-98B6-E939A2A04673">
 
     <Package InstallerVersion="500"
              Compressed="yes"
@@ -40,7 +41,7 @@
     </Directory>
 
     <DirectoryRef Id="INSTALLFOLDER">
-      <Component Id="MainExecutable" Guid="B2C3D4E5-F6A7-48B9-AC0D-2E3F40516273">
+      <Component Id="MainExecutable" Guid="26829DD8-8888-4F20-84E4-4DEDE21CD08F">
         <File Id="StundaExe"
               Source="$(var.SourceDir)\stunda.exe"
               KeyPath="yes">

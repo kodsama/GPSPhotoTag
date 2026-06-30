@@ -87,11 +87,18 @@ Without signing:
 
 ### Manual setup notes / known nuances
 
-- **WiX `product.wxs`**: replace the placeholder `UpgradeCode` GUID with a
-  stable project-owned GUID before the first real release (keep it constant
-  across versions). For a *complete* install, harvest the rest of the Release
-  folder with `heat.exe` (see the comment in `product.wxs`); the bundled minimal
-  component yields a valid `.msi` on its own.
+- **WiX `product.wxs`**: the `UpgradeCode` and `MainExecutable` component GUID
+  are permanent and must **never change** — Windows Installer uses them to
+  identify Stunda across versions for in-place upgrades.
+
+  | GUID | Value | Must change? |
+  |------|-------|--------------|
+  | Windows MSI UpgradeCode | `8A12A9FB-2887-443B-98B6-E939A2A04673` | Never |
+  | MainExecutable Component | `26829DD8-8888-4F20-84E4-4DEDE21CD08F` | Never |
+
+  For a *complete* install, harvest the rest of the Release folder with
+  `heat.exe` (see the comment in `product.wxs`); the bundled minimal component
+  yields a valid `.msi` on its own.
 - **Flatpak**: the manifest packages the pre-built `flutter build linux` bundle
   (flatpak builds offline and cannot run the Flutter toolchain), so the Linux
   build must run before the flatpak step.
