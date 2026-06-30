@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:meta/meta.dart';
 
 import '../data/ports/process_runner.dart';
+import '../internal/json_utils.dart';
 
 /// A curated set of camera/exposure EXIF tags for the big-preview viewer.
 ///
@@ -125,7 +124,7 @@ Stream<CuratedExif> readCuratedExif(
     ]);
 
     final byPath = <String, Map<String, Object?>>{};
-    final decoded = _tryDecodeList(result.stdout);
+    final decoded = tryDecodeJsonList(result.stdout);
     for (final entry in decoded) {
       if (entry is! Map) continue;
       final source = entry['SourceFile'];
@@ -138,12 +137,3 @@ Stream<CuratedExif> readCuratedExif(
   }
 }
 
-List<dynamic> _tryDecodeList(String text) {
-  if (text.trim().isEmpty) return const [];
-  try {
-    final decoded = jsonDecode(text);
-    return decoded is List ? decoded : const [];
-  } on FormatException {
-    return const [];
-  }
-}

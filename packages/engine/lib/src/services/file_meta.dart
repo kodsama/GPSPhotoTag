@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:meta/meta.dart';
@@ -8,6 +7,7 @@ import '../data/ports/process_runner.dart';
 import '../data/sources/google_source.dart';
 import '../data/sources/gpx_source.dart';
 import '../domain/timed_point.dart';
+import '../internal/json_utils.dart';
 
 /// Per-file metadata shown in the drill-down dialog.
 ///
@@ -112,7 +112,7 @@ Stream<FileMeta> readImageMeta(
     ]);
 
     final byPath = <String, Map<String, Object?>>{};
-    final decoded = _tryDecodeList(result.stdout);
+    final decoded = tryDecodeJsonList(result.stdout);
     for (final entry in decoded) {
       if (entry is! Map) continue;
       final source = entry['SourceFile'];
@@ -127,16 +127,16 @@ Stream<FileMeta> readImageMeta(
 
 FileMeta _metaFrom(String path, Map<String, Object?>? fields) {
   if (fields == null) return FileMeta(path: path);
-  final lat = _asDouble(fields['GPSLatitude']);
-  final lon = _asDouble(fields['GPSLongitude']);
+  final lat = exifAsDouble(fields['GPSLatitude']);
+  final lon = exifAsDouble(fields['GPSLongitude']);
   final hasGps = lat != null && lon != null;
   return FileMeta(
     path: path,
     hasGps: hasGps,
     latitude: hasGps ? lat : null,
     longitude: hasGps ? lon : null,
-    width: _asInt(fields['ImageWidth']),
-    height: _asInt(fields['ImageHeight']),
+    width: exifAsInt(fields['ImageWidth']),
+    height: exifAsInt(fields['ImageHeight']),
     date: parseExifDateTimeNaive(
       fields['DateTimeOriginal'] ?? fields['CreateDate'],
     ),
@@ -179,29 +179,4 @@ List<TimedPoint> _parseFor(String path, String content) {
   return parseGoogleAuto(content);
 }
 
-List<dynamic> _tryDecodeList(String text) {
-  if (text.trim().isEmpty) return const [];
-  try {
-    final decoded = jsonDecode(text);
-    return decoded is List ? decoded : const [];
-  } on FormatException {
-    return const [];
-  }
-}
-
-int? _asInt(Object? v) {
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  if (v is String) return int.tryParse(v);
-  return null;
-}
-
-double? _asDouble(Object? v) {
-  if (v is num) return v.toDouble();
-  if (v is String) {
-    final s = v.trim();
-    return s.isEmpty ? null : double.tryParse(s);
-  }
-  return null;
-}
 

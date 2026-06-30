@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import '../data/ports/process_runner.dart';
 import '../domain/engine_event.dart';
 import '../domain/options.dart';
+import '../internal/json_utils.dart';
 
 /// Side length in pixels of one CARTO `@2x` basemap tile.
 const int _tileSize = 512;
@@ -183,20 +184,13 @@ class MapService {
     final points = <GeoPoint>[];
     for (final entry in decoded) {
       final map = entry as Map<String, dynamic>;
-      final lat = _asDouble(map['GPSLatitude']);
-      final lon = _asDouble(map['GPSLongitude']);
+      final lat = exifAsDouble(map['GPSLatitude']);
+      final lon = exifAsDouble(map['GPSLongitude']);
       if (lat == null || lon == null) continue;
       final source = (map['SourceFile'] as String?) ?? '';
       points.add(GeoPoint(lat, lon, p.basenameWithoutExtension(source)));
     }
     return points;
-  }
-
-  /// Numeric coercion for exiftool `-n` values (already numbers, but lenient).
-  static double? _asDouble(Object? v) {
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v);
-    return null;
   }
 
   /// Builds the basemap image covering the canvas, fetching every needed tile.

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -8,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../data/photo_formats.dart';
 import '../data/ports/process_runner.dart';
+import '../internal/json_utils.dart';
 import 'embedding/embedding_math.dart';
 import 'embedding/image_embedder.dart';
 import 'image_quality.dart';
@@ -766,14 +766,14 @@ Future<Map<String, _Meta>> _readBatchMeta(
     return const {};
   }
   final meta = <String, _Meta>{};
-  final decoded = _tryDecodeJsonList(result.stdout);
+  final decoded = tryDecodeJsonList(result.stdout);
   for (final entry in decoded) {
     if (entry is! Map) continue;
     final source = entry['SourceFile'];
     if (source is! String) continue;
     meta[source] = (
-      width: _asInt(entry['ImageWidth']) ?? 0,
-      height: _asInt(entry['ImageHeight']) ?? 0,
+      width: exifAsInt(entry['ImageWidth']) ?? 0,
+      height: exifAsInt(entry['ImageHeight']) ?? 0,
       peopleScore: peopleScoreFromTags(entry),
     );
   }
@@ -863,19 +863,3 @@ Future<HashedFile> _withEmbedding(
   return file.withEmbedding(vector);
 }
 
-List<dynamic> _tryDecodeJsonList(String text) {
-  if (text.trim().isEmpty) return const [];
-  try {
-    final decoded = jsonDecode(text);
-    return decoded is List ? decoded : const [];
-  } on FormatException {
-    return const [];
-  }
-}
-
-int? _asInt(Object? v) {
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  if (v is String) return int.tryParse(v);
-  return null;
-}
