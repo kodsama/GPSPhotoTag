@@ -398,8 +398,9 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
                           : () => _fitToPoints(points),
                     ),
                     const SizedBox(width: 8),
-                    _SaveButton(onPressed: points.isEmpty ? null : _saveView),
-                    const SizedBox(width: 8),
+                    if (!isMobile)
+                      _SaveButton(onPressed: points.isEmpty ? null : _saveView),
+                    if (!isMobile) const SizedBox(width: 8),
                     _ModeButton(mode: _mode, onPressed: _cycleMode),
                   ],
                 ),

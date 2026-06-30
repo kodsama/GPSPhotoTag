@@ -80,6 +80,28 @@ Future<void> _pump(
 Uint8List _realPng() =>
     Uint8List.fromList(img.encodePng(img.Image(width: 2, height: 2)));
 
+Future<void> _pumpMobile(
+  WidgetTester tester,
+  AppController c, {
+  Future<String?> Function()? savePathPicker,
+  Future<Uint8List?> Function()? capturePng,
+}) async {
+  tester.view.physicalSize = const Size(390, 844); // iPhone-sized
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final screen = MaterialApp(
+    home: Scaffold(
+      body: ExploreMapScreen(
+        savePathPicker: savePathPicker,
+        capturePng: capturePng,
+      ),
+    ),
+  );
+  await tester.pumpWidget(ControllerScope(controller: c, child: screen));
+  await tester.pump();
+}
+
 MapPoint _mapPoint(double lat, double lon) => MapPoint(
   latitude: lat,
   longitude: lon,
@@ -689,4 +711,41 @@ void main() {
     expect(find.text('2020-01-01 00:00'), findsOneWidget);
     expect(find.text('2020-01-31 00:00'), findsOneWidget);
   });
+
+  // P-01: _SaveButton must be hidden on mobile (getSaveLocation throws
+  // UnimplementedError on Android/iOS) and shown on desktop.
+
+  testWidgets(
+    'P-01: _SaveButton is hidden on mobile (isMobile=true)',
+    (tester) async {
+      final c = AppController(
+        runner: FakeEngineRunner(),
+        photoLibrary: FakePhotoLibrary([]),
+        requestPhotoAccess: () async => true,
+      )
+        ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+        ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+      await _pumpMobile(tester, c);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // The save button must NOT appear on mobile.
+      expect(find.byIcon(Icons.save_alt), findsNothing);
+      expect(find.byTooltip('Save view as PNG'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'P-01: _SaveButton is shown on desktop (isMobile=false)',
+    (tester) async {
+      final c = AppController(runner: FakeEngineRunner())
+        ..debugSetScan(fakeScan(photos: const ['/library/a.heic']))
+        ..debugSetExplore([_gpsPhoto('/library/a.heic', 42.5, 18.1)]);
+      await _pump(tester, c);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // The save button must be present on desktop.
+      expect(find.byIcon(Icons.save_alt), findsOneWidget);
+      expect(find.byTooltip('Save view as PNG'), findsOneWidget);
+    },
+  );
 }
