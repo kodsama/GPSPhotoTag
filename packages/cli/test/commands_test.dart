@@ -530,4 +530,51 @@ void main() {
       }
     });
   });
+
+  group('usage errors in --json mode', () {
+    // runCli wraps the runner + UsageException handler so that when --json is
+    // present the error is emitted as a JSON event on stdout (buf), not as
+    // plain text on stderr.
+    Future<int> runCli(List<String> args) =>
+        runCliWithSink(args, sink: buf, errorSink: BufferSink());
+
+    test(
+      '--json with unknown command emits JSON error event on stdout (exit 3)',
+      () async {
+        final code = await runCli(['--json', 'no-such-command']);
+        expect(code, ExitCodes.badInput);
+        final decoded = jsonDecode(buf.text.trim()) as Map<String, Object?>;
+        expect(decoded['event'], 'error');
+        expect(decoded['code'], 'bad_input');
+        expect(decoded['message'], isA<String>());
+      },
+    );
+
+    test(
+      '--json with unknown flag emits JSON error event on stdout (exit 3)',
+      () async {
+        final code = await runCli(['--json', '--no-such-flag']);
+        expect(code, ExitCodes.badInput);
+        final decoded = jsonDecode(buf.text.trim()) as Map<String, Object?>;
+        expect(decoded['event'], 'error');
+        expect(decoded['code'], 'bad_input');
+      },
+    );
+
+    test(
+      'without --json, usage error still goes to errorSink as plain text',
+      () async {
+        final errBuf = BufferSink();
+        final code = await runCliWithSink(
+          ['no-such-command'],
+          sink: buf,
+          errorSink: errBuf,
+        );
+        expect(code, ExitCodes.badInput);
+        // stdout (buf) must be empty; error text goes to errBuf
+        expect(buf.text.trim(), isEmpty);
+        expect(errBuf.text, isNotEmpty);
+      },
+    );
+  });
 }
