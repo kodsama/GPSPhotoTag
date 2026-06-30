@@ -12,6 +12,7 @@ export 'src/data/collectors.dart';
 export 'src/data/exif/backend_registry.dart';
 export 'src/data/exif/dispatching_backend.dart';
 export 'src/data/exif/exif_backend.dart';
+export 'src/data/exif/exif_utils.dart';
 export 'src/data/exif/exiftool_backend.dart';
 export 'src/data/exif/jpeg_exif_backend.dart';
 export 'src/data/exif/png_exif_backend.dart';

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:image/image.dart' as img;
 
 import 'exif_backend.dart';
+import 'exif_utils.dart';
 
 /// tEXt keyword under which the serialized EXIF block is stored.
 ///
@@ -29,7 +30,7 @@ class PngExifBackend implements ExifBackend {
     if (image == null) return const PhotoMeta();
 
     final exif = _exifOf(image);
-    final capture = _parseCaptureNaive(
+    final capture = parseExifDateTimeNaive(
       exif.exifIfd['DateTimeOriginal']?.toString() ??
           exif.imageIfd['DateTimeOriginal']?.toString(),
     );
@@ -55,7 +56,7 @@ class PngExifBackend implements ExifBackend {
       ..gpsLatitudeRef = latitude < 0 ? 'S' : 'N'
       ..gpsLongitudeRef = longitude < 0 ? 'W' : 'E';
     if (dateTimeOriginal != null) {
-      final stamp = _formatExifDateTime(dateTimeOriginal);
+      final stamp = formatExifDateTime(dateTimeOriginal);
       exif.exifIfd['DateTimeOriginal'] = stamp;
       exif.imageIfd['DateTimeOriginal'] = stamp;
     }
@@ -82,31 +83,4 @@ class PngExifBackend implements ExifBackend {
     image.addTextData({_kExifTextKey: base64.encode(out.getBytes())});
   }
 
-  /// Parses an EXIF `"YYYY:MM:DD HH:MM:SS"` string as a naive [DateTime].
-  static DateTime? _parseCaptureNaive(String? raw) {
-    if (raw == null || raw.length < 19) return null;
-    final head = raw.substring(0, 19);
-    final year = int.tryParse(head.substring(0, 4));
-    final month = int.tryParse(head.substring(5, 7));
-    final day = int.tryParse(head.substring(8, 10));
-    final hour = int.tryParse(head.substring(11, 13));
-    final minute = int.tryParse(head.substring(14, 16));
-    final second = int.tryParse(head.substring(17, 19));
-    if (year == null ||
-        month == null ||
-        day == null ||
-        hour == null ||
-        minute == null ||
-        second == null) {
-      return null;
-    }
-    return DateTime(year, month, day, hour, minute, second);
-  }
-
-  /// Formats [dt] as the EXIF `"YYYY:MM:DD HH:MM:SS"` literal.
-  static String _formatExifDateTime(DateTime dt) {
-    String p2(int n) => n.toString().padLeft(2, '0');
-    return '${dt.year.toString().padLeft(4, '0')}:${p2(dt.month)}:'
-        '${p2(dt.day)} ${p2(dt.hour)}:${p2(dt.minute)}:${p2(dt.second)}';
-  }
 }

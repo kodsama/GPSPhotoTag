@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'exif_backend.dart';
+import 'exif_utils.dart';
 
 /// Pure-Dart, lossless JPEG EXIF GPS backend.
 ///
@@ -132,7 +133,7 @@ class JpegExifBackend implements ExifBackend {
       final exifIfd = _readIfd(bd, exifOffset, little);
       final dto = exifIfd[_tagDateTimeOriginal];
       if (dto != null) {
-        captureNaive = _parseExifDateTime(dto.readAscii(tiff, bd, little));
+        captureNaive = parseExifDateTimeNaive(dto.readAscii(tiff, bd, little));
       }
       final oto = exifIfd[_tagOffsetTimeOriginal];
       if (oto != null) {
@@ -191,23 +192,6 @@ class JpegExifBackend implements ExifBackend {
       p += 12;
     }
     return out;
-  }
-
-  /// Parses an EXIF `"YYYY:MM:DD HH:MM:SS"` string into a naive [DateTime].
-  static DateTime? _parseExifDateTime(String? s) {
-    if (s == null) return null;
-    final m = RegExp(
-      r'^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})',
-    ).firstMatch(s.trim());
-    if (m == null) return null;
-    return DateTime(
-      int.parse(m.group(1)!),
-      int.parse(m.group(2)!),
-      int.parse(m.group(3)!),
-      int.parse(m.group(4)!),
-      int.parse(m.group(5)!),
-      int.parse(m.group(6)!),
-    );
   }
 
   /// Parses an EXIF offset string like `"+02:00"` / `"-05:30"` to a [Duration].
@@ -269,7 +253,7 @@ class JpegExifBackend implements ExifBackend {
       exifFields.add(
         _Field.ascii(
           _tagDateTimeOriginal,
-          _formatExifDateTime(dateTimeOriginal),
+          formatExifDateTime(dateTimeOriginal),
         ),
       );
     }
@@ -312,12 +296,6 @@ class JpegExifBackend implements ExifBackend {
       _Rational(min, 1),
       _Rational((sec * 100).round(), 100),
     ];
-  }
-
-  static String _formatExifDateTime(DateTime dt) {
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${dt.year.toString().padLeft(4, '0')}:${two(dt.month)}:'
-        '${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
   }
 
   // ---------------------------------------------------------------------------

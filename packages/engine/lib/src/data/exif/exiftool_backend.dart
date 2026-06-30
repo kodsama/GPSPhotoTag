@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../ports/process_runner.dart';
 import 'exif_backend.dart';
+import 'exif_utils.dart';
 
 /// File extensions (without dot) for RAW formats handled by exiftool.
 const Set<String> kRawExtensions = {
@@ -70,8 +71,8 @@ class ExiftoolBackend implements ExifBackend {
     if (obj is! Map) return const PhotoMeta();
 
     final capture =
-        _parseCaptureNaive(obj['DateTimeOriginal']) ??
-        _parseCaptureNaive(obj['CreateDate']);
+        parseExifDateTimeNaive(obj['DateTimeOriginal']) ??
+        parseExifDateTimeNaive(obj['CreateDate']);
     final offset = _parseOffset(obj['OffsetTimeOriginal']);
     final lat = obj['GPSLatitude'];
     final hasGps = lat != null && lat.toString().isNotEmpty;
@@ -95,7 +96,7 @@ class ExiftoolBackend implements ExifBackend {
       '-GPSMapDatum=WGS-84',
     ];
     if (dateTimeOriginal != null) {
-      final stamp = _formatExifDateTime(dateTimeOriginal);
+      final stamp = formatExifDateTime(dateTimeOriginal);
       args
         ..add('-DateTimeOriginal=$stamp')
         ..add('-CreateDate=$stamp');
@@ -110,30 +111,6 @@ class ExiftoolBackend implements ExifBackend {
     }
   }
 
-  /// Parses an exiftool date string (`"YYYY:MM:DD HH:MM:SS"`, optionally with
-  /// sub-seconds or a trailing offset) as a naive [DateTime].
-  static DateTime? _parseCaptureNaive(Object? raw) {
-    if (raw == null) return null;
-    final text = raw.toString();
-    if (text.length < 19) return null;
-    final head = text.substring(0, 19);
-    final year = int.tryParse(head.substring(0, 4));
-    final month = int.tryParse(head.substring(5, 7));
-    final day = int.tryParse(head.substring(8, 10));
-    final hour = int.tryParse(head.substring(11, 13));
-    final minute = int.tryParse(head.substring(14, 16));
-    final second = int.tryParse(head.substring(17, 19));
-    if (year == null ||
-        month == null ||
-        day == null ||
-        hour == null ||
-        minute == null ||
-        second == null) {
-      return null;
-    }
-    return DateTime(year, month, day, hour, minute, second);
-  }
-
   /// Parses an EXIF offset string such as `"+02:00"` or `"-05:00"`.
   static Duration? _parseOffset(Object? raw) {
     if (raw == null) return null;
@@ -146,10 +123,4 @@ class ExiftoolBackend implements ExifBackend {
     return Duration(hours: sign * hours, minutes: sign * minutes);
   }
 
-  /// Formats [dt] as the EXIF `"YYYY:MM:DD HH:MM:SS"` literal.
-  static String _formatExifDateTime(DateTime dt) {
-    String p2(int n) => n.toString().padLeft(2, '0');
-    return '${dt.year.toString().padLeft(4, '0')}:${p2(dt.month)}:'
-        '${p2(dt.day)} ${p2(dt.hour)}:${p2(dt.minute)}:${p2(dt.second)}';
-  }
 }

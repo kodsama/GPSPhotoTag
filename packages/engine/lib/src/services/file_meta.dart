@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:meta/meta.dart';
 
+import '../data/exif/exif_utils.dart';
 import '../data/ports/process_runner.dart';
 import '../data/sources/google_source.dart';
 import '../data/sources/gpx_source.dart';
@@ -136,7 +137,9 @@ FileMeta _metaFrom(String path, Map<String, Object?>? fields) {
     longitude: hasGps ? lon : null,
     width: _asInt(fields['ImageWidth']),
     height: _asInt(fields['ImageHeight']),
-    date: _parseExifDate(fields['DateTimeOriginal'] ?? fields['CreateDate']),
+    date: parseExifDateTimeNaive(
+      fields['DateTimeOriginal'] ?? fields['CreateDate'],
+    ),
   );
 }
 
@@ -202,21 +205,3 @@ double? _asDouble(Object? v) {
   return null;
 }
 
-/// Parses an exiftool date string into a naive [DateTime].
-///
-/// exiftool emits `YYYY:MM:DD HH:MM:SS` (optionally with sub-seconds and a zone
-/// suffix); we normalise the date separators and strip any timezone so the
-/// result is the wall-clock capture time, matching the rest of the engine.
-DateTime? _parseExifDate(Object? value) {
-  if (value is! String) return null;
-  var text = value.trim();
-  if (text.isEmpty) return null;
-  // Convert leading "YYYY:MM:DD" to "YYYY-MM-DD" without touching the time.
-  final m = RegExp(r'^(\d{4}):(\d{2}):(\d{2})').firstMatch(text);
-  if (m != null) {
-    text = '${m[1]}-${m[2]}-${m[3]}${text.substring(m.end)}';
-  }
-  // Drop any trailing timezone designator so the time is read as naive.
-  text = text.replaceFirst(RegExp(r'(Z|[+-]\d{2}:?\d{2})$'), '').trim();
-  return DateTime.tryParse(text.replaceFirst(' ', 'T'));
-}
