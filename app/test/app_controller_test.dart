@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda_engine/stunda_engine.dart';
+import 'package:stunda/src/engine/engine_runner.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_prefs.dart';
 import 'package:stunda/src/state/app_screen.dart';
@@ -69,6 +71,53 @@ void main() {
       expect(c.screen, AppScreen.welcome);
       expect(c.scan, isNull);
     });
+
+    // C-01: changeLibrary while scan is in-flight must cancel _scanSub so the
+    // late ScanDoneEvent does NOT flip the screen back to workspace.
+    //
+    // The fake delivers progress-only events while keepOpen=true holds the
+    // stream open. changeLibrary() must cancel the subscription so that when
+    // we manually add a ScanDoneEvent the listener is gone and the screen
+    // stays on welcome.
+    test(
+      'C-01_happy: changeLibrary during in-flight scan keeps screen on welcome',
+      () async {
+        final scanCtrl = StreamController<ScanEvent>();
+        addTearDown(scanCtrl.close);
+
+        final runner = FakeEngineRunner(keepOpen: true);
+
+        // Override just the scan stream via a StreamController so we can
+        // deliver events at will. We wrap FakeEngineRunner in a minimal
+        // custom EngineRunner that delegates everything but scan.
+        final c = AppController(
+          runner: _ControllableScanRunner(runner, scanCtrl.stream),
+        );
+
+        // Start the scan without awaiting — sets screen to scanning.
+        // ignore: unawaited_futures
+        c.startScan('/library');
+        // Pump a microtask so startScan assigns _scanSub.
+        await Future<void>.value();
+        expect(c.screen, AppScreen.scanning);
+
+        // Deliver a progress event to prove the subscription is live.
+        scanCtrl.add(const ScanProgressEvent(ScanProgress(files: 1, photos: 1)));
+        await Future<void>.value();
+
+        // Abandon the in-flight scan — changeLibrary() must cancel _scanSub.
+        c.changeLibrary();
+        expect(c.screen, AppScreen.welcome);
+
+        // Now deliver ScanDoneEvent — with the fix, _scanSub is null so the
+        // event is discarded and the screen stays on welcome.
+        scanCtrl.add(ScanDoneEvent(fakeScan(photos: const ['/library/a.jpg'])));
+        await Future<void>.value();
+
+        // Screen must stay on welcome — stale ScanDoneEvent must not navigate.
+        expect(c.screen, AppScreen.welcome);
+      },
+    );
   });
 
   group('readiness', () {
@@ -1256,4 +1305,88 @@ void main() {
       expect(c.folder, dir.path);
     });
   });
+}
+
+/// An [EngineRunner] that overrides only the scan stream with a caller-supplied
+/// [Stream<ScanEvent>], delegating everything else to [_delegate]. Used by the
+/// C-01 in-flight scan test to deliver scan events at precise moments.
+class _ControllableScanRunner implements EngineRunner {
+  _ControllableScanRunner(this._delegate, this._scanStream);
+
+  final FakeEngineRunner _delegate;
+  final Stream<ScanEvent> _scanStream;
+
+  @override
+  Stream<ScanEvent> scan(List<String> roots) {
+    _delegate.calls.add('scan');
+    _delegate.lastScanRoots = roots;
+    return _scanStream;
+  }
+
+  @override
+  Stream<EngineEvent> tag({
+    required List<String> photos,
+    required List<String> gpxFiles,
+    required List<String> kmlFiles,
+    required List<String> googleFiles,
+    required TagOptions options,
+  }) => _delegate.tag(
+    photos: photos,
+    gpxFiles: gpxFiles,
+    kmlFiles: kmlFiles,
+    googleFiles: googleFiles,
+    options: options,
+  );
+
+  @override
+  Stream<EngineEvent> prune({
+    required List<String> roots,
+    required PruneOptions options,
+  }) => _delegate.prune(roots: roots, options: options);
+
+  @override
+  Stream<EngineEvent> trashPaths(List<String> paths, {bool delete = false}) =>
+      _delegate.trashPaths(paths, delete: delete);
+
+  @override
+  Stream<EngineEvent> fixDates({
+    required List<String> files,
+    required FixDatesMode mode,
+    bool dryRun = false,
+  }) => _delegate.fixDates(files: files, mode: mode, dryRun: dryRun);
+
+  @override
+  Stream<FileMeta> readImageMeta(List<String> paths) =>
+      _delegate.readImageMeta(paths);
+
+  @override
+  Stream<CuratedExif> readCuratedExif(List<String> paths) =>
+      _delegate.readCuratedExif(paths);
+
+  @override
+  Future<String?> extractPreview(String path, {bool full = false}) =>
+      _delegate.extractPreview(path, full: full);
+
+  @override
+  bool get smartAvailable => _delegate.smartAvailable;
+
+  @override
+  Future<List<DuplicateGroup>> findDuplicates(
+    List<String> paths, {
+    required double minSimilarity,
+    SimilarityMetric metric = SimilarityMetric.fast,
+    void Function(int done, int total)? onProgress,
+  }) => _delegate.findDuplicates(
+    paths,
+    minSimilarity: minSimilarity,
+    metric: metric,
+    onProgress: onProgress,
+  );
+
+  @override
+  Future<List<HashedFile>> hashFiles(
+    List<String> paths, {
+    bool embed = false,
+    void Function(int done, int total)? onProgress,
+  }) => _delegate.hashFiles(paths, embed: embed, onProgress: onProgress);
 }

@@ -381,6 +381,8 @@ class AppController extends ChangeNotifier {
 
   /// Drops the current library and returns to the welcome screen.
   void changeLibrary() {
+    _scanSub?.cancel();
+    _scanSub = null;
     _sub?.cancel();
     _metaSub?.cancel();
     _curatedSub?.cancel();
