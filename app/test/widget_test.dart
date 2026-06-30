@@ -255,7 +255,8 @@ void main() {
   });
 
   testWidgets(
-    'with no injected controller, StundaApp builds its own and starts services',
+    'with no injected controller, StundaApp builds its own controller and '
+    'tears down cleanly (controller == null initState/dispose branches)',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -263,26 +264,32 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.runAsync(() async {
-        // No `controller:` -> the State builds a real AppController, starts the
-        // MCP server isolate, and runs the environment probe (initState branch).
+        // No `controller:` argument — exercises the widget.controller == null
+        // branch in initState (builds its own AppController) and in dispose
+        // (calls _controller.dispose()). MCP lifecycle and env-probe behaviour
+        // are covered separately in mcp_service_test.dart.
         await tester.pumpWidget(const StundaApp(prefs: null));
         await tester.pump();
 
-        // The real app stands up on its welcome screen.
+        // The app reaches the WelcomeScreen, confirming the self-built
+        // controller initialised successfully.
         expect(find.byType(WelcomeScreen), findsOneWidget);
 
-        // Let the async environment probe (real exiftool) settle while the
-        // controller is still mounted, so its notifyListeners runs before
-        // dispose.
+        // Give any async init callbacks (notifyListeners, etc.) time to settle
+        // while the controller is still mounted, so they don't fire after
+        // dispose and cause a use-after-free in the widget tree.
         await Future<void>.delayed(const Duration(seconds: 2));
         await tester.pump();
 
-        // Tear the app down: dispose() (controller == null branch) stops the
-        // MCP isolate and frees the controller.
+        // Replace the tree — exercises the dispose() controller == null branch.
         await tester.pumpWidget(const SizedBox());
         await tester.pump();
-        // Let the spawned server isolate finish shutting down cleanly.
+        // Brief pause so any spawned resources finish releasing before the
+        // test runner moves on.
         await Future<void>.delayed(const Duration(milliseconds: 200));
+
+        // Confirm the widget is gone and dispose completed without throwing.
+        expect(find.byType(StundaApp), findsNothing);
       });
     },
   );
