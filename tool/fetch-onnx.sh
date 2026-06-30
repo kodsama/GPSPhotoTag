@@ -135,8 +135,8 @@ case "$(uname -s)" in
     fetch_ort "linux-x64" "linux-x64" "libonnxruntime.so.${ORT_VER}" "libonnxruntime.so"
     ;;
   # Windows CI runs this under Git Bash, where uname -s is MINGW*/MSYS*/CYGWIN*.
-  # The Windows ORT release zip lays the dll at runtime/onnxruntime.dll; `tar`
-  # on the runners handles .zip via libarchive (fetch_ort calls tar xzf).
+  # The Windows ORT release is a .zip; fetch_ort is called with ext='zip',
+  # which uses unzip (not tar) to extract the dll.
   MINGW*|MSYS*|CYGWIN*)
     fetch_ort "win-x64" "win-x64" "onnxruntime.dll" "onnxruntime.dll" "zip"
     ;;
