@@ -1,33 +1,9 @@
 import 'dart:convert';
 
+import '../photo_formats.dart';
 import '../ports/process_runner.dart';
 import 'exif_backend.dart';
 import 'exif_utils.dart';
-
-/// File extensions (without dot) for RAW formats handled by exiftool.
-const Set<String> kRawExtensions = {
-  'raf',
-  'nef',
-  'nrw',
-  'cr2',
-  'cr3',
-  'crw',
-  'arw',
-  'sr2',
-  'srf',
-  'dng',
-  'rw2',
-  'orf',
-  'pef',
-  'ptx',
-  'raw',
-  'rwl',
-  'srw',
-  'x3f',
-  'iiq',
-  '3fr',
-  'erf',
-};
 
 /// An [ExifBackend] that shells out to `exiftool` for RAW, HEIC/HEIF, and
 /// other formats that the in-process decoders cannot write.
@@ -40,7 +16,8 @@ class ExiftoolBackend implements ExifBackend {
   /// [extensions] overrides the default supported set (RAW + HEIC/HEIF +
   /// WebP); pass it lower-cased and without leading dots.
   ExiftoolBackend(this._runner, {Set<String>? extensions})
-    : _extensions = extensions ?? {...kRawExtensions, 'heic', 'heif', 'webp'};
+    : _extensions =
+          extensions ?? {...PhotoFormats.raw, 'heic', 'heif', 'webp'};
 
   final ProcessRunner _runner;
   final Set<String> _extensions;

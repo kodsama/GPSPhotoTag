@@ -73,4 +73,18 @@ abstract final class PhotoFormats {
   /// Whether [path] is a supported library input — a taggable photo or a
   /// GPS-source file. Used to classify individually added / dropped files.
   static bool isSupported(String path) => isPhoto(path) || isGpsSource(path);
+
+  /// Lower-cased basename without its extension, used to match RAW/companion
+  /// pairs across the file tree.
+  ///
+  /// Uses a manual last-separator + last-dot split (handling both `/` and `\`)
+  /// rather than `p.basenameWithoutExtension`, so it is correct on Windows when
+  /// paths use mixed separators.
+  static String baseKeyOf(String path) {
+    final slash = path.lastIndexOf(RegExp(r'[/\\]'));
+    final base = slash < 0 ? path : path.substring(slash + 1);
+    final dot = base.lastIndexOf('.');
+    final stem = dot <= 0 ? base : base.substring(0, dot);
+    return stem.toLowerCase();
+  }
 }

@@ -108,10 +108,7 @@ RawPairing classifyPairing(List<String> photoPaths) {
 }
 
 /// Lower-cased basename without its extension, used to match companions.
-String _baseKey(String path) {
-  final slash = path.lastIndexOf(RegExp(r'[/\\]'));
-  final base = slash < 0 ? path : path.substring(slash + 1);
-  final dot = base.lastIndexOf('.');
-  final stem = dot <= 0 ? base : base.substring(0, dot);
-  return stem.toLowerCase();
-}
+///
+/// Delegates to [PhotoFormats.baseKeyOf] so the separator-robust logic is
+/// shared with [Pruner].
+String _baseKey(String path) => PhotoFormats.baseKeyOf(path);

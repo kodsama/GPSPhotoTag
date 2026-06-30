@@ -2,20 +2,12 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../data/photo_formats.dart';
 import '../data/ports/trash.dart';
 import '../domain/engine_event.dart';
 import '../domain/options.dart';
 import '../domain/photo_row.dart';
 import '../domain/status.dart';
-
-/// RAW file extensions (lowercase, no dot) recognised as camera raw images.
-const Set<String> _rawExtensions = {
-  'raf', 'nef', 'nrw', 'cr2', 'cr3', 'crw', 'arw', 'sr2', 'srf', 'dng', //
-  'rw2', 'orf', 'pef', 'ptx', 'raw', 'rwl', 'srw', 'x3f', 'iiq', '3fr', 'erf',
-};
-
-/// Photo extensions (lowercase, no dot) that count as a RAW's companion.
-const Set<String> _companionExtensions = {'jpg', 'jpeg', 'heic', 'heif'};
 
 /// Finds and removes orphan RAW files — RAWs with no same-named JPG/HEIC
 /// companion anywhere in the scanned tree.
@@ -41,7 +33,7 @@ class Pruner {
     await _scan(roots, companions, raws);
 
     final orphans = raws
-        .where((f) => !companions.contains(_baseKey(f.path)))
+        .where((f) => !companions.contains(PhotoFormats.baseKeyOf(f.path)))
         .toList(growable: false);
 
     yield LogEvent('Found ${orphans.length} orphan RAW file(s).');
@@ -72,9 +64,9 @@ class Pruner {
       )) {
         if (entity is! File) continue;
         final ext = _ext(entity.path);
-        if (_companionExtensions.contains(ext)) {
-          companions.add(_baseKey(entity.path));
-        } else if (_rawExtensions.contains(ext)) {
+        if (PhotoFormats.companion.contains(ext)) {
+          companions.add(PhotoFormats.baseKeyOf(entity.path));
+        } else if (PhotoFormats.raw.contains(ext)) {
           raws.add(entity);
         }
       }
@@ -196,8 +188,4 @@ class Pruner {
     final ext = p.extension(path);
     return ext.isEmpty ? '' : ext.substring(1).toLowerCase();
   }
-
-  /// Lowercased basename without its extension, used to match companions.
-  String _baseKey(String path) =>
-      p.basenameWithoutExtension(path).toLowerCase();
 }

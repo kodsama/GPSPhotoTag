@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:xml/xml.dart';
 
+import '../photo_formats.dart';
 import 'exif_backend.dart';
-import 'exiftool_backend.dart' show kRawExtensions;
 
 /// An [ExifBackend] that records GPS in a companion `.xmp` sidecar instead of
 /// modifying the (often unwritable) RAW file itself.
@@ -19,7 +19,7 @@ class XmpSidecarBackend implements ExifBackend {
   /// [extensions] overrides the default RAW set; pass it lower-cased without
   /// leading dots.
   XmpSidecarBackend({Set<String>? extensions})
-    : _extensions = extensions ?? kRawExtensions;
+    : _extensions = extensions ?? PhotoFormats.raw;
 
   final Set<String> _extensions;
 
