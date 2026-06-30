@@ -294,6 +294,16 @@ jobs:
           Get-ChildItem -Recurse -Include *.exe -Path dist | ForEach-Object { Copy-Item $_.FullName dist/ -Force } 2>$null
           if (Test-Path dist/inno) { Get-ChildItem -Recurse dist/inno -Include *.exe | Copy-Item -Destination dist/ -Force }
 
+      - name: Verify installer artifacts
+        working-directory: app
+        shell: pwsh
+        run: |
+          $installers = Get-ChildItem dist -Filter '*.exe','*.msi' -ErrorAction SilentlyContinue
+          if (-not $installers) {
+            Write-Error "No installer produced; both Inno Setup and WiX builds failed."
+            exit 1
+          }
+
       # NOTE: the installer/exe/msi are UNSIGNED. Windows SmartScreen will warn.
       # To sign, add a code-signing cert via secrets (WINDOWS_CERT_BASE64,
       # WINDOWS_CERT_PASSWORD) and run signtool on the outputs.
