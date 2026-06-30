@@ -298,7 +298,7 @@ jobs:
         working-directory: app
         shell: pwsh
         run: |
-          $installers = Get-ChildItem dist -Filter '*.exe','*.msi' -ErrorAction SilentlyContinue
+          $installers = Get-ChildItem dist -Include *.exe,*.msi -Recurse -ErrorAction SilentlyContinue
           if (-not $installers) {
             Write-Error "No installer produced; both Inno Setup and WiX builds failed."
             exit 1
