@@ -8,6 +8,8 @@ library;
 
 /// English strings, the source of truth and fallback for every locale.
 const Map<String, String> kEnglishStrings = {
+  '__comment__':
+      'Source of truth for all locale string tables and the compile-time English fallback. Keep {placeholders} intact when translating.',
   'app_name': 'Stunda',
   'app_tagline': 'Give every photo its moment',
   'app_tagline_period': 'Give every photo its moment.',
