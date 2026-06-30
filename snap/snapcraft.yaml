@@ -25,6 +25,11 @@ apps:
 
 parts:
   stunda:
-    source: .
-    plugin: flutter
-    flutter-target: app/lib/main.dart
+    # Package the Linux bundle already produced by the `linux` CI job (it is
+    # downloaded into this path before snapcraft runs) instead of rebuilding
+    # Flutter here. The repo is a pub workspace with no Linux desktop runner at
+    # its root, so the snapcraft `flutter` plugin's in-tree `flutter build linux`
+    # fails ("No Linux desktop project configured"). The bundle ships `stunda`
+    # plus its `lib/` (found via the binary's $ORIGIN/lib rpath) and `data/`.
+    plugin: dump
+    source: build/linux/x64/release/bundle

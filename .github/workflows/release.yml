@@ -394,6 +394,15 @@ jobs:
           path: app/build/symbols/linux
           if-no-files-found: warn
 
+      # The raw Flutter Linux bundle, shared with the snap/flatpak jobs so they
+      # package this exact build instead of rebuilding Flutter (which can't work
+      # from this pub-workspace root). Excluded from the release upload below.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle
+          path: app/build/linux/x64/release/bundle
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
@@ -407,11 +416,20 @@ jobs:
   linux-snap:
     name: Build Linux (.snap)
     runs-on: ubuntu-latest
-    # Best-effort extra format: snapcraft in CI is finicky, so a failure here
-    # must not block the release of the core artifacts.
+    # Packages the bundle from the `linux` job (snapcraft.yaml uses plugin: dump),
+    # so it must run after it. Best-effort extra: a failure here must not block
+    # the release of the core artifacts.
+    needs: linux
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+
+      # snapcraft.yaml (plugin: dump) reads the bundle from this path.
+      - name: Download Linux bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-bundle
+          path: build/linux/x64/release/bundle
 
       - name: Build snap
         id: snapcraft
@@ -430,13 +448,24 @@ jobs:
   linux-flatpak:
     name: Build Linux (.flatpak)
     runs-on: ubuntu-latest
-    # Best-effort extra format (see linux-snap) — non-blocking for the release.
+    # Packages the bundle from the `linux` job (the manifest's `dir` source is
+    # the pre-built bundle), so it must run after it. Best-effort extra
+    # (see linux-snap) — non-blocking for the release.
+    needs: linux
     continue-on-error: true
     container:
       image: bilelmoussaoui/flatpak-github-actions:freedesktop-23.08
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+
+      # The manifest packages app/build/linux/x64/release/bundle (it does not
+      # build Flutter); restore that bundle from the `linux` job's artifact.
+      - name: Download Linux bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-bundle
+          path: app/build/linux/x64/release/bundle
 
       - name: Build flatpak bundle
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
@@ -456,9 +485,10 @@ jobs:
   # ---------------------------------------------------------------------------
   release:
     name: Publish GitHub Release
-    # Gate on the core platform artifacts; snap/flatpak are best-effort extras
-    # (continue-on-error) and are included only if they happen to finish in time.
-    needs: [android, ios, macos, windows, linux]
+    # Wait for every build, including the best-effort snap/flatpak extras, so
+    # they make it into the release. They are continue-on-error, so a failure in
+    # one of them still counts as "succeeded" to this job and never blocks it.
+    needs: [android, ios, macos, windows, linux, linux-snap, linux-flatpak]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -467,6 +497,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      # The raw Flutter bundle is a build input for snap/flatpak, not a release
+      # asset — drop it so its hundreds of files don't pollute the release.
+      - name: Drop non-release artifacts
+        run: rm -rf artifacts/linux-bundle
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
