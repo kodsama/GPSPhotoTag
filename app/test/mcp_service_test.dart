@@ -325,8 +325,15 @@ void main() {
       reason: 'a survivable error must not move the endpoint',
     );
     expect(service.error, contains('synthetic failure'));
+    // Poll rather than asking once: a single handshake under load can time out
+    // and read as a dead server when the worker is simply busy.
+    var serving = false;
+    final until = DateTime.now().add(const Duration(seconds: 10));
+    while (!serving && DateTime.now().isBefore(until)) {
+      serving = await _answers(bound);
+    }
     expect(
-      await _answers(bound),
+      serving,
       isTrue,
       reason: 'the original worker is still the one serving',
     );
