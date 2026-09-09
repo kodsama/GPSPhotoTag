@@ -42,6 +42,23 @@ void main() {
     expect((result['serverInfo'] as Map<String, Object?>)['name'], 'stunda');
   });
 
+  test('initialize names the app and the version it was given', () async {
+    // Two local apps answering on neighbouring ports is the case that made
+    // this matter: a client has to be able to tell which one it reached, and
+    // the version has to be the host app's rather than a package literal.
+    final r = await McpServer(tools: const [], version: '9.9.9').handle(
+      _req(1, 'initialize', {
+        'protocolVersion': '2025-06-18',
+        'capabilities': <String, Object?>{},
+      }),
+    );
+    final info =
+        (r!['result'] as Map<String, Object?>)['serverInfo']
+            as Map<String, Object?>;
+    expect(info['title'], 'Stunda');
+    expect(info['version'], '9.9.9');
+  });
+
   test('notifications (no id) get no response', () async {
     final r = await _server().handle({
       'jsonrpc': '2.0',

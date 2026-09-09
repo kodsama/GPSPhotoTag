@@ -11,6 +11,8 @@ typedef _IsolateSpawner = Future<Isolate> Function(
   void Function(_Config) entry,
   _Config message, {
   String? debugName,
+  SendPort? onExit,
+  SendPort? onError,
 });
 
 /// Runs the MCP server on a localhost TCP socket in a dedicated worker isolate,
@@ -23,11 +25,14 @@ class McpService extends ChangeNotifier {
   /// [spawn] is an optional seam used in tests to replace [Isolate.spawn].
   /// Production callers omit it and get the real implementation.
   // ignore: library_private_types_in_public_api
-  McpService({this.exiftoolBundleDir, _IsolateSpawner? spawn})
+  McpService({this.exiftoolBundleDir, this.appVersion, _IsolateSpawner? spawn})
     : _spawn = spawn ?? Isolate.spawn;
 
   /// On-disk dir of the bundled exiftool, or null to use `PATH`.
   final String? exiftoolBundleDir;
+
+  /// Version this app reports over MCP, or null to use the package default.
+  final String? appVersion;
 
   final _IsolateSpawner _spawn;
 
@@ -45,17 +50,29 @@ class McpService extends ChangeNotifier {
   Isolate? _isolate;
   ReceivePort? _receive;
 
+  /// The base [start] was last called with, so a lost worker comes back on the
+  /// same range rather than the default.
+  int _base = 8787;
+
+  /// Automatic restarts since the last successful bind. Bounded so a worker
+  /// that dies on every spawn cannot spin.
+  int _restarts = 0;
+  static const _maxRestarts = 3;
+
   /// Starts the server, trying ports in [base]..[base]+9 until one binds.
   Future<void> start({int base = 8787}) async {
     if (_isolate != null) return;
+    _base = base;
     _error = null;
     _receive = ReceivePort();
     _receive!.listen(_onMessage);
     try {
       _isolate = await _spawn(
         _serverEntry,
-        _Config(_receive!.sendPort, base, exiftoolBundleDir),
+        _Config(_receive!.sendPort, base, exiftoolBundleDir, appVersion),
         debugName: 'mcp-server',
+        onExit: _receive!.sendPort,
+        onError: _receive!.sendPort,
       );
     } on Object catch (e) {
       // Reached when the spawner itself throws (e.g., a process-level failure
@@ -67,25 +84,76 @@ class McpService extends ChangeNotifier {
 
   /// Stops the server and tears down the isolate.
   Future<void> stop() async {
-    _isolate?.kill(priority: Isolate.immediate);
-    _isolate = null;
+    // Close the port before the kill: `onExit` fires either way, and a
+    // deliberate teardown must not be mistaken for the worker dying.
     _receive?.close();
     _receive = null;
+    _isolate?.kill(priority: Isolate.immediate);
+    _isolate = null;
     _port = null;
     notifyListeners();
   }
 
+  /// Tears the worker down and brings it back on the last base port, clearing
+  /// the automatic-restart budget: asking by hand is a fresh chance.
+  Future<void> restart() async {
+    await stop();
+    _restarts = 0;
+    await start(base: _base);
+  }
+
   void _onMessage(Object? message) {
+    // `onExit` sends null and `onError` sends [error, stackTrace]. Both mean
+    // the socket is gone; without them the last `ready` port stays on display
+    // as live forever, which is what left the status green against a dead
+    // server.
+    if (message == null) {
+      _onWorkerLost('MCP server worker exited');
+      return;
+    }
+    if (message is List) {
+      _onWorkerLost('MCP server worker crashed: ${message.first}');
+      return;
+    }
     if (message is! Map) return;
     if (message['ready'] is int) {
       _port = message['ready'] as int;
       _error = null;
+      _restarts = 0;
       notifyListeners();
     } else if (message['error'] is String) {
+      // The worker reports its own failure and then returns, so an `onExit`
+      // follows. Stop listening here so that expected exit cannot overwrite a
+      // precise diagnostic ("no free port in 8787..8796") with a generic one,
+      // or burn restarts retrying a failure that is deterministic.
+      _receive?.close();
+      _receive = null;
+      _isolate = null;
       _error = message['error'] as String;
       _port = null;
       notifyListeners();
     }
+  }
+
+  /// Drops the stale port and brings the worker back, so an LLM reconnecting
+  /// hours later finds a socket instead of a port number nothing answers on.
+  void _onWorkerLost(String reason) {
+    // Fatal isolate errors deliver on both ports; the first call closes the
+    // receive port, so this guard swallows the duplicate.
+    if (_receive == null) return;
+    _receive!.close();
+    _receive = null;
+    _isolate = null;
+    _port = null;
+    if (_restarts >= _maxRestarts) {
+      _error = '$reason; gave up after $_maxRestarts restarts';
+      notifyListeners();
+      return;
+    }
+    _restarts++;
+    _error = reason;
+    notifyListeners();
+    start(base: _base);
   }
 
   @override
@@ -96,10 +164,11 @@ class McpService extends ChangeNotifier {
 }
 
 class _Config {
-  const _Config(this.send, this.basePort, this.bundleDir);
+  const _Config(this.send, this.basePort, this.bundleDir, this.appVersion);
   final SendPort send;
   final int basePort;
   final String? bundleDir;
+  final String? appVersion;
 }
 
 /// Isolate entry: probe exiftool, build the tool catalog, and serve TCP. Tries a
@@ -117,6 +186,7 @@ Future<void> _serverEntry(_Config cfg) async {
       tools.any((t) => t.id == 'exiftool' && t.present);
   final server = McpServer(
     tools: buildTools(runner: runner, exiftoolAvailable: exiftool),
+    version: cfg.appVersion ?? kMcpDefaultVersion,
   );
 
   for (var port = cfg.basePort; port < cfg.basePort + 10; port++) {

@@ -9,12 +9,16 @@ import 'tools.dart';
 /// The server is transport-agnostic: [handle] takes one decoded JSON-RPC
 /// message and returns the response map (or null for notifications). A stdio or
 /// TCP transport wraps it.
+/// Version advertised when no host app supplies its own.
+const kMcpDefaultVersion = '2.1.1';
+
 class McpServer {
   /// Creates a server exposing [tools].
   McpServer({
     required this.tools,
     this.name = 'stunda',
-    this.version = '2.1.1',
+    this.title = 'Stunda',
+    this.version = kMcpDefaultVersion,
     this.protocolVersion = '2025-06-18',
   });
 
@@ -23,6 +27,10 @@ class McpServer {
 
   /// Advertised server name.
   final String name;
+
+  /// Human-readable app name. Several local apps can serve MCP on neighbouring
+  /// ports, so a client needs to see which one it actually reached.
+  final String title;
 
   /// Advertised server version.
   final String version;
@@ -49,7 +57,7 @@ class McpServer {
           'capabilities': {
             'tools': {'listChanged': false},
           },
-          'serverInfo': {'name': name, 'version': version},
+          'serverInfo': {'name': name, 'title': title, 'version': version},
         });
 
       case 'ping':

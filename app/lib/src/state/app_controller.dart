@@ -13,6 +13,7 @@ import '../engine/isolate_runner.dart';
 import '../engine/mcp_service.dart';
 import '../engine/mobile_library.dart';
 import '../explore/explore_model.dart';
+import '../i18n/app_strings.g.dart';
 import 'action_run_state.dart';
 import 'app_prefs.dart';
 import 'app_screen.dart';
@@ -69,7 +70,10 @@ class AppController extends ChangeNotifier {
                ExiftoolInvocation.resolve(exiftoolBundleDir),
              ),
            ).check()),
-       mcp = McpService(exiftoolBundleDir: exiftoolBundleDir) {
+       mcp = McpService(
+         exiftoolBundleDir: exiftoolBundleDir,
+         appVersion: kEnglishStrings['app_version'],
+       ) {
     _runner = runner;
     if (prefs != null) {
       _themeMode = prefs.themeMode;

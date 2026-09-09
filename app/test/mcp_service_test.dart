@@ -1,7 +1,9 @@
 @Timeout(Duration(seconds: 30))
 library;
 
+import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stunda/src/engine/mcp_service.dart';
@@ -144,7 +146,7 @@ void main() {
     () async {
       var notified = false;
       final service = McpService(
-        spawn: (_, _, {debugName}) => throw StateError('boom'),
+        spawn: (_, _, {debugName, onExit, onError}) => throw StateError('boom'),
       );
       addTearDown(service.dispose);
 
@@ -169,4 +171,173 @@ void main() {
       );
     },
   );
+
+  test('the port it reports actually answers a request', () async {
+    // `running` and `port` only echo the isolate's ready message. A socket
+    // that died with the isolate still leaves both set, so the only honest
+    // check is a real client connection.
+    final service = McpService();
+    addTearDown(service.stop);
+    await service.start(base: 18950);
+
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(service.running, isTrue);
+
+    final socket = await Socket.connect(
+      InternetAddress.loopbackIPv4,
+      service.port!,
+    );
+    addTearDown(socket.close);
+    socket.writeln(
+      jsonEncode({
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'initialize',
+        'params': {
+          'protocolVersion': '2024-11-05',
+          'capabilities': <String, Object?>{},
+          'clientInfo': {'name': 'liveness', 'version': '1'},
+        },
+      }),
+    );
+    await socket.flush();
+
+    final reply = await utf8.decoder
+        .bind(socket)
+        .transform(const LineSplitter())
+        .first
+        .timeout(const Duration(seconds: 5));
+    expect(jsonDecode(reply), containsPair('id', 1));
+  });
+
+  test('a worker that dies is noticed and the server comes back', () async {
+    // The bug this pins: the app reported `running on :8788` for hours while
+    // the process held no socket at all. Nothing watched the worker, so the
+    // last `ready` port stayed on display after the isolate was gone.
+    //
+    // The spawner seam forwards the real entry and config untouched, so a real
+    // server binds; capturing the Isolate is what lets the test kill it the
+    // way the worker went away in the wild.
+    Isolate? worker;
+    final service = McpService(
+      spawn: (entry, message, {debugName, onExit, onError}) async {
+        worker = await Isolate.spawn(
+          entry,
+          message,
+          debugName: debugName,
+          onExit: onExit,
+          onError: onError,
+        );
+        return worker!;
+      },
+    );
+    addTearDown(service.stop);
+    await service.start(base: 19200);
+
+    var deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(service.running, isTrue, reason: 'server never came up');
+    expect(
+      await _answers(service.port!),
+      isTrue,
+      reason: 'socket dead at once',
+    );
+
+    worker!.kill(priority: Isolate.immediate);
+
+    // A live port again is the only proof that matters: before the fix the
+    // status stayed green on a port nothing was listening on.
+    deadline = DateTime.now().add(const Duration(seconds: 20));
+    var back = false;
+    while (!back && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      back = service.running && await _answers(service.port!);
+    }
+    expect(
+      back,
+      isTrue,
+      reason:
+          'worker death left a stale port: ${service.port} / ${service.error}',
+    );
+  });
+
+  test('restart brings the server back on a live socket', () async {
+    final service = McpService();
+    addTearDown(service.stop);
+    await service.start(base: 19500);
+
+    var deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(service.running, isTrue);
+
+    await service.restart();
+    deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(service.running, isTrue);
+    expect(await _answers(service.port!), isTrue);
+  });
+
+  test('gives up loudly when the worker cannot stay alive', () async {
+    // A worker that dies on every spawn must not be retried forever.
+    final service = McpService(
+      spawn: (entry, message, {debugName, onExit, onError}) =>
+          Isolate.spawn(_diesAtOnce, null, onExit: onExit, onError: onError),
+    );
+    addTearDown(service.stop);
+    await service.start(base: 19300);
+
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    while ((service.error == null || !service.error!.contains('gave up')) &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    expect(service.running, isFalse);
+    expect(service.error, contains('gave up'));
+  });
+}
+
+/// A worker that returns immediately, so its isolate exits without ever
+/// binding. Top-level because [Isolate.spawn] cannot take a closure.
+void _diesAtOnce(void _) {}
+
+/// True when [port] completes an MCP `initialize` handshake.
+Future<bool> _answers(int port) async {
+  try {
+    final socket = await Socket.connect(
+      InternetAddress.loopbackIPv4,
+      port,
+      timeout: const Duration(seconds: 3),
+    );
+    socket.writeln(
+      jsonEncode({
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'initialize',
+        'params': {
+          'protocolVersion': '2024-11-05',
+          'capabilities': <String, Object?>{},
+          'clientInfo': {'name': 'liveness', 'version': '1'},
+        },
+      }),
+    );
+    await socket.flush();
+    final reply = await utf8.decoder
+        .bind(socket)
+        .transform(const LineSplitter())
+        .first
+        .timeout(const Duration(seconds: 3));
+    socket.destroy();
+    return (jsonDecode(reply) as Map)['result'] != null;
+  } on Object {
+    return false;
+  }
 }
