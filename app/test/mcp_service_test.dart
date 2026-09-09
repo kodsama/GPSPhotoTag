@@ -49,6 +49,31 @@ void main() {
     await service.stop();
   });
 
+  test('walks past a port another app already holds', () async {
+    // The real-world case: an unrelated app already holds the base port, so the
+    // server must land on the next one rather than failing. Without the walk
+    // this binds nothing and `running` stays false.
+    const base = 18930;
+    final squatter = await ServerSocket.bind(
+      InternetAddress.loopbackIPv4,
+      base,
+    );
+    addTearDown(squatter.close);
+
+    final service = McpService();
+    addTearDown(service.stop);
+    await service.start(base: base);
+
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+
+    expect(service.error, isNull, reason: 'startup error: ${service.error}');
+    expect(service.running, isTrue);
+    expect(service.port, base + 1, reason: 'must skip the occupied base port');
+  });
+
   test('reports an error when every port in the range is taken', () async {
     // Occupy the whole 10-port range the worker probes, so it can bind none and
     // reports back the "no free port" error.
