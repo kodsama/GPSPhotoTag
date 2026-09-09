@@ -74,6 +74,7 @@ class AppController extends ChangeNotifier {
          exiftoolBundleDir: exiftoolBundleDir,
          appVersion: kEnglishStrings['app_version'],
        ) {
+    mcp.addListener(_onMcpChanged);
     _runner = runner;
     if (prefs != null) {
       _themeMode = prefs.themeMode;
@@ -945,6 +946,29 @@ class AppController extends ChangeNotifier {
     _unread = 0;
     notifyListeners();
   }
+
+  /// Records MCP endpoint transitions in the activity log.
+  ///
+  /// The worker has gone away in the wild without leaving a trace anywhere a
+  /// user could see, so the port it binds and the reason it stops both belong
+  /// in the log: the next occurrence should explain itself rather than needing
+  /// lsof to reconstruct.
+  void _onMcpChanged() {
+    if (_disposed) return;
+    final state = mcp.running
+        ? 'listening on 127.0.0.1:${mcp.port}'
+        : (mcp.error ?? 'stopped');
+    if (state == _lastMcpState) return;
+    _lastMcpState = state;
+    _log(
+      'MCP server $state',
+      level: mcp.running ? LogLevel.info : LogLevel.warning,
+    );
+    notifyListeners();
+  }
+
+  String? _lastMcpState;
+  bool _disposed = false;
 
   void _log(String message, {LogLevel level = LogLevel.info}) {
     _logEntries.add(LogEntry(message, level: level));
@@ -2831,6 +2855,8 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    mcp.removeListener(_onMcpChanged);
     _scanSub?.cancel();
     _sub?.cancel();
     _metaSub?.cancel();

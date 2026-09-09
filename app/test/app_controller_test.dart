@@ -1302,6 +1302,40 @@ void main() {
       expect(c.folder, dir.path);
     });
   });
+
+  group('MCP endpoint logging', () {
+    test('a bound port and a failure both reach the activity log', () async {
+      // The worker has gone away in the wild leaving no trace a user could
+      // see. Both transitions belong in the log so the next occurrence
+      // explains itself without lsof.
+      final c = AppController(runner: FakeEngineRunner());
+      addTearDown(c.dispose);
+
+      await c.mcp.start(base: 19700);
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (!c.mcp.running && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(c.mcp.running, isTrue);
+      expect(
+        c.logEntries.any(
+          (e) => e.message.contains('MCP server listening on 127.0.0.1:'),
+        ),
+        isTrue,
+        reason: 'the bound port was never logged',
+      );
+
+      await c.mcp.stop();
+      expect(
+        c.logEntries.any(
+          (e) =>
+              e.message.contains('MCP server') && e.level == LogLevel.warning,
+        ),
+        isTrue,
+        reason: 'losing the endpoint was never logged',
+      );
+    });
+  });
 }
 
 /// An [EngineRunner] that overrides only the scan stream with a caller-supplied
