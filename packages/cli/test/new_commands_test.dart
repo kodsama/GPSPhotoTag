@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:stunda_cli/src/commands/inspect_command.dart';
 import 'package:stunda_cli/src/commands/photos_command.dart';
 import 'package:stunda_cli/src/commands/scan_command.dart';
 import 'package:stunda_cli/src/exit_codes.dart';
@@ -45,6 +46,31 @@ class _FakeShrink extends ShrinkService {
   Stream<EngineEvent> shrink(List<String> roots, ShrinkOptions options) async* {
     lastOptions = options;
     yield const DoneEvent({'dry_run': 2});
+  }
+}
+
+/// Answers both exiftool reads `inspectPhotos` makes.
+class _InspectRunner implements ProcessRunner {
+  @override
+  Future<ProcResult> run(String executable, List<String> args) async {
+    final paths = args.where((a) => !a.startsWith('-')).toList();
+    if (args.contains('-Make')) {
+      return ProcResult(
+        0,
+        jsonEncode([
+          for (final path in paths) {'SourceFile': path, 'Make': 'FUJIFILM'},
+        ]),
+        '',
+      );
+    }
+    return ProcResult(
+      0,
+      jsonEncode([
+        for (final path in paths)
+          {'SourceFile': path, 'ImageWidth': 6240, 'ImageHeight': 4160},
+      ]),
+      '',
+    );
   }
 }
 
@@ -522,6 +548,126 @@ void main() {
       ], sink: buf);
 
       expect(code, ExitCodes.badInput);
+    });
+  });
+
+  group('inspect', () {
+    test('reports dimensions, GPS and camera per photo', () async {
+      File(p.join(tmp.path, 'a.jpg')).writeAsBytesSync(minimalJpeg());
+
+      final code = await runCliWithSink(
+        ['--json', 'inspect', '-p', tmp.path],
+        sink: buf,
+        inspectRunner: _InspectRunner(),
+      );
+
+      expect(code, ExitCodes.ok);
+      final photo =
+          (lastJson()['photos']! as List).single as Map<String, Object?>;
+      expect(photo['width'], 6240);
+      expect(photo['make'], 'FUJIFILM');
+    });
+
+    test('no photos found is bad_input', () async {
+      final code = await runCliWithSink(
+        ['--json', 'inspect', '-p', tmp.path],
+        sink: buf,
+        inspectRunner: _InspectRunner(),
+      );
+
+      expect(code, ExitCodes.badInput);
+    });
+
+    test('human mode pretty-prints the records', () async {
+      File(p.join(tmp.path, 'a.jpg')).writeAsBytesSync(minimalJpeg());
+
+      await runCliWithSink(
+        ['inspect', '-p', tmp.path],
+        sink: buf,
+        inspectRunner: _InspectRunner(),
+      );
+
+      expect(buf.text, contains('"width": 6240'));
+      expect(buf.text, isNot(contains('"event"')));
+    });
+
+    test('a human-mode error is plain text', () async {
+      await runCliWithSink(
+        ['inspect', '-p', tmp.path],
+        sink: buf,
+        inspectRunner: _InspectRunner(),
+      );
+
+      expect(buf.text, startsWith('error: no photos found'));
+    });
+
+    test('it builds its own runner when none is injected', () {
+      expect(InspectCommand().name, 'inspect');
+    });
+  });
+
+  group('--keep', () {
+    test('duplicates passes the rule order through, highest first', () async {
+      final fake = _FakeDuplicates();
+      await runCliWithSink(
+        [
+          '--json',
+          'duplicates',
+          '-p',
+          tmp.path,
+          '--keep',
+          'people',
+          '--keep',
+          'resolution',
+        ],
+        sink: buf,
+        duplicatesService: fake,
+      );
+
+      final steps = fake.lastOptions!.pipeline.steps;
+      expect(steps.take(2).map((s) => s.rule), [
+        KeepRule.people,
+        KeepRule.resolution,
+      ]);
+      // Quality was not listed, so it is disabled rather than dropped.
+      expect(
+        steps.firstWhere((s) => s.rule == KeepRule.quality).enabled,
+        isFalse,
+      );
+    });
+
+    test('shrink passes the rule order through too', () async {
+      final fake = _FakeShrink();
+      await runCliWithSink(
+        [
+          '--json',
+          'shrink',
+          '-p',
+          tmp.path,
+          '--stage',
+          'duplicates',
+          '--keep',
+          'quality',
+        ],
+        sink: buf,
+        shrinkService: fake,
+      );
+
+      expect(fake.lastOptions!.pipeline.steps.first.rule, KeepRule.quality);
+    });
+
+    test('omitting --keep leaves the standard pipeline', () async {
+      final fake = _FakeDuplicates();
+      await runCliWithSink(
+        ['--json', 'duplicates', '-p', tmp.path],
+        sink: buf,
+        duplicatesService: fake,
+      );
+
+      expect(
+        fake.lastOptions!.pipeline.steps.map((s) => s.rule),
+        KeepPipeline.standard.steps.map((s) => s.rule),
+      );
     });
   });
 

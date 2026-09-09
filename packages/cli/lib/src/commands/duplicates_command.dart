@@ -34,6 +34,13 @@ class DuplicatesCommand extends Command<int> {
         defaultsTo: '0.92',
         help: 'Match cutoff 0..1; higher groups only near-identical photos.',
       )
+      ..addMultiOption(
+        'keep',
+        allowed: ['resolution', 'quality', 'people'],
+        help:
+            'Keep-rule priority, highest first (repeatable). Rules left out '
+            'are disabled. Default: resolution, quality, people.',
+      )
       ..addFlag(
         'apply',
         negatable: false,
@@ -81,6 +88,10 @@ class DuplicatesCommand extends Command<int> {
       return out.exitCode;
     }
 
+    // `allowed:` on --keep already rejects anything that is not a rule name,
+    // so the parser cannot fail here.
+    final pipeline = keepPipelineFromNames(argResults!.multiOption('keep'))!;
+
     final service =
         _service ??
         DuplicatesService(
@@ -93,6 +104,7 @@ class DuplicatesCommand extends Command<int> {
         DuplicatesOptions(
           minSimilarity: similarity,
           metric: SimilarityMetric.values.byName(argResults!.option('metric')!),
+          pipeline: pipeline,
           delete: argResults!.flag('rm'),
           dryRun: !argResults!.flag('apply'),
         ),

@@ -8,6 +8,7 @@ import 'commands/check_command.dart';
 import 'commands/duplicates_command.dart';
 import 'commands/fix_dates_command.dart';
 import 'commands/info_command.dart';
+import 'commands/inspect_command.dart';
 import 'commands/list_command.dart';
 import 'commands/map_command.dart';
 import 'commands/photos_command.dart';
@@ -33,9 +34,10 @@ import 'exit_codes.dart';
 /// [checkRunner] overrides how the `check` command probes external tools; tests
 /// inject a fake to exercise the missing-tool reporting path deterministically.
 ///
-/// [scanner], [duplicatesService] and [shrinkService] override the engine
-/// collaborators behind `scan`, `duplicates` and `shrink`; tests inject fakes so
-/// those commands run without exiftool, a model, or a real tree.
+/// [scanner], [duplicatesService], [shrinkService] and [inspectRunner] override
+/// the engine collaborators behind `scan`, `duplicates`, `shrink` and
+/// `inspect`; tests inject fakes so those commands run without exiftool, a
+/// model, or a real tree.
 CommandRunner<int> buildRunner({
   IOSink? sink,
   Future<MapService> Function()? mapServiceFactory,
@@ -43,6 +45,7 @@ CommandRunner<int> buildRunner({
   FolderScanner? scanner,
   DuplicatesService? duplicatesService,
   ShrinkService? shrinkService,
+  ProcessRunner? inspectRunner,
 }) {
   final runner =
       CommandRunner<int>(
@@ -67,6 +70,7 @@ CommandRunner<int> buildRunner({
     ..addCommand(PruneCommand(sink: sink))
     ..addCommand(ScanCommand(sink: sink, scanner: scanner))
     ..addCommand(PhotosCommand(sink: sink, serviceFactory: mapServiceFactory))
+    ..addCommand(InspectCommand(sink: sink, runner: inspectRunner))
     ..addCommand(DuplicatesCommand(sink: sink, service: duplicatesService))
     ..addCommand(ShrinkCommand(sink: sink, service: shrinkService))
     ..addCommand(FixDatesCommand(sink: sink))
@@ -94,6 +98,7 @@ Future<int> runCliWithSink(
   FolderScanner? scanner,
   DuplicatesService? duplicatesService,
   ShrinkService? shrinkService,
+  ProcessRunner? inspectRunner,
 }) async {
   final out = sink ?? stdout; // coverage:ignore-line
   final err = errorSink ?? stderr; // coverage:ignore-line
@@ -104,6 +109,7 @@ Future<int> runCliWithSink(
     scanner: scanner,
     duplicatesService: duplicatesService,
     shrinkService: shrinkService,
+    inspectRunner: inspectRunner,
   );
   try {
     return await runner.run(args) ?? ExitCodes.ok;

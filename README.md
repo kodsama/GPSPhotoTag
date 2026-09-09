@@ -111,8 +111,9 @@ dart run stunda_cli --version
 dart compile exe packages/cli/bin/stunda.dart -o stunda
 ```
 
-Commands: `tag`, `map`, `photos`, `scan`, `prune-raw`, `duplicates`, `shrink`,
-`fix-dates`, `check`, `info`, `list-sources`, `list-providers`, `schema`.
+Commands: `tag`, `map`, `photos`, `inspect`, `scan`, `prune-raw`, `duplicates`,
+`shrink`, `fix-dates`, `check`, `info`, `list-sources`, `list-providers`,
+`schema`.
 
 Every feature the desktop app has is here too — the GUI and the CLI drive the
 same engine services, so nothing is GUI-only.
@@ -140,6 +141,9 @@ stunda photos -p ~/Pictures/Trip
 stunda duplicates -p ~/Pictures/Trip --metric smart --similarity 0.9
 stunda duplicates -p ~/Pictures/Trip --apply
 
+# Reorder the keep-rule priority the way the GUI's list does:
+stunda duplicates -p ~/Pictures/Trip --keep people --keep resolution
+
 # Shrink in opt-in stages (nothing goes until --apply):
 stunda shrink -p ~/Pictures/Trip --stage duplicates --stage low-quality
 
@@ -163,6 +167,7 @@ Two ways to drive it as an LLM:
   | `tag_photos` | Write GPS EXIF from GPX / Google history |
   | `render_heatmap` | Render the density-heatmap PNG |
   | `list_photos` | Geotagged photos + coordinates (the Explore data) |
+  | `describe_photos` | Dimensions, date, GPS, camera, lens, exposure |
   | `scan_library` | What a library holds (the Review summary) |
   | `prune_raw` | Trash orphan RAWs **or** orphan images |
   | `find_duplicates` | Group near-duplicates, keep the best of each |

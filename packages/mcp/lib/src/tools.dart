@@ -377,6 +377,35 @@ List<McpTool> buildTools({
       },
     ),
     McpTool(
+      name: 'describe_photos',
+      description:
+          'Per photo: dimensions, capture date, GPS, camera, lens and '
+          'exposure — the comparison viewer\u0027s info strip. Read-only.',
+      inputSchema: const {
+        'type': 'object',
+        'required': ['photos'],
+        'properties': {
+          'photos': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': 'Photo files or directories (recursive).',
+          },
+        },
+      },
+      run: (args) async {
+        final photos = Collectors.photos(_strList(args['photos']));
+        if (photos.isEmpty) {
+          return {'ok': false, 'code': 'bad_input', 'error': 'no photos found'};
+        }
+        final info = await inspectPhotos(photos, runner: runner);
+        return {
+          'ok': true,
+          'count': info.length,
+          'photos': [for (final i in info) i.toJson()],
+        };
+      },
+    ),
+    McpTool(
       name: 'find_duplicates',
       description:
           'Group visually-similar photos and pick the best of each group. '
@@ -400,6 +429,16 @@ List<McpTool> buildTools({
           'min_similarity': {
             'type': 'number',
             'description': 'Match cutoff 0..1 (default 0.92).',
+          },
+          'keep_rules': {
+            'type': 'array',
+            'items': {
+              'type': 'string',
+              'enum': ['resolution', 'quality', 'people'],
+            },
+            'description':
+                'Keep-rule priority, highest first. Rules left out are '
+                'disabled. Default: resolution, quality, people.',
           },
           'apply': {
             'type': 'boolean',
@@ -426,6 +465,14 @@ List<McpTool> buildTools({
             'error': 'min_similarity must be between 0 and 1',
           };
         }
+        final pipeline = keepPipelineFromNames(_strList(args['keep_rules']));
+        if (pipeline == null) {
+          return {
+            'ok': false,
+            'code': 'bad_input',
+            'error': 'keep_rules must be resolution, quality and/or people',
+          };
+        }
         return collectResult(
           DuplicatesService(
             runner: runner,
@@ -437,6 +484,7 @@ List<McpTool> buildTools({
               metric: SimilarityMetric.values.byName(
                 (args['metric'] as String?) ?? 'fast',
               ),
+              pipeline: pipeline,
               delete: args['delete'] as bool? ?? false,
               dryRun: !(args['apply'] as bool? ?? false),
             ),
@@ -488,6 +536,16 @@ List<McpTool> buildTools({
             'enum': ['raw', 'photo'],
             'description': 'Which half of a RAW+photo pair to drop.',
           },
+          'keep_rules': {
+            'type': 'array',
+            'items': {
+              'type': 'string',
+              'enum': ['resolution', 'quality', 'people'],
+            },
+            'description':
+                'Keep-rule priority, highest first. Rules left out are '
+                'disabled. Default: resolution, quality, people.',
+          },
           'apply': {
             'type': 'boolean',
             'description': 'Remove the staged files (default false).',
@@ -523,6 +581,14 @@ List<McpTool> buildTools({
             'error': 'at least one stage is required',
           };
         }
+        final pipeline = keepPipelineFromNames(_strList(args['keep_rules']));
+        if (pipeline == null) {
+          return {
+            'ok': false,
+            'code': 'bad_input',
+            'error': 'keep_rules must be resolution, quality and/or people',
+          };
+        }
         final side = PairDropSide.byWire(
           (args['pair_drop'] as String?) ?? 'raw',
         );
@@ -543,6 +609,7 @@ List<McpTool> buildTools({
               metric: SimilarityMetric.values.byName(
                 (args['metric'] as String?) ?? 'fast',
               ),
+              pipeline: pipeline,
               qualityThreshold:
                   (args['quality_threshold'] as num?)?.toDouble() ?? 0.35,
               pairDropSide: side,

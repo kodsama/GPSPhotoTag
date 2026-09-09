@@ -51,6 +51,13 @@ class ShrinkCommand extends Command<int> {
         defaultsTo: 'raw',
         help: 'Which half of a RAW+photo pair the pairs stage drops.',
       )
+      ..addMultiOption(
+        'keep',
+        allowed: ['resolution', 'quality', 'people'],
+        help:
+            'Keep-rule priority, highest first (repeatable). Rules left out '
+            'are disabled. Default: resolution, quality, people.',
+      )
       ..addFlag(
         'apply',
         negatable: false,
@@ -120,6 +127,10 @@ class ShrinkCommand extends Command<int> {
       return out.exitCode;
     }
 
+    // `allowed:` on --keep already rejects anything that is not a rule name,
+    // so the parser cannot fail here.
+    final pipeline = keepPipelineFromNames(argResults!.multiOption('keep'))!;
+
     final service =
         _service ??
         ShrinkService(
@@ -133,6 +144,7 @@ class ShrinkCommand extends Command<int> {
           stages: stages,
           minSimilarity: similarity,
           metric: SimilarityMetric.values.byName(argResults!.option('metric')!),
+          pipeline: pipeline,
           qualityThreshold: threshold,
           pairDropSide: PairDropSide.byWire(argResults!.option('pair-drop')!)!,
           delete: argResults!.flag('rm'),

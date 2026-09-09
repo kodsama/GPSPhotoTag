@@ -62,6 +62,28 @@ class KeepStep {
   }
 }
 
+/// Builds a pipeline from an ordered list of enabled rule names.
+///
+/// The CLI's `--keep` and the MCP `keep_rules` argument take the same shape the
+/// GUI's reorderable, toggleable list produces: the names given are enabled in
+/// the order given, and every rule left out is appended disabled, so the result
+/// always covers each [KeepRule] exactly once. Returns null when a name is not
+/// a rule, so callers can report `bad_input` instead of silently ignoring it.
+KeepPipeline? keepPipelineFromNames(List<String> names) {
+  final steps = <KeepStep>[];
+  final seen = <KeepRule>{};
+  for (final name in names) {
+    final rule = KeepRule.values.where((r) => r.name == name).firstOrNull;
+    if (rule == null) return null;
+    if (seen.add(rule)) steps.add(KeepStep(rule));
+  }
+  if (steps.isEmpty) return KeepPipeline.standard;
+  for (final rule in KeepRule.values) {
+    if (seen.add(rule)) steps.add(KeepStep(rule, enabled: false));
+  }
+  return KeepPipeline(steps);
+}
+
 /// An ordered list of [KeepStep]s. Placement = priority.
 class KeepPipeline {
   /// Creates a pipeline from [steps] (order = priority).

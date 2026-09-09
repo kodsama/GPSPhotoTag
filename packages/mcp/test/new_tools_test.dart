@@ -39,6 +39,31 @@ class _GpsRunner implements ProcessRunner {
   }
 }
 
+/// Answers both exiftool reads `describe_photos` makes.
+class _ExifRunner implements ProcessRunner {
+  @override
+  Future<ProcResult> run(String executable, List<String> args) async {
+    final paths = args.where((a) => !a.startsWith('-')).toList();
+    if (args.contains('-Make')) {
+      return ProcResult(
+        0,
+        jsonEncode([
+          for (final path in paths) {'SourceFile': path, 'Make': 'FUJIFILM'},
+        ]),
+        '',
+      );
+    }
+    return ProcResult(
+      0,
+      jsonEncode([
+        for (final path in paths)
+          {'SourceFile': path, 'ImageWidth': 6240, 'ImageHeight': 4160},
+      ]),
+      '',
+    );
+  }
+}
+
 McpTool _tool(String name, {ProcessRunner? runner}) =>
     buildTools(runner: runner ?? _FailingRunner())
         .firstWhere((t) => t.name == name);
@@ -72,6 +97,7 @@ void main() {
         'fix_dates',
         'scan_library',
         'list_photos',
+        'describe_photos',
         'find_duplicates',
         'shrink_library',
         'list_providers',
@@ -354,6 +380,66 @@ void main() {
       });
 
       expect(out['code'], 'bad_input');
+    });
+  });
+
+  group('describe_photos', () {
+    test('merges dimensions and camera into one record per photo', () async {
+      jpeg('a.jpg', 30);
+
+      final out = await _tool('describe_photos', runner: _ExifRunner()).run({
+        'photos': [tmp.path],
+      });
+
+      expect(out['ok'], isTrue);
+      final photo = (out['photos']! as List).single as Map<String, Object?>;
+      expect(photo['width'], 6240);
+      expect(photo['make'], 'FUJIFILM');
+    });
+
+    test('no photos found is bad_input', () async {
+      expect(
+        (await _tool('describe_photos').run({
+          'photos': [tmp.path],
+        }))['code'],
+        'bad_input',
+      );
+    });
+  });
+
+  group('keep_rules', () {
+    test('find_duplicates rejects an unknown rule', () async {
+      final out = await _tool('find_duplicates').run({
+        'roots': [tmp.path],
+        'keep_rules': ['sharpness'],
+      });
+
+      expect(out['code'], 'bad_input');
+      expect(out['error'], contains('keep_rules'));
+    });
+
+    test('shrink_library rejects an unknown rule', () async {
+      final out = await _tool('shrink_library').run({
+        'roots': [tmp.path],
+        'stages': ['orphans'],
+        'keep_rules': ['sharpness'],
+      });
+
+      expect(out['code'], 'bad_input');
+    });
+
+    test('a valid rule order is accepted end to end', () async {
+      jpeg('a.jpg', 31);
+      File(at('copy.jpg'))
+          .writeAsBytesSync(File(at('a.jpg')).readAsBytesSync());
+
+      final out = await _tool('find_duplicates').run({
+        'roots': [tmp.path],
+        'keep_rules': ['people', 'resolution'],
+      });
+
+      expect(out['ok'], isTrue);
+      expect(out['summary'], {'kept': 1, 'dry_run': 1});
     });
   });
 

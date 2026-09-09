@@ -91,12 +91,20 @@ const _schema = {
         '(json) {event:photos, count, photos:[{path,lat,lon,taken_at}]}',
       ],
     },
+    'inspect': {
+      'summary': 'Dimensions, date, GPS, camera and exposure per photo.',
+      'options': {'--photo|-p': 'string[] (required) — files/dirs'},
+      'emits': ['(json) {event:inspect, count, photos:[{path,width,...}]}'],
+    },
     'duplicates': {
       'summary': 'Group visually-similar photos; keep the best of each group.',
       'options': {
         '--photo|-p': 'string[] (required) — roots to scan',
         '--metric': 'enum fast|smart (default fast)',
         '--similarity': 'number 0..1 (default 0.92)',
+        '--keep':
+            'enum[] resolution|quality|people — keep-rule priority, highest '
+            'first; omitted rules are disabled',
         '--apply': 'bool — remove duplicates (default: report only)',
         '--rm': 'bool — with --apply, delete instead of Trash',
       },
@@ -111,6 +119,9 @@ const _schema = {
         '--similarity': 'number 0..1 (default 0.92)',
         '--quality-threshold': 'number 0..1 (default 0.35)',
         '--pair-drop': 'enum raw|photo (default raw)',
+        '--keep':
+            'enum[] resolution|quality|people — keep-rule priority, highest '
+            'first; omitted rules are disabled',
         '--apply': 'bool — remove staged files (default: report only)',
         '--rm': 'bool — with --apply, delete instead of Trash',
       },

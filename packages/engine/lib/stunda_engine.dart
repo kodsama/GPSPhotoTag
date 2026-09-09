@@ -8,6 +8,7 @@
 library;
 
 export 'src/app/duplicates_service.dart';
+export 'src/app/inspect_service.dart';
 export 'src/app/shrink_service.dart';
 export 'src/app/tag_service.dart';
 export 'src/data/collectors.dart';
