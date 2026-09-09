@@ -34,8 +34,9 @@ the exact symbols from a given build to de-obfuscate traces from that build:
 flutter symbolize -i <stack_trace.txt> -d build/symbols/<platform>/app.<arch>.symbols
 ```
 
-Windows is the exception: it emits `app.windows-x64.pdb` rather than a symbols
-file, and `flutter symbolize` cannot read it - use a Windows debugger.
+Flutter's docs say Windows emits `app.windows-x64.pdb` instead of a symbols
+file, but 3.47.2 ships `app.windows-x64.symbols` like every other target, so
+`flutter symbolize` reads it. Re-check this if the pinned Flutter version moves.
 
 `flutter_distributor` runs `flutter clean` before packaging and rebuilds without
 the obfuscation flags, so the Linux and Windows jobs pass `--skip-clean` and
