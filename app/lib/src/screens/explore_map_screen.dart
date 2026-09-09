@@ -905,9 +905,8 @@ class _DateLabel extends StatelessWidget {
       onPressed: onTap,
       child: Text(
         label,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(fontFeatures: AppTheme.tabular),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(fontFeatures: AppTheme.tabular),
       ),
     );
   }
@@ -983,9 +982,8 @@ class _LoadingChip extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               context.tr('explore_loading', {'loaded': loaded, 'total': total}),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(fontFeatures: AppTheme.tabular),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(fontFeatures: AppTheme.tabular),
             ),
           ],
         ),

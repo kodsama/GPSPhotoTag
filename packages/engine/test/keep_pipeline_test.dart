@@ -156,20 +156,17 @@ void main() {
         expect(chooseKeeper([face, hint], peopleOnly).path, '/face.jpg');
       });
 
-      test(
-        'people breaks a resolution+quality tie in the standard pipeline',
-        () {
-          // Identical resolution and quality; only the people signal differs, so
-          // the standard pipeline's people rule decides.
-          final withPeople = hf('/people.jpg', peopleScore: 1, fileSize: 100);
-          final without = hf('/scenery.jpg', peopleScore: 0, fileSize: 999);
-          final keeper = chooseKeeper([
-            without,
-            withPeople,
-          ], KeepPipeline.standard);
-          expect(keeper.path, '/people.jpg');
-        },
-      );
+      test('people breaks a resolution+quality tie in the standard pipeline', () {
+        // Identical resolution and quality; only the people signal differs, so
+        // the standard pipeline's people rule decides.
+        final withPeople = hf('/people.jpg', peopleScore: 1, fileSize: 100);
+        final without = hf('/scenery.jpg', peopleScore: 0, fileSize: 999);
+        final keeper = chooseKeeper([
+          without,
+          withPeople,
+        ], KeepPipeline.standard);
+        expect(keeper.path, '/people.jpg');
+      });
     });
 
     test('a single candidate is returned directly', () {

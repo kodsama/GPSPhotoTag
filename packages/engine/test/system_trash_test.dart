@@ -42,16 +42,11 @@ void main() {
     // whose trash layout this test understands.
     final posix = Platform.isMacOS || Platform.isLinux;
 
-    test(
-      'moves a file out of its source location',
-      () async {
-        final src = File(p.join(tmp.path, 'orphan.raf'))
-          ..writeAsStringSync('a');
-        await trash.toTrash(src.path);
-        expect(src.existsSync(), isFalse);
-      },
-      skip: posix ? false : 'POSIX-only trash layout',
-    );
+    test('moves a file out of its source location', () async {
+      final src = File(p.join(tmp.path, 'orphan.raf'))..writeAsStringSync('a');
+      await trash.toTrash(src.path);
+      expect(src.existsSync(), isFalse);
+    }, skip: posix ? false : 'POSIX-only trash layout');
   });
 
   // The OS decision and environment are injectable, so each platform's layout

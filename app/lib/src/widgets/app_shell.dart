@@ -245,9 +245,8 @@ class _HelpModeBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 context.tr('help_mode_banner'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: scheme.onPrimaryContainer),
               ),
             ),
             TextButton(

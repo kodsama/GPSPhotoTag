@@ -674,7 +674,8 @@ class _OrtApi {
       _release(_oReleaseSessionOptions, opts);
   void releaseEnv(Pointer<Void> env) => _release(_oReleaseEnv, env);
 
-  void _release(int ordinal, Pointer<Void> handle) => _fn(ordinal)
-      .cast<NativeFunction<Void Function(Pointer<Void>)>>()
-      .asFunction<void Function(Pointer<Void>)>()(handle);
+  void _release(int ordinal, Pointer<Void> handle) =>
+      _fn(ordinal)
+          .cast<NativeFunction<Void Function(Pointer<Void>)>>()
+          .asFunction<void Function(Pointer<Void>)>()(handle);
 }

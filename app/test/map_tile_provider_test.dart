@@ -49,12 +49,10 @@ void main() {
 
   test('getImage keys differ when the underlying cache differs', () {
     final layer = TileLayer(urlTemplate: 'https://e/{z}/{x}/{y}.png');
-    final a = CachingTileProvider(
-      cache: makeCache(),
-    ).getImage(const TileCoordinates(1, 2, 3), layer);
-    final b = CachingTileProvider(
-      cache: makeCache(),
-    ).getImage(const TileCoordinates(1, 2, 3), layer);
+    final a = CachingTileProvider(cache: makeCache())
+        .getImage(const TileCoordinates(1, 2, 3), layer);
+    final b = CachingTileProvider(cache: makeCache())
+        .getImage(const TileCoordinates(1, 2, 3), layer);
     expect(a, isNot(b));
   });
 

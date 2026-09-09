@@ -250,9 +250,8 @@ void main() {
         // A real photo of a person, hashed with NO people metadata, so the only
         // way it gets a non-zero peopleScore is the Tier-2 native detector.
         final person = p.join(tmp.path, 'person.jpg');
-        File(
-          person,
-        ).writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
+        File(person)
+            .writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
         final events = await _drain(
           (port) => hashFilesEntry(
             HashFilesRequest(
@@ -280,9 +279,8 @@ void main() {
           return;
         }
         final person = p.join(tmp.path, 'person.jpg');
-        File(
-          person,
-        ).writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
+        File(person)
+            .writeAsBytesSync(File(_fixture('person.jpg')).readAsBytesSync());
         final events = await _drain(
           (port) => hashFilesEntry(
             HashFilesRequest(

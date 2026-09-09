@@ -132,9 +132,8 @@ void main() {
     setUp(() {
       tmp = Directory.systemTemp.createTempSync('jpeg_exif_exiftool');
       fixture = '${tmp.path}/fuji.jpg';
-      File(
-        fixture,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+      File(fixture)
+          .writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
       // Inject rich EXIF including external-data (S)RATIONAL tags.
       Process.runSync('exiftool', <String>[
         '-overwrite_original',

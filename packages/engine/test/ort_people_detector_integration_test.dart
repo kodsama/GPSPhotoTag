@@ -22,73 +22,68 @@ void main() {
   final available =
       bundleDir != null && (resolveOnnxBundle(bundleDir)?.isComplete ?? false);
 
-  group(
-    'OrtPeopleDetector (native ORT inference)',
-    () {
-      late OrtPeopleDetector detector;
+  group('OrtPeopleDetector (native ORT inference)', () {
+    late OrtPeopleDetector detector;
 
-      setUpAll(() {
-        detector = OrtPeopleDetector.fromBundleDir(bundleDir);
-      });
-      tearDownAll(() => detector.close());
+    setUpAll(() {
+      detector = OrtPeopleDetector.fromBundleDir(bundleDir);
+    });
+    tearDownAll(() => detector.close());
 
-      test('loads the bundled lib + model and reports available', () {
-        expect(detector.isAvailable, isTrue);
-      });
+    test('loads the bundled lib + model and reports available', () {
+      expect(detector.isAvailable, isTrue);
+    });
 
-      test('scores a photo of a person high', () async {
-        final bytes = File(_fixture('person.jpg')).readAsBytesSync();
-        final score = await detector.scoreImage(bytes);
-        expect(score, isNotNull);
-        expect(score, greaterThan(0.5));
-      });
+    test('scores a photo of a person high', () async {
+      final bytes = File(_fixture('person.jpg')).readAsBytesSync();
+      final score = await detector.scoreImage(bytes);
+      expect(score, isNotNull);
+      expect(score, greaterThan(0.5));
+    });
 
-      test('scores a photo of a dog (animal) high via scoreDecoded', () async {
-        final decoded = img.decodeImage(
-          File(_fixture('dog.jpg')).readAsBytesSync(),
-        )!;
-        final score = await detector.scoreDecoded(decoded);
-        expect(score, isNotNull);
-        expect(score, greaterThan(0.5));
-      });
+    test('scores a photo of a dog (animal) high via scoreDecoded', () async {
+      final decoded = img.decodeImage(
+        File(_fixture('dog.jpg')).readAsBytesSync(),
+      )!;
+      final score = await detector.scoreDecoded(decoded);
+      expect(score, isNotNull);
+      expect(score, greaterThan(0.5));
+    });
 
-      test('scores a blank image ~0', () async {
-        final blank = img.Image(width: 300, height: 300);
-        img.fill(blank, color: img.ColorRgb8(128, 128, 128));
-        final score = await detector.scoreDecoded(blank);
-        expect(score, 0);
-      });
+    test('scores a blank image ~0', () async {
+      final blank = img.Image(width: 300, height: 300);
+      img.fill(blank, color: img.ColorRgb8(128, 128, 128));
+      final score = await detector.scoreDecoded(blank);
+      expect(score, 0);
+    });
 
-      test('undecodable bytes → null (total, never throws)', () async {
-        final score = await detector.scoreImage(
-          Uint8List.fromList([0, 1, 2, 3, 4]), // not an image
-        );
-        expect(score, isNull);
-      });
-
-      test(
-        'a real lib but a corrupt model → OrtException is caught, unavailable',
-        () {
-          // Build a bundle with the REAL ORT library but a bogus model file, so
-          // CreateSession returns a non-null OrtStatus: check() reads the error
-          // message and throws OrtException, which fromBundleDir catches.
-          final tmp = Directory.systemTemp.createTempSync('ort_badmodel');
-          addTearDown(() => tmp.deleteSync(recursive: true));
-          final realBundle = resolveOnnxBundle(bundleDir)!;
-          final libName = p.basename(realBundle.libraryPath);
-          File(realBundle.libraryPath).copySync(p.join(tmp.path, libName));
-          File(
-            p.join(tmp.path, kOnnxModelFileName),
-          ).writeAsStringSync('not a real onnx model');
-
-          final bad = OrtPeopleDetector.fromBundleDir(tmp.path);
-          expect(bad.isAvailable, isFalse);
-          bad.close();
-        },
+    test('undecodable bytes → null (total, never throws)', () async {
+      final score = await detector.scoreImage(
+        Uint8List.fromList([0, 1, 2, 3, 4]), // not an image
       );
-    },
-    skip: available ? false : 'no ONNX bundle (run tool/fetch-onnx.sh)',
-  );
+      expect(score, isNull);
+    });
+
+    test(
+      'a real lib but a corrupt model → OrtException is caught, unavailable',
+      () {
+        // Build a bundle with the REAL ORT library but a bogus model file, so
+        // CreateSession returns a non-null OrtStatus: check() reads the error
+        // message and throws OrtException, which fromBundleDir catches.
+        final tmp = Directory.systemTemp.createTempSync('ort_badmodel');
+        addTearDown(() => tmp.deleteSync(recursive: true));
+        final realBundle = resolveOnnxBundle(bundleDir)!;
+        final libName = p.basename(realBundle.libraryPath);
+        File(realBundle.libraryPath).copySync(p.join(tmp.path, libName));
+        File(p.join(tmp.path, kOnnxModelFileName))
+            .writeAsStringSync('not a real onnx model');
+
+        final bad = OrtPeopleDetector.fromBundleDir(tmp.path);
+        expect(bad.isAvailable, isFalse);
+        bad.close();
+      },
+    );
+  }, skip: available ? false : 'no ONNX bundle (run tool/fetch-onnx.sh)');
 }
 
 /// The test's image fixtures. Tries the package-root cwd first (how CI runs),

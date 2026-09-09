@@ -98,46 +98,34 @@ void main() {
 
   // OffsetTimeOriginal must be parsed into PhotoMeta.offset. img.encodeJpg does
   // not emit that tag, so we inject it with exiftool when available.
-  test(
-    'read parses OffsetTimeOriginal into a UTC offset',
-    () async {
-      final path = '${tmp.path}/offset.jpg';
-      File(
-        path,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
-      Process.runSync('exiftool', <String>[
-        '-overwrite_original',
-        '-DateTimeOriginal=2026:06:22 12:43:38',
-        '-OffsetTimeOriginal=+02:00',
-        path,
-      ]);
+  test('read parses OffsetTimeOriginal into a UTC offset', () async {
+    final path = '${tmp.path}/offset.jpg';
+    File(path).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+    Process.runSync('exiftool', <String>[
+      '-overwrite_original',
+      '-DateTimeOriginal=2026:06:22 12:43:38',
+      '-OffsetTimeOriginal=+02:00',
+      path,
+    ]);
 
-      final meta = await backend.read(path);
-      expect(meta.captureNaive, DateTime(2026, 6, 22, 12, 43, 38));
-      expect(meta.offset, const Duration(hours: 2));
-    },
-    skip: _exiftoolAvailable() ? false : 'exiftool not on PATH',
-  );
+    final meta = await backend.read(path);
+    expect(meta.captureNaive, DateTime(2026, 6, 22, 12, 43, 38));
+    expect(meta.offset, const Duration(hours: 2));
+  }, skip: _exiftoolAvailable() ? false : 'exiftool not on PATH');
 
-  test(
-    'read parses a negative OffsetTimeOriginal',
-    () async {
-      final path = '${tmp.path}/neg_offset.jpg';
-      File(
-        path,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
-      Process.runSync('exiftool', <String>[
-        '-overwrite_original',
-        '-DateTimeOriginal=2026:06:22 12:43:38',
-        '-OffsetTimeOriginal=-05:30',
-        path,
-      ]);
+  test('read parses a negative OffsetTimeOriginal', () async {
+    final path = '${tmp.path}/neg_offset.jpg';
+    File(path).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+    Process.runSync('exiftool', <String>[
+      '-overwrite_original',
+      '-DateTimeOriginal=2026:06:22 12:43:38',
+      '-OffsetTimeOriginal=-05:30',
+      path,
+    ]);
 
-      final meta = await backend.read(path);
-      expect(meta.offset, const Duration(hours: -5, minutes: -30));
-    },
-    skip: _exiftoolAvailable() ? false : 'exiftool not on PATH',
-  );
+    final meta = await backend.read(path);
+    expect(meta.offset, const Duration(hours: -5, minutes: -30));
+  }, skip: _exiftoolAvailable() ? false : 'exiftool not on PATH');
 }
 
 bool _exiftoolAvailable() {

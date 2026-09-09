@@ -113,8 +113,7 @@ const _schema = {
     'item': {
       'event': 'item',
       'path': 'string',
-      'status':
-          'tagged|interpolated|already_tagged|no_gps|no_timestamp|dates_fixed|dry_run|pruned_trashed|pruned_deleted|error',
+      'status': 'tagged|interpolated|already_tagged|no_gps|no_timestamp|dates_fixed|dry_run|pruned_trashed|pruned_deleted|error',
       'timestamp': 'ISO-8601 (optional)',
       'lat': 'number (optional)',
       'lon': 'number (optional)',

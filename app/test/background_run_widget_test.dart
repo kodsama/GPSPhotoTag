@@ -159,9 +159,9 @@ void main() {
           const MethodCall('System.requestAppExit'),
         ),
         (data) {
-          final reply =
-              const JSONMethodCodec().decodeEnvelope(data!)
-                  as Map<Object?, Object?>;
+          final reply = const JSONMethodCodec().decodeEnvelope(
+            data!,
+          ) as Map<Object?, Object?>;
           result = reply['response'] as String?;
         },
       );

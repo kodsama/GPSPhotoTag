@@ -261,9 +261,8 @@ class _RunningTotal extends StatelessWidget {
         'count': total.count,
         'size': formatBytes(total.bytes, context.tr),
       }),
-      style: Theme.of(
-        context,
-      ).textTheme.titleMedium?.copyWith(fontFeatures: AppTheme.tabular),
+      style: Theme.of(context).textTheme.titleMedium
+          ?.copyWith(fontFeatures: AppTheme.tabular),
     );
   }
 }

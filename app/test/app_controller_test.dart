@@ -582,9 +582,8 @@ void main() {
         expect((await AppPrefs.load(dir.path)).similarityPercent, 70);
 
         // An out-of-range stored value is clamped into 0..100 on load.
-        File(
-          '${dir.path}/preferences.json',
-        ).writeAsStringSync('{"similarityPercent": 250}');
+        File('${dir.path}/preferences.json')
+            .writeAsStringSync('{"similarityPercent": 250}');
         expect((await AppPrefs.load(dir.path)).similarityPercent, 100);
       },
     );
@@ -605,17 +604,15 @@ void main() {
       final reloaded = await AppPrefs.load(dir.path);
       expect(reloaded.similarityMetric, SimilarityMetric.fast);
 
-      File(
-        '${dir.path}/preferences.json',
-      ).writeAsStringSync('{"similarityMetric": "smart"}');
+      File('${dir.path}/preferences.json')
+          .writeAsStringSync('{"similarityMetric": "smart"}');
       expect(
         (await AppPrefs.load(dir.path)).similarityMetric,
         SimilarityMetric.smart,
       );
 
-      File(
-        '${dir.path}/preferences.json',
-      ).writeAsStringSync('{"similarityMetric": "bogus"}');
+      File('${dir.path}/preferences.json')
+          .writeAsStringSync('{"similarityMetric": "bogus"}');
       expect(
         (await AppPrefs.load(dir.path)).similarityMetric,
         SimilarityMetric.fast,
@@ -669,9 +666,8 @@ void main() {
     });
 
     test('load clamps an out-of-range saved veil into 0..1', () async {
-      File(
-        '${dir.path}/preferences.json',
-      ).writeAsStringSync('{"backgroundVeil": 5.0}');
+      File('${dir.path}/preferences.json')
+          .writeAsStringSync('{"backgroundVeil": 5.0}');
       final prefs = await AppPrefs.load(dir.path);
       expect(prefs.backgroundVeil, 1.0);
     });

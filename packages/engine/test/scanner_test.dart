@@ -112,9 +112,8 @@ void main() {
   test('a timeline .json is detected as Google', () async {
     final dir = Directory.systemTemp.createTempSync('gjson');
     addTearDown(() => dir.deleteSync(recursive: true));
-    File(
-      p.join(dir.path, 'Timeline.json'),
-    ).writeAsStringSync('{"semanticSegments": []}');
+    File(p.join(dir.path, 'Timeline.json'))
+        .writeAsStringSync('{"semanticSegments": []}');
     final r = await _resultOf(await FolderScanner().scan([dir.path]).toList());
     expect(r.googleCount, 1);
     expect(r.unsupportedCount, 0);
@@ -156,9 +155,9 @@ void main() {
   }, testOn: '!windows');
 
   test('emits at least one progress event before done', () async {
-    final events = await FolderScanner(
-      throttle: Duration.zero,
-    ).scan([root.path]).toList();
+    final events = await FolderScanner(throttle: Duration.zero)
+        .scan([root.path])
+        .toList();
     final doneIndex = events.indexWhere((e) => e is ScanDoneEvent);
     final firstProgress = events.indexWhere((e) => e is ScanProgressEvent);
     expect(firstProgress, greaterThanOrEqualTo(0));
@@ -316,9 +315,9 @@ void main() {
   });
 
   test('result and event toJson round-trip the headline numbers', () async {
-    final events = await FolderScanner(
-      throttle: Duration.zero,
-    ).scan([root.path]).toList();
+    final events = await FolderScanner(throttle: Duration.zero)
+        .scan([root.path])
+        .toList();
     final done = events.whereType<ScanDoneEvent>().single;
     final json = done.toJson();
     expect(json['event'], 'scanDone');

@@ -11,7 +11,7 @@ lockfile.
 | `stunda_mcp`    | `packages/mcp`    | MCP server binary `stunda_mcp`|
 | `stunda`    | `app`             | Flutter desktop + mobile app       |
 
-Toolchain: **Flutter 3.44.3 / Dart 3.12.2** (pinned in CI).
+Toolchain: **Flutter 3.47.2 / Dart 3.13.2** (pinned in CI).
 
 ## One-time setup
 

@@ -77,9 +77,8 @@ class _ImageCompareViewerState extends State<ImageCompareViewer> {
     // Read the curated EXIF for the shown paths so the info line fills in.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ControllerScope.of(
-        context,
-      ).loadCuratedExif([for (final p in widget.panes) p.path]);
+      ControllerScope.of(context)
+          .loadCuratedExif([for (final p in widget.panes) p.path]);
     });
   }
 

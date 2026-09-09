@@ -117,9 +117,8 @@ class _SectionLabel extends StatelessWidget {
         : scheme.onSurface;
     return Text(
       label.toUpperCase(),
-      style: Theme.of(
-        context,
-      ).textTheme.labelMedium?.copyWith(color: color, letterSpacing: 0.8),
+      style: Theme.of(context).textTheme.labelMedium
+          ?.copyWith(color: color, letterSpacing: 0.8),
     );
   }
 }

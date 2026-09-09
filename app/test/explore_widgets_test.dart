@@ -329,9 +329,8 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('thumb');
       addTearDown(() => dir.deleteSync(recursive: true));
       final path = p.join(dir.path, 'pic.jpg');
-      File(
-        path,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+      File(path)
+          .writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
 
       await tester.pumpWidget(_wrap(PhotoThumbnail(path: path, height: 100)));
       await tester.pump();
@@ -352,9 +351,8 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('raw_thumb');
       addTearDown(() => dir.deleteSync(recursive: true));
       final jpeg = p.join(dir.path, 'extracted.jpg');
-      File(
-        jpeg,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
+      File(jpeg)
+          .writeAsBytesSync(img.encodeJpg(img.Image(width: 8, height: 8)));
 
       final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
       final c = AppController(runner: fake);
@@ -383,9 +381,8 @@ void main() {
         final dir = Directory.systemTemp.createTempSync('raw_mini');
         addTearDown(() => dir.deleteSync(recursive: true));
         final jpeg = p.join(dir.path, 'extracted.jpg');
-        File(
-          jpeg,
-        ).writeAsBytesSync(img.encodeJpg(img.Image(width: 64, height: 64)));
+        File(jpeg)
+            .writeAsBytesSync(img.encodeJpg(img.Image(width: 64, height: 64)));
 
         final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
         final c = AppController(runner: fake);
@@ -445,9 +442,8 @@ void main() {
         final dir = Directory.systemTemp.createTempSync('raw_unbounded');
         addTearDown(() => dir.deleteSync(recursive: true));
         final jpeg = p.join(dir.path, 'extracted.jpg');
-        File(
-          jpeg,
-        ).writeAsBytesSync(img.encodeJpg(img.Image(width: 64, height: 64)));
+        File(jpeg)
+            .writeAsBytesSync(img.encodeJpg(img.Image(width: 64, height: 64)));
         final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
         final c = AppController(runner: fake);
 

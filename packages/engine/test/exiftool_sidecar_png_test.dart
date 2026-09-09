@@ -208,9 +208,8 @@ void main() {
 
     test('writeGps then read round-trips GPS within tolerance', () async {
       final path = '${dir.path}/tiny.png';
-      File(
-        path,
-      ).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
+      File(path)
+          .writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
 
       const backend = PngExifBackend();
       const lat = -33.8688;
@@ -232,9 +231,8 @@ void main() {
 
     test('read reports hasGps false for PNG without GPS', () async {
       final path = '${dir.path}/plain.png';
-      File(
-        path,
-      ).writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
+      File(path)
+          .writeAsBytesSync(img.encodePng(img.Image(width: 4, height: 4)));
 
       final meta = await const PngExifBackend().read(path);
       expect(meta.hasGps, isFalse);

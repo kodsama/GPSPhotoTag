@@ -48,9 +48,9 @@ void main() {
 
   test('trashes only orphan RAWs and their sidecars', () async {
     final trash = FakeTrash();
-    final events = await Pruner(
-      trash: trash,
-    ).prune([root.path], const PruneOptions()).toList();
+    final events = await Pruner(trash: trash)
+        .prune([root.path], const PruneOptions())
+        .toList();
 
     final orphan = p.join(root.path, 'DSCF2.RAF');
     final sidecar = p.join(root.path, 'DSCF2.RAF.xmp');
@@ -75,9 +75,9 @@ void main() {
 
   test('dry run removes and trashes nothing', () async {
     final trash = FakeTrash();
-    final events = await Pruner(
-      trash: trash,
-    ).prune([root.path], const PruneOptions(dryRun: true)).toList();
+    final events = await Pruner(trash: trash)
+        .prune([root.path], const PruneOptions(dryRun: true))
+        .toList();
 
     expect(trash.trashed, isEmpty);
     expect(File(p.join(root.path, 'DSCF2.RAF')).existsSync(), isTrue);
@@ -92,9 +92,9 @@ void main() {
 
   test('delete mode unlinks orphans without using trash', () async {
     final trash = FakeTrash();
-    final events = await Pruner(
-      trash: trash,
-    ).prune([root.path], const PruneOptions(delete: true)).toList();
+    final events = await Pruner(trash: trash)
+        .prune([root.path], const PruneOptions(delete: true))
+        .toList();
 
     expect(trash.trashed, isEmpty);
     expect(File(p.join(root.path, 'DSCF2.RAF')).existsSync(), isFalse);
@@ -105,9 +105,9 @@ void main() {
   });
 
   test('a failing removal surfaces an error item and log', () async {
-    final events = await Pruner(
-      trash: ThrowingTrash(),
-    ).prune([root.path], const PruneOptions()).toList();
+    final events = await Pruner(trash: ThrowingTrash())
+        .prune([root.path], const PruneOptions())
+        .toList();
 
     final item = events.whereType<ItemEvent>().single;
     expect(item.row.status, PhotoStatus.error);
@@ -153,9 +153,9 @@ void main() {
     test('delete mode unlinks without using trash', () async {
       final trash = FakeTrash();
       final orphan = p.join(root.path, 'DSCF2.RAF');
-      final events = await Pruner(
-        trash: trash,
-      ).trashPaths([orphan], delete: true).toList();
+      final events = await Pruner(trash: trash)
+          .trashPaths([orphan], delete: true)
+          .toList();
 
       expect(trash.trashed, isEmpty);
       expect(File(orphan).existsSync(), isFalse);
@@ -167,9 +167,9 @@ void main() {
 
     test('a failing removal surfaces an error item and continues', () async {
       final orphan = p.join(root.path, 'DSCF1.RAF');
-      final events = await Pruner(
-        trash: ThrowingTrash(),
-      ).trashPaths([orphan]).toList();
+      final events = await Pruner(trash: ThrowingTrash())
+          .trashPaths([orphan])
+          .toList();
 
       final item = events.whereType<ItemEvent>().single;
       expect(item.row.status, PhotoStatus.error);

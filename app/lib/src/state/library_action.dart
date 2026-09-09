@@ -4,8 +4,10 @@ import 'package:stunda_engine/stunda_engine.dart';
 /// A translator: a localization key (+ optional params) → the resolved string.
 /// The widget layer supplies `context.tr`, keeping these models Flutter-free of
 /// any `BuildContext`.
-typedef Translator =
-    String Function(String key, [Map<String, Object?>? params]);
+typedef Translator = String Function(
+  String key, [
+  Map<String, Object?>? params,
+]);
 
 /// Whether an action can run against the current library, plus a short reason.
 ///

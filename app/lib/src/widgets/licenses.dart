@@ -58,9 +58,8 @@ const _attached = <_Component>[
 
 /// Opens the curated licenses page.
 void showAppLicenses(BuildContext context) {
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => const LicensesPage()));
+  Navigator.of(context)
+      .push(MaterialPageRoute<void>(builder: (_) => const LicensesPage()));
 }
 
 /// Scrollable licenses screen.

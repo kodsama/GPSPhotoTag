@@ -8,8 +8,7 @@ library;
 
 /// English strings, the source of truth and fallback for every locale.
 const Map<String, String> kEnglishStrings = {
-  '__comment__':
-      'Source of truth for all locale string tables and the compile-time English fallback. Keep {placeholders} intact when translating.',
+  '__comment__': 'Source of truth for all locale string tables and the compile-time English fallback. Keep {placeholders} intact when translating.',
   'app_name': 'Stunda',
   'app_tagline': 'Give every photo its moment',
   'app_tagline_period': 'Give every photo its moment.',
@@ -29,78 +28,50 @@ const Map<String, String> kEnglishStrings = {
   'help_mode_banner': 'Click any control to see its help.',
   'help_mode_done': 'Done',
   'help_title': 'Help',
-  'help_intro':
-      'Stunda places your photos on the map using the GPS tracks and location history you already have, and helps you tidy your library. Everything below is review-first — nothing is changed or deleted until you confirm.',
+  'help_intro': 'Stunda places your photos on the map using the GPS tracks and location history you already have, and helps you tidy your library. Everything below is review-first — nothing is changed or deleted until you confirm.',
   'help_getting_started_title': 'Getting started',
-  'help_getting_started_b1':
-      'Choose a photo library to begin, or drag and drop folders or individual photos straight onto the window. You can add several folders, in any layout — Stunda finds the photos, GPX/KML tracks, and Google Timeline exports anywhere inside.',
-  'help_getting_started_b2':
-      'After a scan, the Review summary shows what was found: folders, photos, GPS tracks, Timeline data, and anything unsupported.',
-  'help_getting_started_b3':
-      'Pick an action from the workspace when you are ready — tag, explore, match, find duplicates, or shrink.',
+  'help_getting_started_b1': 'Choose a photo library to begin, or drag and drop folders or individual photos straight onto the window. You can add several folders, in any layout — Stunda finds the photos, GPX/KML tracks, and Google Timeline exports anywhere inside.',
+  'help_getting_started_b2': 'After a scan, the Review summary shows what was found: folders, photos, GPS tracks, Timeline data, and anything unsupported.',
+  'help_getting_started_b3': 'Pick an action from the workspace when you are ready — tag, explore, match, find duplicates, or shrink.',
   'help_tag_title': 'Tag with GPS',
-  'help_tag_b1':
-      'Writes location into your photos from GPX tracks, Google Timeline, or KML, matching each photo to the nearest point in time. Set a maximum time difference so only close matches are used.',
-  'help_tag_b2':
-      'RAW files can be handled as a sidecar (a small companion file, the default) or, with ExifTool present, embedded into the file itself. Set a timezone when your photos have no offset of their own, e.g. Europe/Paris.',
-  'help_tag_b3':
-      'Tag your originals in place, or copy tagged versions to a new folder. Existing coordinates are never overwritten unless you turn that on, and a dry run lets you preview without writing anything.',
+  'help_tag_b1': 'Writes location into your photos from GPX tracks, Google Timeline, or KML, matching each photo to the nearest point in time. Set a maximum time difference so only close matches are used.',
+  'help_tag_b2': 'RAW files can be handled as a sidecar (a small companion file, the default) or, with ExifTool present, embedded into the file itself. Set a timezone when your photos have no offset of their own, e.g. Europe/Paris.',
+  'help_tag_b3': 'Tag your originals in place, or copy tagged versions to a new folder. Existing coordinates are never overwritten unless you turn that on, and a dry run lets you preview without writing anything.',
   'help_explore_title': 'Explore on map',
-  'help_explore_b1':
-      'Browse your geotagged photos on a live, zoomable map. Pan and zoom freely; nearby photos group into clusters that open into individual pins as you zoom in.',
-  'help_explore_b2':
-      'Switch between Numbers, Heatmap, or Both, and use the Timeline to filter by a date range. Fit to photos frames everything at once.',
-  'help_explore_b3':
-      'Save the current view as a PNG image to share. Map tiles are cached, so areas you have viewed load quickly again and work offline.',
+  'help_explore_b1': 'Browse your geotagged photos on a live, zoomable map. Pan and zoom freely; nearby photos group into clusters that open into individual pins as you zoom in.',
+  'help_explore_b2': 'Switch between Numbers, Heatmap, or Both, and use the Timeline to filter by a date range. Fit to photos frames everything at once.',
+  'help_explore_b3': 'Save the current view as a PNG image to share. Map tiles are cached, so areas you have viewed load quickly again and work offline.',
   'help_match_title': 'Match Images to RAW',
-  'help_match_b1':
-      'Find files that have lost their partner: remove orphan RAW files with no matching photo, or — the other direction — photos with no matching RAW.',
-  'help_match_b2':
-      'You review the full list and choose what to include before anything is moved to the Trash.',
+  'help_match_b1': 'Find files that have lost their partner: remove orphan RAW files with no matching photo, or — the other direction — photos with no matching RAW.',
+  'help_match_b2': 'You review the full list and choose what to include before anything is moved to the Trash.',
   'help_duplicates_title': 'Find duplicates',
-  'help_duplicates_b1':
-      'Spots visually-similar photos. Choose a matching method at the top — Fast (perceptual hash + colour) or Smart (on-device embedding similarity) — then use the similarity slider from Exact to Loose, with a live example preview of how strict each setting is.',
-  'help_duplicates_b2':
-      'A Keep priority pipeline decides which copy to keep: Resolution, Quality, and People & animals. Reorder the rules and toggle them on or off; the first rule that clearly decides wins.',
-  'help_duplicates_b3':
-      'Review each pair, swap which side is kept, or deselect to keep both. Nothing is deleted until you confirm.',
+  'help_duplicates_b1': 'Spots visually-similar photos. Choose a matching method at the top — Fast (perceptual hash + colour) or Smart (on-device embedding similarity) — then use the similarity slider from Exact to Loose, with a live example preview of how strict each setting is.',
+  'help_duplicates_b2': 'A Keep priority pipeline decides which copy to keep: Resolution, Quality, and People & animals. Reorder the rules and toggle them on or off; the first rule that clearly decides wins.',
+  'help_duplicates_b3': 'Review each pair, swap which side is kept, or deselect to keep both. Nothing is deleted until you confirm.',
   'help_compare_title': 'Comparison viewer',
-  'help_compare_b1':
-      'Open any image full-screen. Compare two photos with a vertical or horizontal curtain, or side by side with synced zoom and a reset button.',
-  'help_compare_b2':
-      'An info line shows each photo\'s name, resolution, file size, capture time, GPS, and key EXIF details.',
+  'help_compare_b1': 'Open any image full-screen. Compare two photos with a vertical or horizontal curtain, or side by side with synced zoom and a reset button.',
+  'help_compare_b2': 'An info line shows each photo\'s name, resolution, file size, capture time, GPS, and key EXIF details.',
   'help_shrink_title': 'Shrink picture library',
-  'help_shrink_b1':
-      'A staged wizard that reclaims space: work through Duplicates, Orphans, RAW + photo pairs, and Low quality in turn. Everything you pick goes onto one cumulative trash list — a file added in an earlier stage is never counted twice.',
-  'help_shrink_b2':
-      'For low quality, choose which aspects matter — blurriness, histogram, colour, exposure — and a strictness threshold; photos scoring below it are flagged. Each stage has its own Clear if you change your mind.',
-  'help_shrink_b3':
-      'A final review shows everything staged and the total space to free before you empty it.',
+  'help_shrink_b1': 'A staged wizard that reclaims space: work through Duplicates, Orphans, RAW + photo pairs, and Low quality in turn. Everything you pick goes onto one cumulative trash list — a file added in an earlier stage is never counted twice.',
+  'help_shrink_b2': 'For low quality, choose which aspects matter — blurriness, histogram, colour, exposure — and a strictness threshold; photos scoring below it are flagged. Each stage has its own Clear if you change your mind.',
+  'help_shrink_b3': 'A final review shows everything staged and the total space to free before you empty it.',
   'help_settings_title': 'Settings',
-  'help_settings_b1':
-      'Choose the app language, switch between light and dark, and set a custom background image with an adjustable intensity.',
-  'help_settings_b2':
-      'Settings also shows the live status of the built-in MCP server and the defaults that new tag runs start from.',
+  'help_settings_b1': 'Choose the app language, switch between light and dark, and set a custom background image with an adjustable intensity.',
+  'help_settings_b2': 'Settings also shows the live status of the built-in MCP server and the defaults that new tag runs start from.',
   'help_safety_title': 'Safety & privacy',
-  'help_safety_b1':
-      'Every action is review-first: you see exactly what will change before it happens, and deletions go to your system Trash, where they can be restored. Confirming a deletion asks you to type a random word, so nothing is removed by accident.',
-  'help_safety_b2':
-      'Processing happens on your device. The optional people & animal detection uses a small model that also runs entirely on-device — your photos are never uploaded.',
+  'help_safety_b1': 'Every action is review-first: you see exactly what will change before it happens, and deletions go to your system Trash, where they can be restored. Confirming a deletion asks you to type a random word, so nothing is removed by accident.',
+  'help_safety_b2': 'Processing happens on your device. The optional people & animal detection uses a small model that also runs entirely on-device — your photos are never uploaded.',
   'help_power_title': 'For power users',
-  'help_power_b1':
-      'Stunda also ships a scriptable command-line tool and an MCP server for automation. See the repository and its AGENTS.md for details.',
+  'help_power_b1': 'Stunda also ships a scriptable command-line tool and an MCP server for automation. See the repository and its AGENTS.md for details.',
   'activity_log_tooltip': 'Activity log',
   'badge_overflow': '99+',
-  'welcome_value_prop':
-      'Place your photos on the map from the GPS tracks and location history you already have.',
+  'welcome_value_prop': 'Place your photos on the map from the GPS tracks and location history you already have.',
   'welcome_choose_library': 'Choose photo library',
   'welcome_or': 'or',
   'welcome_drop_hint': 'Drop folders or photos here',
-  'welcome_drop_explainer':
-      'Point it at any folder, or combine several. Photos, GPX/KML tracks, and Google Timeline exports anywhere inside — in any layout — are all found.',
+  'welcome_drop_explainer': 'Point it at any folder, or combine several. Photos, GPX/KML tracks, and Google Timeline exports anywhere inside — in any layout — are all found.',
   'welcome_scan_library': 'Scan photo library',
-  'welcome_permission_denied':
-      'Photo access is needed to scan your library. Grant it in Settings, then try again.',
+  'welcome_permission_denied': 'Photo access is needed to scan your library. Grant it in Settings, then try again.',
   'scanning_title': 'Scanning your library…',
   'scan_tile_files': 'Files',
   'scan_tile_folders': 'Folders',
@@ -116,8 +87,7 @@ const Map<String, String> kEnglishStrings = {
   'library_add_folder': 'Add folder',
   'library_change': 'Change library',
   'library_remove_root': 'Remove from library',
-  'library_stat_line':
-      '{dirs} folders · {photos} photos · {gpx} GPX · {kml} KML · {google} Timeline',
+  'library_stat_line': '{dirs} folders · {photos} photos · {gpx} GPX · {kml} KML · {google} Timeline',
   'library_stat_line_mobile': '{photos} photos in your library',
   'library_rescan': 'Rescan library',
   'tt_library_rescan': 'Scan your photo library again for new photos',
@@ -182,8 +152,7 @@ const Map<String, String> kEnglishStrings = {
   'tag_dry_run': 'Dry run',
   'tag_dry_run_help': 'Locate and report only — write nothing.',
   'tag_mobile_tracks_title': 'GPS tracks & location history',
-  'tag_mobile_tracks_help':
-      'Pick GPX/KML tracks or Google Timeline exports; coordinates are matched to each photo\'s time and written back to your library.',
+  'tag_mobile_tracks_help': 'Pick GPX/KML tracks or Google Timeline exports; coordinates are matched to each photo\'s time and written back to your library.',
   'tag_mobile_pick_tracks': 'Pick GPS track files',
   'tag_mobile_clear_tracks': 'Clear track files',
   'tag_choose_destination': 'Choose destination folder',
@@ -191,12 +160,9 @@ const Map<String, String> kEnglishStrings = {
   'tag_pick_folder': 'Pick a folder to continue.',
   'done_back_to_library': 'Done — back to library',
   'prune_no_library': 'No library scanned.',
-  'prune_mobile_unavailable':
-      'Matching photos to RAW works on Android but not on iPhone or iPad: the Photos library keeps a RAW and its JPEG as one item, and a stand-alone RAW is your only copy — so there\'s nothing safe to pair or remove here.',
-  'prune_review_intro':
-      'Nothing is removed until you review the list below and confirm. {description}',
-  'prune_summary':
-      '{orphans} orphan RAWs · {paired} RAWs with a JPG · {photos} photos without a RAW',
+  'prune_mobile_unavailable': 'Matching photos to RAW works on Android but not on iPhone or iPad: the Photos library keeps a RAW and its JPEG as one item, and a stand-alone RAW is your only copy — so there\'s nothing safe to pair or remove here.',
+  'prune_review_intro': 'Nothing is removed until you review the list below and confirm. {description}',
+  'prune_summary': '{orphans} orphan RAWs · {paired} RAWs with a JPG · {photos} photos without a RAW',
   'prune_dir_orphan_raws': 'Remove orphan RAWs',
   'prune_dir_orphan_raws_desc': 'Trash RAW files that have no matching photo.',
   'prune_dir_orphan_images': 'Remove orphan images',
@@ -220,8 +186,7 @@ const Map<String, String> kEnglishStrings = {
   'prune_kind_paired': 'Paired',
   'prune_kind_no_raw': 'No RAW',
   'prune_kind_has_raw': 'Has RAW',
-  'dup_intro':
-      'Drag toward Loose to also catch lightly-edited near-duplicates. Nothing is removed until you review and confirm.',
+  'dup_intro': 'Drag toward Loose to also catch lightly-edited near-duplicates. Nothing is removed until you review and confirm.',
   'dup_find': 'Find duplicates',
   'dup_similarity': 'Similarity',
   'dup_similarity_value': '{label} · {percent}%',
@@ -236,8 +201,7 @@ const Map<String, String> kEnglishStrings = {
   'dup_remove_right': 'Remove the right file',
   'dup_keep_both': 'Keep both (deselected)',
   'dup_keep_priority': 'Keep priority',
-  'dup_keep_priority_explainer':
-      'When duplicates are found, keep the winner of the first rule that clearly decides; ties fall through. Drag to reorder.',
+  'dup_keep_priority_explainer': 'When duplicates are found, keep the winner of the first rule that clearly decides; ties fall through. Drag to reorder.',
   'dup_keep_resolution': 'Resolution',
   'dup_keep_quality': 'Quality',
   'dup_keep_people': 'People & animals',
@@ -300,19 +264,16 @@ const Map<String, String> kEnglishStrings = {
   'preview_next': 'Next',
   'preview_dimensions': '{width} × {height}',
   'warning_dismiss': 'Dismiss',
-  'warning_exiftool':
-      'ExifTool couldn\'t start, so RAW-embed, HEIC, and Fuji/Canon RAW timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.',
+  'warning_exiftool': 'ExifTool couldn\'t start, so RAW-embed, HEIC, and Fuji/Canon RAW timestamps are unavailable. JPEG, PNG, and RAW sidecars still work.',
   'exit_running': 'A process is still running — cancel it before quitting.',
   'activity_log_title': 'Activity log',
   'activity_no_activity': 'No activity yet.',
   'licenses_title': 'Licenses',
   'licenses_app_name': 'Stunda',
   'licenses_app_license': 'Licensed under GPL-3.0-or-later',
-  'licenses_gpl':
-      'Stunda\nCopyright (C) 2026 Kodsama\n\nThis program is free software: you can redistribute it and/or modify it under\nthe terms of the GNU General Public License as published by the Free Software\nFoundation, either version 3 of the License, or (at your option) any later\nversion.\n\nThis program is distributed in the hope that it will be useful, but WITHOUT ANY\nWARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A\nPARTICULAR PURPOSE. See the GNU General Public License for more details.\n\nFull text: the LICENSE file in the repository.',
+  'licenses_gpl': 'Stunda\nCopyright (C) 2026 Kodsama\n\nThis program is free software: you can redistribute it and/or modify it under\nthe terms of the GNU General Public License as published by the Free Software\nFoundation, either version 3 of the License, or (at your option) any later\nversion.\n\nThis program is distributed in the hope that it will be useful, but WITHOUT ANY\nWARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A\nPARTICULAR PURPOSE. See the GNU General Public License for more details.\n\nFull text: the LICENSE file in the repository.',
   'licenses_attached': 'Attached software',
-  'licenses_attached_desc':
-      'The libraries and tools Stunda bundles or builds on — listed once each, by component.',
+  'licenses_attached_desc': 'The libraries and tools Stunda bundles or builds on — listed once each, by component.',
   'lic_role_exiftool': 'RAW/HEIC metadata read & GPS embed (bundled)',
   'lic_role_flutter': 'App framework & language',
   'lic_role_map': 'Interactive map',
@@ -402,10 +363,8 @@ const Map<String, String> kEnglishStrings = {
   'tt_file_select_all': 'Select every file in this group',
   'tt_file_select_none': 'Clear the selection',
   'action_shrink_title': 'Shrink picture library',
-  'action_shrink_desc':
-      'Reclaim space by trashing duplicate, orphan, redundant, and low-quality photos.',
-  'shrink_intro':
-      'Work through the stages below. Open each one to review its real finder and pick the files to add to a single shrink list — a file added earlier is never counted twice. Nothing is deleted until the final confirm.',
+  'action_shrink_desc': 'Reclaim space by trashing duplicate, orphan, redundant, and low-quality photos.',
+  'shrink_intro': 'Work through the stages below. Open each one to review its real finder and pick the files to add to a single shrink list — a file added earlier is never counted twice. Nothing is deleted until the final confirm.',
   'shrink_stage_duplicates': '1. Duplicates',
   'shrink_stage_orphans': '2. Orphans',
   'shrink_stage_pairs': '3. RAW + photo pairs',
@@ -420,20 +379,16 @@ const Map<String, String> kEnglishStrings = {
   'shrink_stage_not_reviewed': 'Not reviewed yet — open to choose files.',
   'shrink_stage_added': 'Added {count} file(s) · {size} to free',
   'shrink_stage_clear': 'Clear',
-  'shrink_duplicates_hint':
-      'Find visually-similar photos and add every copy except the one worth keeping.',
+  'shrink_duplicates_hint': 'Find visually-similar photos and add every copy except the one worth keeping.',
   'shrink_orphans_hint':
       'Find RAW files with no JPG/HEIC companion, or images with no RAW.',
   'shrink_pairs_hint':
       'Where both a RAW and a photo exist, add the redundant side.',
-  'shrink_pairs_intro':
-      'Choose which side of each RAW + photo pair to add to the shrink list, then tick the files to include.',
+  'shrink_pairs_intro': 'Choose which side of each RAW + photo pair to add to the shrink list, then tick the files to include.',
   'shrink_low_quality_hint':
       'Find photos scoring below a quality threshold you choose.',
-  'shrink_low_quality_intro':
-      'Set how strict to be, find the photos that score below it, then tick the ones to add.',
-  'shrink_quality_explainer':
-      'Pick which aspects count as low quality, then set how strict to be. Photos scoring below your threshold on the chosen aspects are flagged.',
+  'shrink_low_quality_intro': 'Set how strict to be, find the photos that score below it, then tick the ones to add.',
+  'shrink_quality_explainer': 'Pick which aspects count as low quality, then set how strict to be. Photos scoring below your threshold on the chosen aspects are flagged.',
   'shrink_quality_title': 'Quality threshold',
   'lowq_criteria_title': 'What counts as low quality',
   'lowq_param_sharpness': 'Blurriness',
@@ -444,8 +399,7 @@ const Map<String, String> kEnglishStrings = {
   'tt_lowq_contrast':
       'Flag flat photos with a narrow tonal range (low contrast).',
   'tt_lowq_color': 'Flag dull, washed-out photos (low colourfulness).',
-  'tt_lowq_exposure':
-      'Flag under- or over-exposed photos (crushed shadows or blown highlights).',
+  'tt_lowq_exposure': 'Flag under- or over-exposed photos (crushed shadows or blown highlights).',
   'lowq_criteria_all_off':
       'Turn on at least one aspect to flag low-quality photos.',
   'lowq_lenient': 'Lenient',
@@ -472,8 +426,7 @@ const Map<String, String> kEnglishStrings = {
   'shrink_has_gps': 'GPS',
   'shrink_no_gps': 'No GPS',
   'shrink_confirm_title': 'Move {count} file(s) to Trash?',
-  'shrink_confirm_body':
-      'This moves the selected files to your system Trash. You can restore them from there.',
+  'shrink_confirm_body': 'This moves the selected files to your system Trash. You can restore them from there.',
   'shrink_reason_duplicate': 'duplicate',
   'shrink_reason_orphan_raw': 'orphan RAW',
   'shrink_reason_orphan_image': 'orphan image',
@@ -482,16 +435,15 @@ const Map<String, String> kEnglishStrings = {
   'shrink_reason_low_quality': 'low quality',
   'dup_metric_title': 'Matching method',
   'dup_metric_fast': 'Fast — perceptual hash',
-  'dup_metric_fast_desc':
-      'Compares a perceptual hash (pHash) plus colour. Instant, runs on every file.',
+  'dup_metric_fast_desc': 'Compares a perceptual hash (pHash) plus colour. Instant, runs on every file.',
   'dup_metric_fast_pro': 'Best for near-identical copies and re-saves.',
   'dup_metric_fast_con': 'Misses heavy crops, rotations or recolours.',
   'dup_metric_smart': 'Smart — embedding similarity',
-  'dup_metric_smart_desc':
-      'Compares an on-device embedding of each photo. Runs entirely on your computer.',
+  'dup_metric_smart_desc': 'Compares an on-device embedding of each photo. Runs entirely on your computer.',
   'dup_metric_smart_pro':
       'Understands crops, rotations and recolours of the same scene.',
-  'dup_metric_smart_con': 'A little slower, and needs the bundled embedding model.',
+  'dup_metric_smart_con':
+      'A little slower, and needs the bundled embedding model.',
   'dup_metric_smart_unavailable':
       'The embedding model is not available here, so Smart falls back to Fast.',
   'lic_role_mobilenet_embed':

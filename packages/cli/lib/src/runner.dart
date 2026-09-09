@@ -89,7 +89,11 @@ Future<int> runCliWithSink(
   } on UsageException catch (e) {
     if (args.contains('--json')) {
       out.writeln(
-        jsonEncode({'event': 'error', 'code': 'bad_input', 'message': e.message}),
+        jsonEncode({
+          'event': 'error',
+          'code': 'bad_input',
+          'message': e.message,
+        }),
       );
     } else {
       err.writeln(e.message);

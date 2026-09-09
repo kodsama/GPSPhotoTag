@@ -23,9 +23,8 @@ class _PreviewRunner implements ProcessRunner {
     final dir = p.dirname(template);
     final source = args.last;
     final stem = p.basenameWithoutExtension(source);
-    File(
-      p.join(dir, '${stem}_PreviewImage.jpg'),
-    ).writeAsBytesSync(img.encodeJpg(_stripes(32, 32)));
+    File(p.join(dir, '${stem}_PreviewImage.jpg'))
+        .writeAsBytesSync(img.encodeJpg(_stripes(32, 32)));
     return const ProcResult(0, '', '');
   }
 }

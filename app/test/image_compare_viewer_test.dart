@@ -275,9 +275,8 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('viewer_raw');
       addTearDown(() => dir.deleteSync(recursive: true));
       final jpeg = p.join(dir.path, 'full.jpg');
-      File(
-        jpeg,
-      ).writeAsBytesSync(img.encodeJpg(img.Image(width: 16, height: 16)));
+      File(jpeg)
+          .writeAsBytesSync(img.encodeJpg(img.Image(width: 16, height: 16)));
 
       final fake = FakeEngineRunner()..previews['/library/shot.raf'] = jpeg;
       final c = AppController(runner: fake);

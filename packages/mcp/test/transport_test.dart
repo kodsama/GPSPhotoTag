@@ -70,56 +70,53 @@ void main() {
   });
 
   group('serveStdio', () {
-    test(
-      'reads request frames from input and writes response frames to output',
-      () async {
-        // Feed two newline-delimited frames (plus a blank line that must be
-        // skipped) into the loop via an in-memory byte stream.
-        final input = Stream<List<int>>.fromIterable([
-          utf8.encode(
-            '${jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})}\n',
-          ),
-          utf8.encode('\n'), // blank line -> skipped, no response
-          utf8.encode(
-            '${jsonEncode({
-              'jsonrpc': '2.0',
-              'id': 2,
-              'method': 'tools/call',
-              'params': {'name': 'get_capabilities', 'arguments': <String, Object?>{}},
-            })}\n',
-          ),
-          // Notification (no id) -> no response frame emitted.
-          utf8.encode(
-            '${jsonEncode({'jsonrpc': '2.0', 'method': 'notifications/initialized'})}\n',
-          ),
-        ]);
+    test('reads request frames from input and writes response frames to output', () async {
+      // Feed two newline-delimited frames (plus a blank line that must be
+      // skipped) into the loop via an in-memory byte stream.
+      final input = Stream<List<int>>.fromIterable([
+        utf8.encode(
+          '${jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})}\n',
+        ),
+        utf8.encode('\n'), // blank line -> skipped, no response
+        utf8.encode(
+          '${jsonEncode({
+            'jsonrpc': '2.0',
+            'id': 2,
+            'method': 'tools/call',
+            'params': {'name': 'get_capabilities', 'arguments': <String, Object?>{}},
+          })}\n',
+        ),
+        // Notification (no id) -> no response frame emitted.
+        utf8.encode(
+          '${jsonEncode({'jsonrpc': '2.0', 'method': 'notifications/initialized'})}\n',
+        ),
+      ]);
 
-        final captured = <int>[];
-        final output = IOSink(_ByteCollector(captured));
+      final captured = <int>[];
+      final output = IOSink(_ByteCollector(captured));
 
-        await serveStdio(_server(), input: input, output: output);
-        await output.close();
+      await serveStdio(_server(), input: input, output: output);
+      await output.close();
 
-        final frames = utf8
-            .decode(captured)
-            .split('\n')
-            .where((l) => l.trim().isNotEmpty)
-            .map((l) => jsonDecode(l) as Map<String, Object?>)
-            .toList();
+      final frames = utf8
+          .decode(captured)
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .map((l) => jsonDecode(l) as Map<String, Object?>)
+          .toList();
 
-        // Exactly two responses: ping and get_capabilities. The blank line and
-        // the notification produce nothing.
-        expect(frames, hasLength(2));
+      // Exactly two responses: ping and get_capabilities. The blank line and
+      // the notification produce nothing.
+      expect(frames, hasLength(2));
 
-        final ping = frames.firstWhere((r) => r['id'] == 1);
-        expect(ping['result'], isA<Map<String, Object?>>());
+      final ping = frames.firstWhere((r) => r['id'] == 1);
+      expect(ping['result'], isA<Map<String, Object?>>());
 
-        final caps = frames.firstWhere((r) => r['id'] == 2);
-        final result = caps['result'] as Map<String, Object?>;
-        final structured = result['structuredContent'] as Map<String, Object?>;
-        expect(structured['ok'], isTrue);
-      },
-    );
+      final caps = frames.firstWhere((r) => r['id'] == 2);
+      final result = caps['result'] as Map<String, Object?>;
+      final structured = result['structuredContent'] as Map<String, Object?>;
+      expect(structured['ok'], isTrue);
+    });
 
     test('defaults output to stdout when only input is injected', () async {
       // Empty input -> the loop exits immediately without writing anything, so
@@ -211,40 +208,37 @@ void main() {
       expect((response['error'] as Map<String, Object?>)['code'], -32600);
     });
 
-    test(
-      'invalid UTF-8 on the socket triggers onError and destroys it',
-      () async {
-        final logs = <String>[];
-        final s = await serveTcp(_server(), port: 0, onLog: logs.add);
-        addTearDown(() => s.close());
+    test('invalid UTF-8 on the socket triggers onError and destroys it', () async {
+      final logs = <String>[];
+      final s = await serveTcp(_server(), port: 0, onLog: logs.add);
+      addTearDown(() => s.close());
 
-        final socket = await Socket.connect('127.0.0.1', s.port);
-        addTearDown(() => socket.destroy());
+      final socket = await Socket.connect('127.0.0.1', s.port);
+      addTearDown(() => socket.destroy());
 
-        // When the server destroys the client, our read stream completes (or
-        // errors); either way the connection is observably gone.
-        final closed = Completer<void>();
-        socket.listen(
-          (_) {},
-          onError: (Object _) {
-            if (!closed.isCompleted) closed.complete();
-          },
-          onDone: () {
-            if (!closed.isCompleted) closed.complete();
-          },
-          cancelOnError: false,
-        );
+      // When the server destroys the client, our read stream completes (or
+      // errors); either way the connection is observably gone.
+      final closed = Completer<void>();
+      socket.listen(
+        (_) {},
+        onError: (Object _) {
+          if (!closed.isCompleted) closed.complete();
+        },
+        onDone: () {
+          if (!closed.isCompleted) closed.complete();
+        },
+        cancelOnError: false,
+      );
 
-        // Wait for the connect log so the listener is attached, then send a byte
-        // sequence that is not valid UTF-8 to fault the decoder stream.
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        socket.add([0xff, 0xfe, 0xff]);
-        await socket.flush();
+      // Wait for the connect log so the listener is attached, then send a byte
+      // sequence that is not valid UTF-8 to fault the decoder stream.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      socket.add([0xff, 0xfe, 0xff]);
+      await socket.flush();
 
-        await closed.future.timeout(const Duration(seconds: 5));
-        expect(logs.any((l) => l.contains('client connected')), isTrue);
-      },
-    );
+      await closed.future.timeout(const Duration(seconds: 5));
+      expect(logs.any((l) => l.contains('client connected')), isTrue);
+    });
 
     test('emits lifecycle log lines via onLog', () async {
       final logs = <String>[];
@@ -264,87 +258,82 @@ void main() {
     // second chunk arriving while the first await is suspended can corrupt the
     // shared buffer and/or reorder responses.  The fix (future-chain tail)
     // ensures both lines parse correctly and responses arrive in request-id order.
-    test(
-      'C-02: pipelined requests arriving as rapid chunks respond in order',
-      () async {
-        // Build a server with one slow tool (id=1) and one instant tool (id=2).
-        final slowDone = Completer<void>();
-        final slowTool = McpTool(
-          name: 'slow',
-          description: 'deliberate delay',
-          inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
-          run: (_) async {
-            await Future<void>.delayed(const Duration(milliseconds: 100));
-            return {'ok': true, 'tool': 'slow'};
-          },
-        );
-        final fastTool = McpTool(
-          name: 'fast',
-          description: 'instant',
-          inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
-          run: (_) async => {'ok': true, 'tool': 'fast'},
-        );
-        final server = McpServer(tools: [slowTool, fastTool]);
+    test('C-02: pipelined requests arriving as rapid chunks respond in order', () async {
+      // Build a server with one slow tool (id=1) and one instant tool (id=2).
+      final slowDone = Completer<void>();
+      final slowTool = McpTool(
+        name: 'slow',
+        description: 'deliberate delay',
+        inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
+        run: (_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          return {'ok': true, 'tool': 'slow'};
+        },
+      );
+      final fastTool = McpTool(
+        name: 'fast',
+        description: 'instant',
+        inputSchema: {'type': 'object', 'properties': <String, Object?>{}},
+        run: (_) async => {'ok': true, 'tool': 'fast'},
+      );
+      final server = McpServer(tools: [slowTool, fastTool]);
 
-        final s = await serveTcp(server, port: 0);
-        addTearDown(() => s.close());
+      final s = await serveTcp(server, port: 0);
+      addTearDown(() => s.close());
 
-        final socket = await Socket.connect('127.0.0.1', s.port);
-        addTearDown(() => socket.destroy());
+      final socket = await Socket.connect('127.0.0.1', s.port);
+      addTearDown(() => socket.destroy());
 
-        final responses = <Map<String, Object?>>[];
-        final gotTwo = Completer<void>();
-        utf8.decoder.bind(socket).transform(const LineSplitter()).listen((
-          line,
-        ) {
-          if (line.trim().isEmpty) return;
-          responses.add(jsonDecode(line) as Map<String, Object?>);
-          if (responses.length == 2 && !gotTwo.isCompleted) {
-            gotTwo.complete();
-          }
-        });
+      final responses = <Map<String, Object?>>[];
+      final gotTwo = Completer<void>();
+      utf8.decoder.bind(socket).transform(const LineSplitter()).listen((line) {
+        if (line.trim().isEmpty) return;
+        responses.add(jsonDecode(line) as Map<String, Object?>);
+        if (responses.length == 2 && !gotTwo.isCompleted) {
+          gotTwo.complete();
+        }
+      });
 
-        // Send both requests as TWO separate TCP chunks without awaiting between
-        // them — this is the pipelining scenario.  The slow tool's 100 ms delay
-        // means its async callback is suspended while the second chunk arrives.
-        final req1 = jsonEncode({
-          'jsonrpc': '2.0',
-          'id': 1,
-          'method': 'tools/call',
-          'params': {'name': 'slow', 'arguments': <String, Object?>{}},
-        });
-        final req2 = jsonEncode({
-          'jsonrpc': '2.0',
-          'id': 2,
-          'method': 'tools/call',
-          'params': {'name': 'fast', 'arguments': <String, Object?>{}},
-        });
-        socket.writeln(req1); // chunk 1 — starts a slow await
-        await socket.flush();
-        // Yield to the event loop so the server starts processing req1 and
-        // suspends at its Future.delayed before req2 arrives.
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        socket.writeln(req2); // chunk 2 — races with the first in buggy code
-        await socket.flush();
+      // Send both requests as TWO separate TCP chunks without awaiting between
+      // them — this is the pipelining scenario.  The slow tool's 100 ms delay
+      // means its async callback is suspended while the second chunk arrives.
+      final req1 = jsonEncode({
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'tools/call',
+        'params': {'name': 'slow', 'arguments': <String, Object?>{}},
+      });
+      final req2 = jsonEncode({
+        'jsonrpc': '2.0',
+        'id': 2,
+        'method': 'tools/call',
+        'params': {'name': 'fast', 'arguments': <String, Object?>{}},
+      });
+      socket.writeln(req1); // chunk 1 — starts a slow await
+      await socket.flush();
+      // Yield to the event loop so the server starts processing req1 and
+      // suspends at its Future.delayed before req2 arrives.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      socket.writeln(req2); // chunk 2 — races with the first in buggy code
+      await socket.flush();
 
-        await gotTwo.future.timeout(const Duration(seconds: 5));
-        slowDone.complete();
+      await gotTwo.future.timeout(const Duration(seconds: 5));
+      slowDone.complete();
 
-        // Both requests must have been parsed correctly (not corrupted).
-        expect(responses, hasLength(2));
-        final ids = responses.map((r) => r['id']).toList();
-        // Responses MUST arrive in request order (id=1 first, then id=2).
-        expect(ids[0], 1, reason: 'slow tool response must come first');
-        expect(ids[1], 2, reason: 'fast tool response must come second');
+      // Both requests must have been parsed correctly (not corrupted).
+      expect(responses, hasLength(2));
+      final ids = responses.map((r) => r['id']).toList();
+      // Responses MUST arrive in request order (id=1 first, then id=2).
+      expect(ids[0], 1, reason: 'slow tool response must come first');
+      expect(ids[1], 2, reason: 'fast tool response must come second');
 
-        final r1 = (responses[0]['result'] as Map<String, Object?>);
-        final sc1 = r1['structuredContent'] as Map<String, Object?>;
-        expect(sc1['tool'], 'slow');
+      final r1 = (responses[0]['result'] as Map<String, Object?>);
+      final sc1 = r1['structuredContent'] as Map<String, Object?>;
+      expect(sc1['tool'], 'slow');
 
-        final r2 = (responses[1]['result'] as Map<String, Object?>);
-        final sc2 = r2['structuredContent'] as Map<String, Object?>;
-        expect(sc2['tool'], 'fast');
-      },
-    );
+      final r2 = (responses[1]['result'] as Map<String, Object?>);
+      final sc2 = r2['structuredContent'] as Map<String, Object?>;
+      expect(sc2['tool'], 'fast');
+    });
   });
 }

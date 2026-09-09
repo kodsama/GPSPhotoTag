@@ -289,44 +289,39 @@ void main() {
       expect(c.shrinkStaged, isEmpty);
     });
 
-    test(
-      'toggling a quality parameter re-filters candidates WITHOUT re-hashing',
-      () async {
-        // soft.jpg is sharp-bad only; the rest are fine on every component.
-        final fake = FakeEngineRunner()
-          ..hashedFiles = [
-            _hfQ('/library/soft.jpg', sharpness: 0.05),
-            _hfQ('/library/good.jpg'),
-          ];
-        final c = AppController(runner: fake)
-          ..debugSetScan(
-            fakeScan(photos: const ['/library/soft.jpg', '/library/good.jpg']),
-          )
-          ..openAction(LibraryAction.shrink);
-        c.openShrinkStage(ShrinkStage.lowQuality);
-        c.setShrinkQualityThreshold(0.35);
-        await c.runShrinkLowQualityHash();
-        final hashCalls = fake.calls.where((e) => e == 'hashFiles').length;
-        expect(hashCalls, 1);
+    test('toggling a quality parameter re-filters candidates WITHOUT re-hashing', () async {
+      // soft.jpg is sharp-bad only; the rest are fine on every component.
+      final fake = FakeEngineRunner()
+        ..hashedFiles = [
+          _hfQ('/library/soft.jpg', sharpness: 0.05),
+          _hfQ('/library/good.jpg'),
+        ];
+      final c = AppController(runner: fake)
+        ..debugSetScan(
+          fakeScan(photos: const ['/library/soft.jpg', '/library/good.jpg']),
+        )
+        ..openAction(LibraryAction.shrink);
+      c.openShrinkStage(ShrinkStage.lowQuality);
+      c.setShrinkQualityThreshold(0.35);
+      await c.runShrinkLowQualityHash();
+      final hashCalls = fake.calls.where((e) => e == 'hashFiles').length;
+      expect(hashCalls, 1);
 
-        // With all params on, the soft photo scores ~ (0.05+0.9+0.9+0.9)/4 ≈ 0.69
-        // → above threshold → NOT flagged.
-        expect(c.shrinkLowQCandidates, isEmpty);
+      // With all params on, the soft photo scores ~ (0.05+0.9+0.9+0.9)/4 ≈ 0.69
+      // → above threshold → NOT flagged.
+      expect(c.shrinkLowQCandidates, isEmpty);
 
-        // Turn OFF every param except sharpness: now the soft photo is scored on
-        // sharpness alone (0.05) → below threshold → flagged. No re-hash.
-        c.setLowQParamEnabled(QualityParam.contrast, false);
-        c.setLowQParamEnabled(QualityParam.color, false);
-        c.setLowQParamEnabled(QualityParam.exposure, false);
-        expect(c.shrinkLowQCandidates.map((h) => h.path), [
-          '/library/soft.jpg',
-        ]);
-        // The selection re-syncs to the new candidate set.
-        expect(c.isShrinkLowQSelected('/library/soft.jpg'), isTrue);
-        // Critically: still only one hash call.
-        expect(fake.calls.where((e) => e == 'hashFiles').length, hashCalls);
-      },
-    );
+      // Turn OFF every param except sharpness: now the soft photo is scored on
+      // sharpness alone (0.05) → below threshold → flagged. No re-hash.
+      c.setLowQParamEnabled(QualityParam.contrast, false);
+      c.setLowQParamEnabled(QualityParam.color, false);
+      c.setLowQParamEnabled(QualityParam.exposure, false);
+      expect(c.shrinkLowQCandidates.map((h) => h.path), ['/library/soft.jpg']);
+      // The selection re-syncs to the new candidate set.
+      expect(c.isShrinkLowQSelected('/library/soft.jpg'), isTrue);
+      // Critically: still only one hash call.
+      expect(fake.calls.where((e) => e == 'hashFiles').length, hashCalls);
+    });
 
     test('enabling/disabling reflects in lowQParams + isLowQParamEnabled', () {
       final c = AppController(runner: FakeEngineRunner());

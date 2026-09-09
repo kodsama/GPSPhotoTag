@@ -152,9 +152,8 @@ class ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.danger),
             ),
           ),
         ],

@@ -782,9 +782,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // On hover the card's border takes the primary accent (the onEnter path).
-      final scheme = Theme.of(
-        tester.element(find.text('Explore on map')),
-      ).colorScheme;
+      final scheme = Theme.of(tester.element(find.text('Explore on map')))
+          .colorScheme;
       Border borderOf() {
         final container = tester.widget<AnimatedContainer>(
           find

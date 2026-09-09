@@ -448,9 +448,8 @@ class _Placeholder extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: scheme.onSurface.withValues(alpha: 0.7),
-            ),
+            style: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(color: scheme.onSurface.withValues(alpha: 0.7)),
           ),
         ],
       ),
