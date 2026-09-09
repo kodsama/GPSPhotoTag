@@ -91,7 +91,9 @@ workspace you choose an action:
   and a final review showing the space to free.
 
 **Settings** cover language, light/dark, a custom background image with
-intensity, and the live MCP server status. A **Help** entry in the settings menu
+intensity, and the live MCP server status, which the header's MCP button also
+shows as a status dot and opens as a panel with a copyable client config. A
+**Help** entry in the settings menu
 opens an in-app, localized guide to every feature. An activity-log button opens
 the full event log, and heavy work runs in **worker isolates** so the UI stays
 responsive.
@@ -179,7 +181,12 @@ Two ways to drive it as an LLM:
   `find_duplicates` and `shrink_library` report only until `apply: true`, and
   trash rather than delete unless `delete: true`. Runs over **stdio** (build
   `packages/mcp/bin/stunda_mcp.dart`), **and** the desktop app keeps an
-  **always-on TCP** endpoint at `127.0.0.1:8787` whenever it's open.
+  **always-on TCP** endpoint whenever it's open. That endpoint starts at
+  `127.0.0.1:8787` and walks up to `8796` for a free port, so read the live one
+  from the MCP button in the header rather than assuming 8787: another program
+  holding it is exactly how a client ends up talking to something else. No key,
+  no handshake beyond `initialize`; `serverInfo` names the app and version so a
+  client can confirm it reached Stunda.
 - **CLI JSON contract** - `--json` emits one JSON event per line; `schema`
   describes every command, option, event, and exit code.
 

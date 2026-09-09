@@ -96,7 +96,13 @@ block **and** a `structuredContent` object: `{ ok, summary, count, items[], logs
   `dart compile exe packages/mcp/bin/stunda_mcp.dart -o stunda_mcp`).
 - **TCP** - the desktop app starts the server on `127.0.0.1:8787` (next free
   port up to 8796) **whenever the app is open**; newline-delimited JSON-RPC. Run
-  the binary the same way with `--tcp [--port N]`.
+  the binary the same way with `--tcp [--port N]`. Read the bound port from the
+  header's MCP button (or Settings) rather than assuming 8787 - when another
+  program holds it the server moves, and connecting to 8787 anyway reaches that
+  other program, whose refusal has nothing to do with Stunda. There is no
+  authentication on either transport; `initialize` is the whole handshake, and
+  its `serverInfo` names the app and version so a client can confirm what it
+  reached.
 
 **Client config (stdio):**
 
