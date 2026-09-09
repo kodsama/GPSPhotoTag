@@ -7,6 +7,8 @@
 /// isolates.
 library;
 
+export 'src/app/duplicates_service.dart';
+export 'src/app/shrink_service.dart';
 export 'src/app/tag_service.dart';
 export 'src/data/collectors.dart';
 export 'src/data/exif/backend_registry.dart';
@@ -26,6 +28,7 @@ export 'src/data/ports/system_trash.dart';
 export 'src/data/ports/trash.dart';
 export 'src/data/sources/google_source.dart';
 export 'src/data/sources/gpx_source.dart';
+export 'src/domain/catalog.dart';
 export 'src/domain/engine_event.dart';
 export 'src/domain/folder_scan.dart';
 export 'src/domain/location_result.dart';

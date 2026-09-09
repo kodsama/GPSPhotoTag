@@ -33,7 +33,7 @@ void main() {
       });
       expect(reasonsForStage(ShrinkStage.pairs), {
         ShrinkReason.redundantRaw,
-        ShrinkReason.redundantJpg,
+        ShrinkReason.redundantPhoto,
       });
       expect(reasonsForStage(ShrinkStage.lowQuality), {
         ShrinkReason.lowQuality,
@@ -123,7 +123,7 @@ void main() {
         side: PairDropSide.dropPhoto,
       );
       expect(out.map((c) => c.path), ['/photos/pair.jpg']);
-      expect(out.single.reason, ShrinkReason.redundantJpg);
+      expect(out.single.reason, ShrinkReason.redundantPhoto);
     });
   });
 

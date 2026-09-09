@@ -10,7 +10,6 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_prefs.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/library_action.dart';
-import 'package:stunda/src/state/prune_direction.dart';
 
 import 'support/fakes.dart';
 

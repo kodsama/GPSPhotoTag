@@ -7,7 +7,6 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/duplicates_model.dart';
 import 'package:stunda/src/state/library_action.dart';
-import 'package:stunda/src/state/shrink_model.dart';
 
 import 'support/fakes.dart';
 

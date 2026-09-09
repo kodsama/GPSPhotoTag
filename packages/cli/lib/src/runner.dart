@@ -5,12 +5,16 @@ import 'package:args/command_runner.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
 import 'commands/check_command.dart';
+import 'commands/duplicates_command.dart';
 import 'commands/fix_dates_command.dart';
 import 'commands/info_command.dart';
 import 'commands/list_command.dart';
 import 'commands/map_command.dart';
+import 'commands/photos_command.dart';
 import 'commands/prune_command.dart';
+import 'commands/scan_command.dart';
 import 'commands/schema_command.dart';
+import 'commands/shrink_command.dart';
 import 'commands/tag_command.dart';
 import 'exit_codes.dart';
 
@@ -28,10 +32,17 @@ import 'exit_codes.dart';
 ///
 /// [checkRunner] overrides how the `check` command probes external tools; tests
 /// inject a fake to exercise the missing-tool reporting path deterministically.
+///
+/// [scanner], [duplicatesService] and [shrinkService] override the engine
+/// collaborators behind `scan`, `duplicates` and `shrink`; tests inject fakes so
+/// those commands run without exiftool, a model, or a real tree.
 CommandRunner<int> buildRunner({
   IOSink? sink,
   Future<MapService> Function()? mapServiceFactory,
   ProcessRunner? checkRunner,
+  FolderScanner? scanner,
+  DuplicatesService? duplicatesService,
+  ShrinkService? shrinkService,
 }) {
   final runner =
       CommandRunner<int>(
@@ -54,6 +65,10 @@ CommandRunner<int> buildRunner({
     ..addCommand(TagCommand(sink: sink))
     ..addCommand(MapCommand(sink: sink, serviceFactory: mapServiceFactory))
     ..addCommand(PruneCommand(sink: sink))
+    ..addCommand(ScanCommand(sink: sink, scanner: scanner))
+    ..addCommand(PhotosCommand(sink: sink, serviceFactory: mapServiceFactory))
+    ..addCommand(DuplicatesCommand(sink: sink, service: duplicatesService))
+    ..addCommand(ShrinkCommand(sink: sink, service: shrinkService))
     ..addCommand(FixDatesCommand(sink: sink))
     ..addCommand(CheckCommand(sink: sink, runner: checkRunner))
     ..addCommand(InfoCommand(sink: sink))
@@ -76,6 +91,9 @@ Future<int> runCliWithSink(
   IOSink? errorSink,
   Future<MapService> Function()? mapServiceFactory,
   ProcessRunner? checkRunner,
+  FolderScanner? scanner,
+  DuplicatesService? duplicatesService,
+  ShrinkService? shrinkService,
 }) async {
   final out = sink ?? stdout; // coverage:ignore-line
   final err = errorSink ?? stderr; // coverage:ignore-line
@@ -83,6 +101,9 @@ Future<int> runCliWithSink(
     sink: out,
     mapServiceFactory: mapServiceFactory,
     checkRunner: checkRunner,
+    scanner: scanner,
+    duplicatesService: duplicatesService,
+    shrinkService: shrinkService,
   );
   try {
     return await runner.run(args) ?? ExitCodes.ok;

@@ -29,6 +29,9 @@ enum PhotoStatus {
   /// An orphan RAW was permanently deleted.
   prunedDeleted('pruned_deleted'),
 
+  /// The member of a duplicate group the keep-rules chose to survive.
+  kept('kept'),
+
   /// Processing failed for this item; see the row note.
   error('error');
 

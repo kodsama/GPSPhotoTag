@@ -38,7 +38,9 @@ class StatusPill extends StatelessWidget {
     PhotoStatus.interpolated ||
     PhotoStatus.datesFixed ||
     PhotoStatus.prunedTrashed => AppColors.success,
-    PhotoStatus.alreadyTagged || PhotoStatus.dryRun => AppColors.contour,
+    PhotoStatus.alreadyTagged ||
+    PhotoStatus.dryRun ||
+    PhotoStatus.kept => AppColors.contour,
     PhotoStatus.noGps || PhotoStatus.noTimestamp => AppColors.warning,
     PhotoStatus.prunedDeleted => AppColors.terracottaDark,
     PhotoStatus.error => AppColors.danger,

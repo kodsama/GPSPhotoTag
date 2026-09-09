@@ -67,11 +67,52 @@ const _schema = {
       'emits': ['log', 'done', 'error'],
     },
     'prune-raw': {
-      'summary': 'Trash/delete RAW files lacking a JPG/HEIC companion.',
+      'summary': 'Trash/delete one side of the RAW/photo pairing.',
       'options': {
         '--photo|-p': 'string[] (required) — roots to scan',
+        '--direction': 'enum orphan-raws|orphan-images (default orphan-raws)',
         '--rm': 'bool — delete instead of Trash',
         '--dry-run': 'bool — report only',
+      },
+      'emits': ['log', 'item', 'progress', 'done', 'error'],
+    },
+    'scan': {
+      'summary': 'Report what a library holds (read-only).',
+      'options': {
+        '--photo|-p': 'string[] (required) — roots to scan',
+        '--paths': 'bool — include full photo/track/history path lists',
+      },
+      'emits': ['(json) {event:scan, files, photoCount, byExtension, ...}'],
+    },
+    'photos': {
+      'summary': 'List geotagged photos with coordinates (read-only).',
+      'options': {'--photo|-p': 'string[] (required) — files/dirs'},
+      'emits': [
+        '(json) {event:photos, count, photos:[{path,lat,lon,taken_at}]}',
+      ],
+    },
+    'duplicates': {
+      'summary': 'Group visually-similar photos; keep the best of each group.',
+      'options': {
+        '--photo|-p': 'string[] (required) — roots to scan',
+        '--metric': 'enum fast|smart (default fast)',
+        '--similarity': 'number 0..1 (default 0.92)',
+        '--apply': 'bool — remove duplicates (default: report only)',
+        '--rm': 'bool — with --apply, delete instead of Trash',
+      },
+      'emits': ['log', 'item', 'progress', 'done', 'error'],
+    },
+    'shrink': {
+      'summary': 'Stage duplicate/orphan/redundant/low-quality photos.',
+      'options': {
+        '--photo|-p': 'string[] (required) — roots to scan',
+        '--stage': 'enum[] duplicates|orphans|pairs|low-quality (required, repeatable)',
+        '--metric': 'enum fast|smart (default fast)',
+        '--similarity': 'number 0..1 (default 0.92)',
+        '--quality-threshold': 'number 0..1 (default 0.35)',
+        '--pair-drop': 'enum raw|photo (default raw)',
+        '--apply': 'bool — remove staged files (default: report only)',
+        '--rm': 'bool — with --apply, delete instead of Trash',
       },
       'emits': ['log', 'item', 'progress', 'done', 'error'],
     },
@@ -113,7 +154,9 @@ const _schema = {
     'item': {
       'event': 'item',
       'path': 'string',
-      'status': 'tagged|interpolated|already_tagged|no_gps|no_timestamp|dates_fixed|dry_run|pruned_trashed|pruned_deleted|error',
+      'status':
+          'tagged|interpolated|already_tagged|no_gps|no_timestamp|dates_fixed'
+          '|dry_run|pruned_trashed|pruned_deleted|kept|error',
       'timestamp': 'ISO-8601 (optional)',
       'lat': 'number (optional)',
       'lon': 'number (optional)',

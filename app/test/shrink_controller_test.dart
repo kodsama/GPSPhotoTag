@@ -6,7 +6,6 @@ import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/library_action.dart';
-import 'package:stunda/src/state/prune_direction.dart';
 import 'package:stunda/src/state/shrink_model.dart';
 
 import 'support/fakes.dart';
@@ -202,7 +201,7 @@ void main() {
       c.addActiveStageToShrinkList();
       final out = c.shrinkOutcome(ShrinkStage.pairs)!;
       expect(out.added.map((e) => e.path), [pairJpg.path]);
-      expect(out.added.single.reason, ShrinkReason.redundantJpg);
+      expect(out.added.single.reason, ShrinkReason.redundantPhoto);
       expect(out.stageTally.bytes, 1);
     });
 

@@ -1,49 +1,20 @@
 import 'package:stunda_engine/stunda_engine.dart';
 
-/// Which side of the RAW/image pairing the prune review trashes.
+/// The localization keys for each [PruneDirection].
 ///
-/// The review classifies the whole library once ([RawPairing]); the direction
-/// only chooses which category is the selectable/trashable *target* — the other
-/// categories stay visible as read-only context. Paired files are never a
-/// target in either direction.
-enum PruneDirection {
-  /// Trash RAW files that have no matching photo ([PairKind.orphanRaw]).
-  removeOrphanRaws(
-    target: PairKind.orphanRaw,
-    labelKey: 'prune_dir_orphan_raws',
-    descriptionKey: 'prune_dir_orphan_raws_desc',
-  ),
-
-  /// Trash non-RAW photos (JPG/HEIC/…) that have no matching RAW
-  /// ([PairKind.photoWithoutRaw]).
-  removeOrphanImages(
-    target: PairKind.photoWithoutRaw,
-    labelKey: 'prune_dir_orphan_images',
-    descriptionKey: 'prune_dir_orphan_images_desc',
-  );
-
-  const PruneDirection({
-    required this.target,
-    required this.labelKey,
-    required this.descriptionKey,
-  });
-
-  /// The [PairKind] this direction selects and trashes.
-  final PairKind target;
-
+/// The enum itself lives in the engine, so the GUI, the CLI (`prune-raw
+/// --direction`) and the MCP server (`prune_raw`) all target the same two
+/// sides. Only the display strings are the app's concern.
+extension PruneDirectionLabels on PruneDirection {
   /// Localization key for the direction toggle segment label.
-  final String labelKey;
+  String get labelKey => switch (this) {
+    PruneDirection.removeOrphanRaws => 'prune_dir_orphan_raws',
+    PruneDirection.removeOrphanImages => 'prune_dir_orphan_images',
+  };
 
   /// Localization key for what this direction trashes.
-  final String descriptionKey;
+  String get descriptionKey => switch (this) {
+    PruneDirection.removeOrphanRaws => 'prune_dir_orphan_raws_desc',
+    PruneDirection.removeOrphanImages => 'prune_dir_orphan_images_desc',
+  };
 }
-
-/// The trashable paths for [pairing] under [direction], in scan order.
-///
-/// Pure and side-effect-free so it is unit-testable without a controller: it is
-/// every path whose kind equals the direction's [PruneDirection.target]
-/// (orphan RAWs for A, orphan images for B). Paired files are never returned.
-List<String> trashCandidates(RawPairing pairing, PruneDirection direction) => [
-  for (final f in pairing.files)
-    if (f.kind == direction.target) f.path,
-];

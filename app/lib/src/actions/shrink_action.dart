@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:stunda_engine/stunda_engine.dart';
 
 import '../explore/photo_detail_panel.dart';
 import '../i18n/app_localizations.dart';

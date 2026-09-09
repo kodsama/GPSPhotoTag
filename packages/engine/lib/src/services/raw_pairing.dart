@@ -112,3 +112,43 @@ RawPairing classifyPairing(List<String> photoPaths) {
 /// Delegates to [PhotoFormats.baseKeyOf] so the separator-robust logic is
 /// shared with [Pruner].
 String _baseKey(String path) => PhotoFormats.baseKeyOf(path);
+
+/// Which side of the RAW/image pairing a prune run targets.
+///
+/// The library is classified once ([classifyPairing]); the direction only picks
+/// which [PairKind] is the trashable target. Paired files are never a target in
+/// either direction.
+enum PruneDirection {
+  /// Trash RAW files that have no matching photo ([PairKind.orphanRaw]).
+  removeOrphanRaws(PairKind.orphanRaw, 'orphan-raws'),
+
+  /// Trash non-RAW photos that have no matching RAW
+  /// ([PairKind.photoWithoutRaw]).
+  removeOrphanImages(PairKind.photoWithoutRaw, 'orphan-images');
+
+  const PruneDirection(this.target, this.wire);
+
+  /// The [PairKind] this direction selects and trashes.
+  final PairKind target;
+
+  /// Stable name used by the CLI `--direction` flag and the MCP `direction`
+  /// argument.
+  final String wire;
+
+  /// The direction whose [wire] is [name], or null when unrecognised.
+  static PruneDirection? byWire(String name) {
+    for (final d in PruneDirection.values) {
+      if (d.wire == name) return d;
+    }
+    return null;
+  }
+}
+
+/// The trashable paths for [pairing] under [direction], in scan order.
+///
+/// Pure: every path whose kind equals the direction's [PruneDirection.target].
+/// Paired files are never returned.
+List<String> trashCandidates(RawPairing pairing, PruneDirection direction) => [
+  for (final f in pairing.files)
+    if (f.kind == direction.target) f.path,
+];

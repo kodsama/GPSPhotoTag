@@ -24,45 +24,21 @@ enum ShrinkBackTarget {
   library,
 }
 
-/// The opt-in stages of the shrink wizard, in order.
-enum ShrinkStage {
-  /// Visually-similar photos (perceptual hashing); non-kept members.
-  duplicates,
-
-  /// RAW with no JPG/HEIC companion, or image with no RAW.
-  orphans,
-
-  /// Both a RAW and a non-RAW exist; drop one side.
-  pairs,
-
-  /// Quality score below a user-chosen threshold.
-  lowQuality,
-}
-
-/// Why a file was staged for deletion. Maps to a localization key for display.
-enum ShrinkReason {
-  /// Non-kept member of a duplicate group.
-  duplicate('shrink_reason_duplicate'),
-
-  /// A RAW file with no JPG/HEIC companion.
-  orphanRaw('shrink_reason_orphan_raw'),
-
-  /// A non-RAW image with no RAW companion.
-  orphanImage('shrink_reason_orphan_image'),
-
-  /// The RAW half of a RAW+photo pair (the photo is kept).
-  redundantRaw('shrink_reason_redundant_raw'),
-
-  /// The photo half of a RAW+photo pair (the RAW is kept).
-  redundantJpg('shrink_reason_redundant_jpg'),
-
-  /// Quality score below the chosen threshold.
-  lowQuality('shrink_reason_low_quality');
-
-  const ShrinkReason(this.labelKey);
-
+/// The localization keys for each [ShrinkReason].
+///
+/// The enum itself lives in the engine, so the wizard, the CLI (`shrink`) and
+/// the MCP server (`shrink_library`) stage files for the same reasons. Only the
+/// display strings are the app's concern.
+extension ShrinkReasonLabels on ShrinkReason {
   /// The localization key for this reason's label.
-  final String labelKey;
+  String get labelKey => switch (this) {
+    ShrinkReason.duplicate => 'shrink_reason_duplicate',
+    ShrinkReason.orphanRaw => 'shrink_reason_orphan_raw',
+    ShrinkReason.orphanImage => 'shrink_reason_orphan_image',
+    ShrinkReason.redundantRaw => 'shrink_reason_redundant_raw',
+    ShrinkReason.redundantPhoto => 'shrink_reason_redundant_jpg',
+    ShrinkReason.lowQuality => 'shrink_reason_low_quality',
+  };
 
   /// The localized label via [tr].
   String label(Translator tr) => tr(labelKey);
@@ -236,7 +212,7 @@ class StagedSet {
 Set<ShrinkReason> reasonsForStage(ShrinkStage stage) => switch (stage) {
   ShrinkStage.duplicates => {ShrinkReason.duplicate},
   ShrinkStage.orphans => {ShrinkReason.orphanRaw, ShrinkReason.orphanImage},
-  ShrinkStage.pairs => {ShrinkReason.redundantRaw, ShrinkReason.redundantJpg},
+  ShrinkStage.pairs => {ShrinkReason.redundantRaw, ShrinkReason.redundantPhoto},
   ShrinkStage.lowQuality => {ShrinkReason.lowQuality},
 };
 
@@ -304,20 +280,11 @@ List<ShrinkCandidate> orphanCandidates(
   return out;
 }
 
-/// Which side of a RAW+photo pair to drop in the redundant-pairs stage.
-enum PairDropSide {
-  /// Keep the photo; drop the RAW.
-  dropRaw,
-
-  /// Keep the RAW; drop the photo.
-  dropPhoto,
-}
-
 /// The redundant-pairs candidates: where BOTH a RAW and its non-RAW partner
 /// exist ([PairKind.pairedRaw] / [PairKind.photoWithRaw]), drop the [side] the
 /// user chose. Dropping the RAW flags [PairKind.pairedRaw] rows
 /// ([ShrinkReason.redundantRaw]); dropping the photo flags [PairKind.photoWithRaw]
-/// rows ([ShrinkReason.redundantJpg]).
+/// rows ([ShrinkReason.redundantPhoto]).
 List<ShrinkCandidate> redundantPairCandidates(
   RawPairing pairing, {
   required PairDropSide side,
@@ -329,7 +296,7 @@ List<ShrinkCandidate> redundantPairCandidates(
       : PairKind.photoWithRaw;
   final reason = side == PairDropSide.dropRaw
       ? ShrinkReason.redundantRaw
-      : ShrinkReason.redundantJpg;
+      : ShrinkReason.redundantPhoto;
   final out = <ShrinkCandidate>[];
   for (final file in pairing.files) {
     if (file.kind != wantKind) continue;

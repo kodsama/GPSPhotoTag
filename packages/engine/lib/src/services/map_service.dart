@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
+import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/ports/process_runner.dart';
@@ -28,6 +29,41 @@ class GeoPoint {
 
   /// Source filename (basename without extension).
   final String name;
+}
+
+/// One geotagged photo: where it was taken and when, keyed by its full path.
+///
+/// Unlike [GeoPoint] (which the renderer reduces to a plotted dot) this keeps
+/// the path, so a caller can act on the file it names.
+@immutable
+class GeoPhoto {
+  /// Creates a geotagged-photo record.
+  const GeoPhoto({
+    required this.path,
+    required this.lat,
+    required this.lon,
+    this.takenAt,
+  });
+
+  /// Absolute path of the photo.
+  final String path;
+
+  /// Latitude in degrees, north positive.
+  final double lat;
+
+  /// Longitude in degrees, east positive.
+  final double lon;
+
+  /// EXIF `DateTimeOriginal` as written in the file, when present.
+  final String? takenAt;
+
+  /// JSON form used by the CLI `photos` command and the MCP `list_photos` tool.
+  Map<String, Object?> toJson() => {
+    'path': path,
+    'lat': lat,
+    'lon': lon,
+    if (takenAt != null) 'taken_at': takenAt,
+  };
 }
 
 /// Fractional Web-Mercator pixel X for [lon] at zoom [z] (tile size [_tileSize]).
@@ -165,33 +201,51 @@ class MapService {
     yield DoneEvent({'mapped': points.length});
   }
 
-  /// Batch-reads numeric GPS for every path in one exiftool call.
+  /// Every geotagged photo among [photos], with its full path and coordinate.
   ///
-  /// Throws if exiftool cannot be launched or returns a non-zero exit, which the
-  /// caller maps to a `missing_toolkit` error.
-  Future<List<GeoPoint>> _readGps(List<String> photos) async {
+  /// The read-only data behind the GUI's Explore map, exposed so the CLI and
+  /// MCP server can list the same set headlessly. Photos with no GPS are
+  /// omitted. Throws when exiftool cannot run, which callers map to
+  /// `missing_toolkit`.
+  Future<List<GeoPhoto>> readGeotagged(List<String> photos) async {
     final result = await _runner.run('exiftool', [
       '-json',
       '-n',
       '-GPSLatitude',
       '-GPSLongitude',
+      '-DateTimeOriginal',
       ...photos,
     ]);
     if (!result.ok && result.stdout.trim().isEmpty) {
       throw StateError('exiftool failed: ${result.stderr}');
     }
     final decoded = jsonDecode(result.stdout) as List<dynamic>;
-    final points = <GeoPoint>[];
+    final out = <GeoPhoto>[];
     for (final entry in decoded) {
       final map = entry as Map<String, dynamic>;
       final lat = exifAsDouble(map['GPSLatitude']);
       final lon = exifAsDouble(map['GPSLongitude']);
       if (lat == null || lon == null) continue;
-      final source = (map['SourceFile'] as String?) ?? '';
-      points.add(GeoPoint(lat, lon, p.basenameWithoutExtension(source)));
+      out.add(
+        GeoPhoto(
+          path: (map['SourceFile'] as String?) ?? '',
+          lat: lat,
+          lon: lon,
+          takenAt: map['DateTimeOriginal'] as String?,
+        ),
+      );
     }
-    return points;
+    return out;
   }
+
+  /// Batch-reads numeric GPS for every path in one exiftool call.
+  ///
+  /// Throws if exiftool cannot be launched or returns a non-zero exit, which the
+  /// caller maps to a `missing_toolkit` error.
+  Future<List<GeoPoint>> _readGps(List<String> photos) async => [
+    for (final g in await readGeotagged(photos))
+      GeoPoint(g.lat, g.lon, p.basenameWithoutExtension(g.path)),
+  ];
 
   /// Builds the basemap image covering the canvas, fetching every needed tile.
   ///

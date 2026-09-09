@@ -199,8 +199,9 @@ List<McpTool> buildTools({
     McpTool(
       name: 'prune_raw',
       description:
-          'Move RAW files that have no same-name JPG/HEIC companion '
-          '(anywhere in the tree) to the Trash, or delete them.',
+          'Move one side of the RAW/photo pairing to the Trash, or delete it: '
+          'orphan RAWs (no JPG/HEIC companion) or orphan images (no RAW). '
+          'Paired files are never touched.',
       inputSchema: {
         'type': 'object',
         'required': ['roots'],
@@ -209,6 +210,11 @@ List<McpTool> buildTools({
             'type': 'array',
             'items': {'type': 'string'},
             'description': 'Files or directories to scan.',
+          },
+          'direction': {
+            'type': 'string',
+            'enum': ['orphan-raws', 'orphan-images'],
+            'description': 'Which side to trash (default orphan-raws).',
           },
           'delete': {
             'type': 'boolean',
@@ -222,12 +228,23 @@ List<McpTool> buildTools({
         if (roots.isEmpty) {
           return {'ok': false, 'code': 'bad_input', 'error': 'roots required'};
         }
+        final direction = PruneDirection.byWire(
+          (args['direction'] as String?) ?? 'orphan-raws',
+        );
+        if (direction == null) {
+          return {
+            'ok': false,
+            'code': 'bad_input',
+            'error': 'direction must be orphan-raws or orphan-images',
+          };
+        }
         return collectResult(
           Pruner(trash: const SystemTrash()).prune(
             roots,
             PruneOptions(
               delete: args['delete'] as bool? ?? false,
               dryRun: args['dry_run'] as bool? ?? false,
+              direction: direction,
             ),
           ),
         );
@@ -278,6 +295,278 @@ List<McpTool> buildTools({
           ),
         );
       },
+    ),
+    McpTool(
+      name: 'scan_library',
+      description:
+          'Walk a library and report what it holds: photo, track and history '
+          'counts, the per-extension breakdown, and unsupported buckets. '
+          'Read-only.',
+      inputSchema: const {
+        'type': 'object',
+        'required': ['roots'],
+        'properties': {
+          'roots': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': 'Files or directories to scan (recursive).',
+          },
+          'paths': {
+            'type': 'boolean',
+            'description': 'Include the full photo/track/history path lists.',
+          },
+        },
+      },
+      run: (args) async {
+        final roots = _strList(args['roots']);
+        if (roots.isEmpty) {
+          return {'ok': false, 'code': 'bad_input', 'error': 'roots required'};
+        }
+        // The scanner always closes with a ScanDoneEvent, so the last one
+        // seen is the complete result.
+        FolderScanResult? result;
+        await for (final e in FolderScanner().scan(roots)) {
+          if (e is ScanDoneEvent) result = e.result;
+        }
+        final out = <String, Object?>{'ok': true, ...result!.toJson()};
+        if (args['paths'] as bool? ?? false) return out;
+        return out
+          ..remove('photos')
+          ..remove('gpxFiles')
+          ..remove('kmlFiles')
+          ..remove('googleFiles')
+          ..remove('unsupported');
+      },
+    ),
+    McpTool(
+      name: 'list_photos',
+      description:
+          'List geotagged photos with their coordinates and capture time — '
+          'the data behind the Explore map. Read-only.',
+      inputSchema: const {
+        'type': 'object',
+        'required': ['photos'],
+        'properties': {
+          'photos': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': 'Photo files or directories (recursive).',
+          },
+        },
+      },
+      run: (args) async {
+        final photos = Collectors.photos(_strList(args['photos']));
+        if (photos.isEmpty) {
+          return {'ok': false, 'code': 'bad_input', 'error': 'no photos found'};
+        }
+        final service = MapService(
+          runner: runner,
+          client: mapClient,
+          exiftoolAvailable: exiftoolAvailable,
+        );
+        try {
+          final found = await service.readGeotagged(photos);
+          return {
+            'ok': true,
+            'count': found.length,
+            'photos': [for (final g in found) g.toJson()],
+          };
+        } on Object catch (e) {
+          return {'ok': false, 'code': 'missing_toolkit', 'error': '$e'};
+        }
+      },
+    ),
+    McpTool(
+      name: 'find_duplicates',
+      description:
+          'Group visually-similar photos and pick the best of each group. '
+          'Reports only unless apply=true, which trashes the non-kept copies.',
+      inputSchema: const {
+        'type': 'object',
+        'required': ['roots'],
+        'properties': {
+          'roots': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': 'Files or directories to scan (recursive).',
+          },
+          'metric': {
+            'type': 'string',
+            'enum': ['fast', 'smart'],
+            'description':
+                "'fast': perceptual hash + colour. 'smart': on-device "
+                'embedding (falls back to fast with no model).',
+          },
+          'min_similarity': {
+            'type': 'number',
+            'description': 'Match cutoff 0..1 (default 0.92).',
+          },
+          'apply': {
+            'type': 'boolean',
+            'description':
+                'Remove the duplicates (default false: report only).',
+          },
+          'delete': {
+            'type': 'boolean',
+            'description':
+                'With apply, delete permanently instead of trashing.',
+          },
+        },
+      },
+      run: (args) async {
+        final roots = _strList(args['roots']);
+        if (roots.isEmpty) {
+          return {'ok': false, 'code': 'bad_input', 'error': 'roots required'};
+        }
+        final similarity = (args['min_similarity'] as num?)?.toDouble() ?? 0.92;
+        if (similarity < 0 || similarity > 1) {
+          return {
+            'ok': false,
+            'code': 'bad_input',
+            'error': 'min_similarity must be between 0 and 1',
+          };
+        }
+        return collectResult(
+          DuplicatesService(
+            runner: runner,
+            trash: const SystemTrash(),
+          ).findDuplicates(
+            roots,
+            DuplicatesOptions(
+              minSimilarity: similarity,
+              metric: SimilarityMetric.values.byName(
+                (args['metric'] as String?) ?? 'fast',
+              ),
+              delete: args['delete'] as bool? ?? false,
+              dryRun: !(args['apply'] as bool? ?? false),
+            ),
+          ),
+        );
+      },
+    ),
+    McpTool(
+      name: 'shrink_library',
+      description:
+          'Stage duplicate, orphan, redundant and low-quality photos for '
+          'removal in opt-in stages. Reports only unless apply=true.',
+      inputSchema: const {
+        'type': 'object',
+        'required': ['roots', 'stages'],
+        'properties': {
+          'roots': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': 'Files or directories to scan (recursive).',
+          },
+          'stages': {
+            'type': 'array',
+            'items': {
+              'type': 'string',
+              'enum': ['duplicates', 'orphans', 'pairs', 'low-quality'],
+            },
+            'description':
+                'Stages to run. A file staged by an earlier stage is never '
+                're-counted by a later one.',
+          },
+          'metric': {
+            'type': 'string',
+            'enum': ['fast', 'smart'],
+            'description': 'Similarity metric for the duplicates stage.',
+          },
+          'min_similarity': {
+            'type': 'number',
+            'description': 'Match cutoff 0..1 for duplicates (default 0.92).',
+          },
+          'quality_threshold': {
+            'type': 'number',
+            'description':
+                'Composite quality below this is staged by low-quality '
+                '(default 0.35).',
+          },
+          'pair_drop': {
+            'type': 'string',
+            'enum': ['raw', 'photo'],
+            'description': 'Which half of a RAW+photo pair to drop.',
+          },
+          'apply': {
+            'type': 'boolean',
+            'description': 'Remove the staged files (default false).',
+          },
+          'delete': {
+            'type': 'boolean',
+            'description':
+                'With apply, delete permanently instead of trashing.',
+          },
+        },
+      },
+      run: (args) async {
+        final roots = _strList(args['roots']);
+        if (roots.isEmpty) {
+          return {'ok': false, 'code': 'bad_input', 'error': 'roots required'};
+        }
+        final stages = <ShrinkStage>{};
+        for (final name in _strList(args['stages'])) {
+          final stage = ShrinkStage.byWire(name);
+          if (stage == null) {
+            return {
+              'ok': false,
+              'code': 'bad_input',
+              'error': 'unknown stage: $name',
+            };
+          }
+          stages.add(stage);
+        }
+        if (stages.isEmpty) {
+          return {
+            'ok': false,
+            'code': 'bad_input',
+            'error': 'at least one stage is required',
+          };
+        }
+        final side = PairDropSide.byWire(
+          (args['pair_drop'] as String?) ?? 'raw',
+        );
+        if (side == null) {
+          return {
+            'ok': false,
+            'code': 'bad_input',
+            'error': 'pair_drop must be raw or photo',
+          };
+        }
+        return collectResult(
+          ShrinkService(runner: runner, trash: const SystemTrash()).shrink(
+            roots,
+            ShrinkOptions(
+              stages: stages,
+              minSimilarity:
+                  (args['min_similarity'] as num?)?.toDouble() ?? 0.92,
+              metric: SimilarityMetric.values.byName(
+                (args['metric'] as String?) ?? 'fast',
+              ),
+              qualityThreshold:
+                  (args['quality_threshold'] as num?)?.toDouble() ?? 0.35,
+              pairDropSide: side,
+              delete: args['delete'] as bool? ?? false,
+              dryRun: !(args['apply'] as bool? ?? false),
+            ),
+          ),
+        );
+      },
+    ),
+    McpTool(
+      name: 'list_providers',
+      description:
+          'List the map tile and geocoder providers the heatmap can draw with.',
+      inputSchema: const {'type': 'object', 'properties': {}},
+      run: (args) async => {'ok': true, 'providers': mapProviders},
+    ),
+    McpTool(
+      name: 'list_sources',
+      description:
+          'List the location-source kinds the engine can parse, with their '
+          'file extensions and precision notes.',
+      inputSchema: const {'type': 'object', 'properties': {}},
+      run: (args) async => {'ok': true, 'sources': locationSources},
     ),
     McpTool(
       name: 'check_toolkit',

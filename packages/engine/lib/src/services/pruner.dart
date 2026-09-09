@@ -1,13 +1,12 @@
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
-
 import '../data/photo_formats.dart';
 import '../data/ports/trash.dart';
 import '../domain/engine_event.dart';
 import '../domain/options.dart';
 import '../domain/photo_row.dart';
 import '../domain/status.dart';
+import 'raw_pairing.dart';
 
 /// Finds and removes orphan RAW files — RAWs with no same-named JPG/HEIC
 /// companion anywhere in the scanned tree.
@@ -22,21 +21,26 @@ class Pruner {
 
   final Trash _trash;
 
-  /// Scans [roots] recursively and removes orphan RAW files per [options].
+  /// Scans [roots] recursively and removes orphans per [options].
+  ///
+  /// [PruneOptions.direction] picks the side: orphan RAWs (RAWs with no
+  /// JPG/HEIC companion) or orphan images (non-RAW photos with no RAW). Files
+  /// that have a partner are never touched in either direction.
   ///
   /// Emits a [LogEvent] and an [ItemEvent] per action, and a final [DoneEvent]
   /// whose summary is keyed by [PhotoStatus.wire]. Per-file failures surface as
   /// an [ItemEvent] with [PhotoStatus.error] and do not abort the run.
   Stream<EngineEvent> prune(List<String> roots, PruneOptions options) async* {
-    final companions = <String>{};
-    final raws = <File>[];
-    await _scan(roots, companions, raws);
+    final photos = <String>[];
+    await _scanPhotos(roots, photos);
+    final orphans = trashCandidates(
+      classifyPairing(photos),
+      options.direction,
+    ).map(File.new).toList(growable: false);
 
-    final orphans = raws
-        .where((f) => !companions.contains(PhotoFormats.baseKeyOf(f.path)))
-        .toList(growable: false);
-
-    yield LogEvent('Found ${orphans.length} orphan RAW file(s).');
+    yield LogEvent(
+      'Found ${orphans.length} ${options.direction.wire} candidate(s).',
+    );
 
     final summary = <String, int>{};
     var done = 0;
@@ -49,12 +53,8 @@ class Pruner {
     yield DoneEvent(summary);
   }
 
-  /// Walks every root, recording companion basenames and collecting RAW files.
-  Future<void> _scan(
-    List<String> roots,
-    Set<String> companions,
-    List<File> raws,
-  ) async {
+  /// Walks every root and collects the photo paths [classifyPairing] buckets.
+  Future<void> _scanPhotos(List<String> roots, List<String> photos) async {
     for (final root in roots) {
       final dir = Directory(root);
       if (!dir.existsSync()) continue;
@@ -63,12 +63,7 @@ class Pruner {
         followLinks: false,
       )) {
         if (entity is! File) continue;
-        final ext = _ext(entity.path);
-        if (PhotoFormats.companion.contains(ext)) {
-          companions.add(PhotoFormats.baseKeyOf(entity.path));
-        } else if (PhotoFormats.raw.contains(ext)) {
-          raws.add(entity);
-        }
+        if (PhotoFormats.isPhoto(entity.path)) photos.add(entity.path);
       }
     }
   }
@@ -182,10 +177,4 @@ class Pruner {
 
   void _bump(Map<String, int> summary, PhotoStatus status) =>
       summary[status.wire] = (summary[status.wire] ?? 0) + 1;
-
-  /// Lowercased extension without the leading dot (empty if none).
-  String _ext(String path) {
-    final ext = p.extension(path);
-    return ext.isEmpty ? '' : ext.substring(1).toLowerCase();
-  }
 }

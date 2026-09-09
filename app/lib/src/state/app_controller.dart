@@ -20,7 +20,6 @@ import 'duplicates_model.dart';
 import 'library_action.dart';
 import 'library_roots.dart';
 import 'log_entry.dart';
-import 'prune_direction.dart';
 import 'shrink_model.dart';
 
 /// The single source of truth for the Stunda GUI.

@@ -11,7 +11,6 @@ import 'package:stunda/src/state/app_controller.dart';
 import 'package:stunda/src/state/app_screen.dart';
 import 'package:stunda/src/state/controller_scope.dart';
 import 'package:stunda/src/state/library_action.dart';
-import 'package:stunda/src/state/prune_direction.dart';
 import 'package:stunda/src/screens/workspace_screen.dart';
 import 'package:stunda/src/widgets/action_card.dart';
 import 'package:stunda/src/widgets/status_pill.dart';

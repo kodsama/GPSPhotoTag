@@ -111,8 +111,11 @@ dart run stunda_cli --version
 dart compile exe packages/cli/bin/stunda.dart -o stunda
 ```
 
-Commands: `tag`, `map`, `prune-raw`, `fix-dates`, `check`, `info`,
-`list-sources`, `list-providers`, `schema`.
+Commands: `tag`, `map`, `photos`, `scan`, `prune-raw`, `duplicates`, `shrink`,
+`fix-dates`, `check`, `info`, `list-sources`, `list-providers`, `schema`.
+
+Every feature the desktop app has is here too — the GUI and the CLI drive the
+same engine services, so nothing is GUI-only.
 
 ```bash
 # Tag a folder from a GPX track, in place:
@@ -126,18 +129,52 @@ stunda prune-raw -p ~/Pictures/Trip
 
 # Preview anything without writing:
 stunda tag -p ~/Pictures/Trip -g trip.gpx --dry-run
+
+# What's in this library? (read-only)
+stunda scan -p ~/Pictures/Trip
+
+# Where was each photo taken? (read-only, the Explore map's data)
+stunda photos -p ~/Pictures/Trip
+
+# Find near-duplicates; reports only until you pass --apply:
+stunda duplicates -p ~/Pictures/Trip --metric smart --similarity 0.9
+stunda duplicates -p ~/Pictures/Trip --apply
+
+# Shrink in opt-in stages (nothing goes until --apply):
+stunda shrink -p ~/Pictures/Trip --stage duplicates --stage low-quality
+
+# Remove orphan images instead of orphan RAWs:
+stunda prune-raw -p ~/Pictures/Trip --direction orphan-images
 ```
+
+Both destructive commands are **review-first**: `duplicates` and `shrink` report
+what they would remove and change nothing until `--apply`, and even then files
+go to the Trash unless you add `--rm`.
 
 ### For agents / scripting
 
 Two ways to drive it as an LLM:
 
-- **MCP server** — a standard Model Context Protocol server (JSON-RPC 2.0) with
-  tools `tag_photos`, `render_heatmap`, `prune_raw`, `fix_dates`,
-  `check_toolkit`, `get_capabilities`. Runs over **stdio** (build
+- **MCP server** — a standard Model Context Protocol server (JSON-RPC 2.0)
+  covering every engine capability, so an agent can do anything the GUI can:
+
+  | Tool | Does |
+  |---|---|
+  | `tag_photos` | Write GPS EXIF from GPX / Google history |
+  | `render_heatmap` | Render the density-heatmap PNG |
+  | `list_photos` | Geotagged photos + coordinates (the Explore data) |
+  | `scan_library` | What a library holds (the Review summary) |
+  | `prune_raw` | Trash orphan RAWs **or** orphan images |
+  | `find_duplicates` | Group near-duplicates, keep the best of each |
+  | `shrink_library` | Staged duplicate/orphan/redundant/low-quality removal |
+  | `fix_dates` | Realign file and EXIF dates |
+  | `list_sources`, `list_providers` | Location-source and tile/geocoder catalogs |
+  | `check_toolkit`, `get_capabilities` | Environment probe |
+
+  `find_duplicates` and `shrink_library` report only until `apply: true`, and
+  trash rather than delete unless `delete: true`. Runs over **stdio** (build
   `packages/mcp/bin/stunda_mcp.dart`), **and** the desktop app keeps an
-  **always-on TCP** endpoint at
-  `127.0.0.1:8787` whenever it's open.
+  **always-on TCP** endpoint at `127.0.0.1:8787` whenever it's open.
 - **CLI JSON contract** — `--json` emits one JSON event per line; `schema`
   describes every command, option, event, and exit code.
 
@@ -151,6 +188,10 @@ stunda --json tag -p ./Trip -g t.gpx --overwrite
 
 Exit codes: `0` ok · `2` partial (some no-match) · `3` bad input · `4` missing
 toolkit · `5` internal.
+
+The engine's high-level services (`TagService`, `MapService`, `Pruner`, `Dater`,
+`DuplicatesService`, `ShrinkService`, `FolderScanner`) are what both front-ends
+call, so the CLI, the MCP server and the GUI can never drift apart.
 
 ## Project layout
 

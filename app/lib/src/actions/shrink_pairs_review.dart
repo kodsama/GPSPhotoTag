@@ -6,7 +6,6 @@ import '../explore/photo_detail_panel.dart';
 import '../i18n/app_localizations.dart';
 import '../state/app_controller.dart';
 import '../state/controller_scope.dart';
-import '../state/shrink_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/image_compare_viewer.dart';
 import 'duplicates_action.dart' show formatBytes;
