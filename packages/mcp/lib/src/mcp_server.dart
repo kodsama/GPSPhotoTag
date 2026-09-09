@@ -10,7 +10,7 @@ import 'tools.dart';
 /// message and returns the response map (or null for notifications). A stdio or
 /// TCP transport wraps it.
 /// Version advertised when no host app supplies its own.
-const kMcpDefaultVersion = '2.1.1';
+const kMcpDefaultVersion = '2.2.0';
 
 class McpServer {
   /// Creates a server exposing [tools].

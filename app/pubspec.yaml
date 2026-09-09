@@ -3,7 +3,7 @@ description: >-
   Stunda - GPS photo tagging, map exploring, duplicate finding, and library
   shrinking on macOS, Linux, Windows, Android, and iOS.
 publish_to: 'none'
-version: 2.1.1+4
+version: 2.2.0+5
 resolution: workspace
 
 environment:

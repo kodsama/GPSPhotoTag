@@ -1,6 +1,6 @@
 name: stunda
 base: core22
-version: '2.1.1'
+version: '2.2.0'
 title: Stunda
 license: GPL-3.0-or-later
 contact: kodsama@protonmail.com
