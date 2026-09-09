@@ -9,7 +9,7 @@
 #     `lib/Image/...` modules) under assets/exiftool/, invoked via the system
 #     `perl`. Strategy:
 #       1. If a system exiftool is installed, vendor its real distribution.
-#       2. Otherwise download the official tarball from exiftool.org.
+#       2. Otherwise download the upstream release tarball.
 #   - Windows: the official self-contained ExifTool (`exiftool.exe` plus its
 #     `exiftool_files/` dir, which embeds a Perl interpreter) under
 #     assets/exiftool/windows/, invoked directly (no `perl`). Fetched from the
@@ -70,7 +70,7 @@ regenerate_pubspec_assets() {
 # `exiftool-<ver>_64.zip` distribution, which contains `exiftool(-k).exe` (the
 # `-k` keeps the console window open on double-click; renamed to `exiftool.exe`
 # for direct invocation) alongside `exiftool_files/`. Mirrors the macOS/Linux
-# download fallback order: exiftool.org first, then the GitHub release mirror.
+# download order: the GitHub tag tarball, then the SourceForge archive.
 vendor_windows_exe() {
   if [ -f "$WIN_DEST/exiftool.exe" ] && [ -d "$WIN_DEST/exiftool_files" ]; then
     echo "windows exiftool already vendored at $WIN_DEST"
@@ -86,16 +86,17 @@ vendor_windows_exe() {
   zip="$workdir/et-win.zip"
   local urls=()
   if [ -n "$ver" ]; then
-    # exiftool.org only hosts the CURRENT version's Windows zip (older 404s) and
-    # GitHub ships no Windows .exe - SourceForge archives every version, so it's
-    # the reliable source.
-    urls+=("https://exiftool.org/exiftool-${ver}_64.zip")
+    # SourceForge is the only source for the prebuilt Windows exe: GitHub ships
+    # no .exe, and exiftool.org stopped serving versioned files from its root
+    # (every such URL 404s now, current version included) - it hands downloads
+    # to SourceForge itself. ver.txt is still served, so it stays the version
+    # oracle.
     urls+=("https://downloads.sourceforge.net/project/exiftool/exiftool-${ver}_64.zip")
   fi
   got=""
   for u in "${urls[@]}"; do
-    # Retry transient failures (the SourceForge mirror occasionally times out or
-    # 503s in CI); exiftool.org 404s for non-hosted versions and falls through.
+    # Retry transient failures: the SourceForge mirror occasionally times out or
+    # 503s in CI.
     if curl -fsSL --retry 4 --retry-delay 3 --connect-timeout 30 "$u" -o "$zip"; then
       echo "downloaded $u"
       got=1
@@ -169,14 +170,14 @@ vendor_from_download() {
   ver="$(curl -fsSL https://exiftool.org/ver.txt 2>/dev/null || true)"
   workdir="$(mktemp -d)"
   tar="$workdir/et.tgz"
-  # Try the official site (only ever hosts the current version), then the
-  # GitHub tag tarball (a stable mirror that keeps every release), then the
-  # GitHub master snapshot as a last resort. exiftool.org 404s the moment a
-  # newer version ships, so it cannot be the only source.
+  # The GitHub tag tarball first (keeps every release, no redirect), then
+  # SourceForge, then the master snapshot as a last resort. exiftool.org is not
+  # listed: its root no longer serves versioned files, so every request there
+  # was a guaranteed 404 on the way to one of these.
   local urls=()
   if [ -n "$ver" ]; then
-    urls+=("https://exiftool.org/Image-ExifTool-${ver}.tar.gz")
     urls+=("https://github.com/exiftool/exiftool/archive/refs/tags/${ver}.tar.gz")
+    urls+=("https://downloads.sourceforge.net/project/exiftool/Image-ExifTool-${ver}.tar.gz")
   fi
   urls+=("https://github.com/exiftool/exiftool/archive/refs/heads/master.tar.gz")
   got=""
@@ -200,7 +201,7 @@ mkdir -p "$DEST/lib"
 if vendor_from_system; then
   echo "vendored exiftool from the system install"
 elif vendor_from_download; then
-  echo "vendored exiftool from exiftool.org"
+  echo "vendored exiftool from the upstream release"
 else
   echo "ERROR: could not vendor exiftool (no system install and download failed)" >&2
   exit 1
