@@ -1,0 +1,16 @@
+# flutter_distributor Inno Setup (.exe installer) config.
+#
+# app_id identifies Stunda to Windows Installer across versions, exactly like
+# the WiX UpgradeCode in packaging/windows/product.wxs. It must NEVER change:
+# a new value makes upgrades install side by side instead of replacing.
+app_id: D1936B9F-2364-4363-BE07-B672F5EB41AD
+display_name: Stunda
+publisher_name: Kodsama
+publisher_url: https://github.com/kodsama/Stunda
+# BINARY_NAME in app/windows/CMakeLists.txt.
+executable_name: stunda
+install_dir_name: Stunda
+create_desktop_icon: true
+privileges_required: lowest
+locales:
+  - en

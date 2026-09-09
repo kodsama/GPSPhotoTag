@@ -27,12 +27,21 @@ release notes, and uploads everything the matrix produced. It runs with
 Obfuscation strips Dart symbol names from the shipped binary, so release crash
 stack traces are unreadable **without** the matching symbols. The
 `build/symbols/<platform>` directory is uploaded as a per-platform artifact
-(`<platform>-symbols`). **Keep these somewhere durable per release** — you need
+(`<platform>-symbols`). **Keep these somewhere durable per release** - you need
 the exact symbols from a given build to de-obfuscate traces from that build:
 
 ```bash
 flutter symbolize -i <stack_trace.txt> -d build/symbols/<platform>/app.<arch>.symbols
 ```
+
+Windows is the exception: it emits `app.windows-x64.pdb` rather than a symbols
+file, and `flutter symbolize` cannot read it - use a Windows debugger.
+
+`flutter_distributor` runs `flutter clean` before packaging and rebuilds without
+the obfuscation flags, so the Linux and Windows jobs pass `--skip-clean` and
+`--flutter-build-args=obfuscate,split-debug-info=...`. Without both, the
+packaged installers ship unobfuscated and the symbol directories are deleted
+before they can be uploaded.
 
 ## Artifacts per platform
 
@@ -63,7 +72,7 @@ documented in comments in `release.yml`.
 | macOS (notarized) | Developer ID cert + notarization | `MACOS_CERTIFICATE_BASE64`, `MACOS_CERTIFICATE_PWD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` |
 | Windows (signed installer) | Code-signing cert | `WINDOWS_CERT_BASE64`, `WINDOWS_CERT_PASSWORD` |
 | Snap Store | Store login token | `SNAPCRAFT_STORE_CREDENTIALS` (publish via `snapcore/action-publish@v1`) |
-| Flathub | PR-based submission to `flathub/ai.kodsama.Stunda` (not done from this repo) | — |
+| Flathub | PR-based submission to `flathub/ai.kodsama.Stunda` (not done from this repo) | - |
 
 Without signing:
 
@@ -88,13 +97,14 @@ Without signing:
 ### Manual setup notes / known nuances
 
 - **WiX `product.wxs`**: the `UpgradeCode` and `MainExecutable` component GUID
-  are permanent and must **never change** — Windows Installer uses them to
+  are permanent and must **never change** - Windows Installer uses them to
   identify Stunda across versions for in-place upgrades.
 
   | GUID | Value | Must change? |
   |------|-------|--------------|
   | Windows MSI UpgradeCode | `8A12A9FB-2887-443B-98B6-E939A2A04673` | Never |
   | MainExecutable Component | `26829DD8-8888-4F20-84E4-4DEDE21CD08F` | Never |
+  | Inno Setup AppId (`app/windows/packaging/exe/make_config.yaml`) | `D1936B9F-2364-4363-BE07-B672F5EB41AD` | Never |
 
   For a *complete* install, harvest the rest of the Release folder with
   `heat.exe` (see the comment in `product.wxs`); the bundled minimal component

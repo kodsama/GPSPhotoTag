@@ -7,7 +7,7 @@ name: Release
 # OBFUSCATION: every `flutter build` uses --release --obfuscate
 # --split-debug-info=build/symbols/<platform>. The symbols dir is uploaded as a
 # per-platform artifact and is REQUIRED to de-obfuscate stack traces from
-# release crashes — keep these somewhere durable per release.
+# release crashes - keep these somewhere durable per release.
 #
 # SIGNING / STORE PUBLISHING: this workflow produces UNSIGNED artifacts. Real
 # distribution (App Store, Play Store, Microsoft Store, notarized macOS, signed
@@ -45,7 +45,7 @@ jobs:
       - run: flutter --version
       - run: flutter pub get
       # Mobile bundles no exiftool (the engine uses the device photo library) and
-      # no desktop ONNX dylibs (the AAR provides the runtime) — only the models.
+      # no desktop ONNX dylibs (the AAR provides the runtime) - only the models.
       - run: bash tool/fetch-exiftool.sh --no-exiftool
       - run: bash tool/fetch-onnx.sh --models-only
 
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: android-artifacts
-          # Only the real distributables + CLI binaries — never the whole
+          # Only the real distributables + CLI binaries - never the whole
           # bundle tree (which would publish exiftool/ONNX assets as junk).
           path: |
             dist/*.apk
@@ -110,7 +110,7 @@ jobs:
       - run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
       # Mobile bundles no exiftool (the engine uses the device photo library) and
-      # no desktop ONNX dylibs (the pod provides the runtime) — only the models.
+      # no desktop ONNX dylibs (the pod provides the runtime) - only the models.
       - run: bash tool/fetch-exiftool.sh --no-exiftool
       - run: bash tool/fetch-onnx.sh --models-only
 
@@ -268,7 +268,9 @@ jobs:
         run: |
           choco install innosetup --no-progress -y
           dart pub global activate flutter_distributor
-          flutter_distributor package --platform windows --targets exe
+          flutter_distributor package --platform windows --targets exe `
+            --skip-clean `
+            --flutter-build-args=obfuscate,split-debug-info=build/symbols/windows
         continue-on-error: true
 
       # WiX Toolset v3 .msi from packaging/windows/product.wxs.
@@ -294,13 +296,21 @@ jobs:
           Get-ChildItem -Recurse -Include *.exe -Path dist | ForEach-Object { Copy-Item $_.FullName dist/ -Force } 2>$null
           if (Test-Path dist/inno) { Get-ChildItem -Recurse dist/inno -Include *.exe | Copy-Item -Destination dist/ -Force }
 
+      # Both makers are continue-on-error so one tool's hiccup does not abort the
+      # job, which makes this the real gate. It demands BOTH installers: an
+      # earlier version accepted either, so a missing .exe rode out two releases
+      # behind a successful .msi.
       - name: Verify installer artifacts
         working-directory: app
         shell: pwsh
         run: |
-          $installers = Get-ChildItem dist -Include *.exe,*.msi -Recurse -ErrorAction SilentlyContinue
-          if (-not $installers) {
-            Write-Error "No installer produced; both Inno Setup and WiX builds failed."
+          $exe = Get-ChildItem dist -Include *.exe -Recurse -ErrorAction SilentlyContinue
+          $msi = Get-ChildItem dist -Include *.msi -Recurse -ErrorAction SilentlyContinue
+          $missing = @()
+          if (-not $exe) { $missing += "Inno Setup .exe" }
+          if (-not $msi) { $missing += "WiX .msi" }
+          if ($missing) {
+            Write-Error "Installer(s) not produced: $($missing -join ', ')"
             exit 1
           }
 
@@ -311,7 +321,7 @@ jobs:
         with:
           name: windows-symbols
           path: app/build/symbols/windows
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:
@@ -379,9 +389,14 @@ jobs:
         run: |
           dart pub global activate flutter_distributor
           export PATH="$PATH:$HOME/.pub-cache/bin"
-          flutter_distributor package --platform linux --targets appimage || true
-          flutter_distributor package --platform linux --targets deb || true
-          flutter_distributor package --platform linux --targets rpm || true
+          # --skip-clean keeps the obfuscated build above (flutter_distributor
+          # runs `flutter clean` by default, which deletes build/symbols/), and
+          # the build args make its own rebuild obfuscated too - without them it
+          # silently ships an unobfuscated binary.
+          args="--skip-clean --flutter-build-args=obfuscate,split-debug-info=build/symbols/linux"
+          flutter_distributor package --platform linux --targets appimage $args || true
+          flutter_distributor package --platform linux --targets deb $args || true
+          flutter_distributor package --platform linux --targets rpm $args || true
 
       - name: Compile Dart CLI/MCP binaries (linux x64)
         run: |
@@ -402,7 +417,7 @@ jobs:
         with:
           name: linux-symbols
           path: app/build/symbols/linux
-          if-no-files-found: warn
+          if-no-files-found: error
 
       # The raw Flutter Linux bundle, shared with the snap/flatpak jobs so they
       # package this exact build instead of rebuilding Flutter (which can't work
@@ -466,7 +481,7 @@ jobs:
     runs-on: ubuntu-latest
     # Packages the bundle from the `linux` job (the manifest's `dir` source is
     # the pre-built bundle), so it must run after it. Best-effort extra
-    # (see linux-snap) — non-blocking for the release.
+    # (see linux-snap) - non-blocking for the release.
     needs: linux
     continue-on-error: true
     container:
@@ -520,7 +535,7 @@ jobs:
           path: artifacts
 
       # The raw Flutter bundle is a build input for snap/flatpak, not a release
-      # asset — drop it so its hundreds of files don't pollute the release.
+      # asset - drop it so its hundreds of files don't pollute the release.
       - name: Drop non-release artifacts
         run: rm -rf artifacts/linux-bundle
 
