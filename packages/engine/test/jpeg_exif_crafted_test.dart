@@ -126,6 +126,84 @@ void main() {
     final meta = await backend.read(path);
     expect(meta.offset, const Duration(hours: -5, minutes: -30));
   }, skip: _exiftoolAvailable() ? false : 'exiftool not on PATH');
+
+  // A phone with location services off still writes a complete GPS block: an
+  // empty latitude ref and zero-denominator rationals. Reading tag presence
+  // alone called these already-tagged, so the tagger skipped every photo that
+  // actually needed a coordinate.
+  Uint8List emptyGpsTiff({
+    required List<int> ref,
+    required List<List<int>> dms,
+  }) {
+    const ifd0Off = 8;
+    const gpsIfdOff = 26; // after the 18-byte IFD0.
+    const latDataOff = 56; // after the 30-byte GPS IFD.
+
+    final b = BytesBuilder()..add(const [0x49, 0x49]);
+    _u16(b, 0x002A);
+    _u32(b, ifd0Off);
+    // IFD0: just the GPS IFD pointer.
+    _u16(b, 1);
+    _u16(b, 0x8825); // GPSInfo IFD.
+    _u16(b, 4); // LONG.
+    _u32(b, 1);
+    _u32(b, gpsIfdOff);
+    _u32(b, 0); // next IFD.
+    // GPS IFD: latitude ref (inline ASCII) + latitude (external RATIONALs).
+    _u16(b, 2);
+    _u16(b, 0x0001); // GPSLatitudeRef.
+    _u16(b, 2); // ASCII.
+    _u32(b, 2);
+    b.add(ref); // 4-byte inline value field.
+    _u16(b, 0x0002); // GPSLatitude.
+    _u16(b, 5); // RATIONAL.
+    _u32(b, 3);
+    _u32(b, latDataOff);
+    _u32(b, 0); // next IFD.
+    for (final r in dms) {
+      _u32(b, r[0]);
+      _u32(b, r[1]);
+    }
+    return b.toBytes();
+  }
+
+  test('an empty GPS block does not count as already tagged', () async {
+    final path = '${tmp.path}/empty_gps.jpg';
+    File(path).writeAsBytesSync(
+      _jpegWithTiff(
+        emptyGpsTiff(
+          ref: const [0x00, 0x00, 0x00, 0x00], // ref present, no value.
+          dms: const [
+            [0, 0],
+            [0, 0],
+            [0, 0],
+          ],
+        ),
+      ),
+    );
+
+    final meta = await backend.read(path);
+    expect(meta.hasGps, isFalse);
+  });
+
+  test('a real coordinate still counts as already tagged', () async {
+    final path = '${tmp.path}/real_gps.jpg';
+    File(path).writeAsBytesSync(
+      _jpegWithTiff(
+        emptyGpsTiff(
+          ref: const [0x4E, 0x00, 0x00, 0x00], // "N"
+          dms: const [
+            [55, 1],
+            [36, 1],
+            [3315, 100],
+          ],
+        ),
+      ),
+    );
+
+    final meta = await backend.read(path);
+    expect(meta.hasGps, isTrue);
+  });
 }
 
 bool _exiftoolAvailable() {

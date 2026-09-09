@@ -146,9 +146,7 @@ class JpegExifBackend implements ExifBackend {
     if (gpsPtr != null) {
       final gpsOffset = gpsPtr.valueAsLong(bd, little);
       final gpsIfd = _readIfd(bd, gpsOffset, little);
-      hasGps =
-          gpsIfd.containsKey(_tagGpsLatitude) &&
-          gpsIfd.containsKey(_tagGpsLatitudeRef);
+      hasGps = _readLatitude(tiff, bd, little, gpsIfd) != null;
     }
 
     return PhotoMeta(
@@ -156,6 +154,33 @@ class JpegExifBackend implements ExifBackend {
       offset: offset,
       hasGps: hasGps,
     );
+  }
+
+  /// The latitude actually stored in [gpsIfd], or null when the block holds no
+  /// usable one.
+  ///
+  /// A GPS tag can be present and empty. A phone with location off still writes
+  /// the whole block - `GPSVersionID 0.0.0.0`, an empty latitude ref,
+  /// zero-denominator rationals - so tag presence says nothing about whether
+  /// there is a coordinate. Reading the value is what separates the two, and
+  /// getting it wrong makes the tagger skip exactly the photos that need a fix.
+  static double? _readLatitude(
+    Uint8List tiff,
+    ByteData bd,
+    bool little,
+    Map<int, _IfdEntry> gpsIfd,
+  ) {
+    final ref = gpsIfd[_tagGpsLatitudeRef]?.readAscii(tiff, bd, little);
+    if (ref != 'N' && ref != 'S') return null;
+    final dms = gpsIfd[_tagGpsLatitude]?.readRationals(tiff, bd, little);
+    if (dms == null || dms.length < 3) return null;
+    const perUnit = [1.0, 60.0, 3600.0];
+    var degrees = 0.0;
+    for (var i = 0; i < 3; i++) {
+      if (dms[i].den == 0) return null;
+      degrees += dms[i].num / dms[i].den / perUnit[i];
+    }
+    return ref == 'S' ? -degrees : degrees;
   }
 
   /// Returns true for little-endian (`II`), false for big-endian (`MM`), or
@@ -538,6 +563,22 @@ class _IfdEntry {
       end--;
     }
     return String.fromCharCodes(tiff.sublist(start, end));
+  }
+
+  /// Reads this entry's value as RATIONALs, or null when it holds another type
+  /// or its data falls outside the segment.
+  List<_Rational>? readRationals(Uint8List tiff, ByteData bd, bool little) {
+    if (type != JpegExifBackend._typeRational) return null;
+    final start = _dataOffset(bd, little);
+    if (start < 0 || start + _byteLength > tiff.length) return null;
+    final e = little ? Endian.little : Endian.big;
+    return [
+      for (var i = 0; i < count; i++)
+        _Rational(
+          bd.getUint32(start + i * 8, e),
+          bd.getUint32(start + i * 8 + 4, e),
+        ),
+    ];
   }
 
   /// Captures this entry's raw value bytes into a serializer [_Field].
