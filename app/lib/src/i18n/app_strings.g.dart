@@ -12,7 +12,7 @@ const Map<String, String> kEnglishStrings = {
   'app_name': 'Stunda',
   'app_tagline': 'Give every photo its moment',
   'app_tagline_period': 'Give every photo its moment.',
-  'app_version': '2.0.0',
+  'app_version': '2.0.1',
   'about_legalese':
       'Give every photo its moment.\nAuthor: Kodsama\nGPL-3.0-or-later',
   'menu_tooltip': 'Menu',

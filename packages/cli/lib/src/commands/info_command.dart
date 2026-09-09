@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 
 /// The CLI/engine version, surfaced by `info` and `--version`.
-const cliVersion = '2.0.0';
+const cliVersion = '2.0.1';
 
 /// `info` — print version, platform, and capabilities.
 class InfoCommand extends Command<int> {

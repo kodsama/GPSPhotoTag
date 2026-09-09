@@ -14,7 +14,7 @@ class McpServer {
   McpServer({
     required this.tools,
     this.name = 'stunda',
-    this.version = '2.0.0',
+    this.version = '2.0.1',
     this.protocolVersion = '2025-06-18',
   });
 

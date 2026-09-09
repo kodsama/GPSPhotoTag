@@ -1,6 +1,6 @@
 name: stunda_cli
 description: Headless, LLM-friendly command line for the Stunda engine.
-version: 2.0.0
+version: 2.0.1
 publish_to: none
 resolution: workspace
 
