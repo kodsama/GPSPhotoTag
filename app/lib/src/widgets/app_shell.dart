@@ -12,11 +12,13 @@ import '../state/app_controller.dart';
 import '../state/app_screen.dart';
 import '../state/controller_scope.dart';
 import '../theme/app_colors.dart';
+import '../engine/mcp_service.dart';
 import 'activity_log_panel.dart';
 import 'app_background.dart';
 import 'glass.dart';
 import 'help.dart';
 import 'licenses.dart';
+import 'mcp_dialog.dart';
 import 'settings_dialog.dart';
 import 'warning_banner.dart';
 
@@ -166,6 +168,7 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          _McpButton(mcp: controller.mcp),
           _LogButton(unread: controller.unreadCount, onPressed: onToggleLog),
           _HelpMenu(controller: controller),
           _SettingsMenu(controller: controller),
@@ -351,6 +354,52 @@ void _showAbout(BuildContext context) {
     applicationIcon: const LogoMark(size: 48),
     applicationLegalese: context.tr('about_legalese'),
   );
+}
+
+/// The header MCP button: the server's own status colour as a corner dot, so a
+/// dead endpoint is visible without opening Settings. Tapping opens the panel
+/// with the connection config.
+class _McpButton extends StatelessWidget {
+  const _McpButton({required this.mcp});
+
+  final McpService mcp;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: mcp,
+      builder: (context, _) {
+        final status = mcpStatus(
+          context.tr,
+          running: mcp.running,
+          port: mcp.port,
+          error: mcp.error,
+        );
+        return IconButton(
+          onPressed: () => showMcpDialog(context, mcp),
+          tooltip: status.tip,
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.hub_outlined),
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: status.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// The header activity-log button (an [IconButton] consistent with the settings

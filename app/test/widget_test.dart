@@ -308,10 +308,17 @@ void main() {
     expect(materialApp.locale, const Locale('sv'));
   });
 
-  testWidgets('MCP status no longer lives in the header', (tester) async {
+  testWidgets('the header carries the MCP dot, not the status text', (
+    tester,
+  ) async {
+    // The status wording belongs to Settings and the MCP panel; the header
+    // gets the glanceable form of it, a dot on the button, so a dead endpoint
+    // is visible without opening anything.
     final controller = AppController(runner: FakeEngineRunner())
       ..debugSetToolkit([_tool('exiftool')]);
     await _pumpApp(tester, controller);
+
+    expect(find.byIcon(Icons.hub_outlined), findsOneWidget);
     expect(find.textContaining('MCP'), findsNothing);
   });
 
