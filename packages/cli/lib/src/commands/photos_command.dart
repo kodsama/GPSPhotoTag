@@ -7,7 +7,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 import '../exit_codes.dart';
 import 'map_command.dart';
 
-/// `photos` — list the geotagged photos in a library with their coordinates.
+/// `photos` - list the geotagged photos in a library with their coordinates.
 ///
 /// The read-only data behind the GUI's Explore map: an agent that cannot open a
 /// map window can still ask where every photo was taken. Read-only.

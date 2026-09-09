@@ -13,7 +13,7 @@ class Locator {
   /// Builds a locator over already-sorted point lists (ascending by time).
   ///
   /// Pass [gpx] and/or [google]; either may be empty. The lists are assumed
-  /// sorted — [parseGpx] and the Google parsers guarantee this.
+  /// sorted - [parseGpx] and the Google parsers guarantee this.
   Locator({List<TimedPoint>? gpx, List<TimedPoint>? google})
     : _gpx = gpx ?? const [],
       _google = google ?? const [];

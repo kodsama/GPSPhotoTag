@@ -6,7 +6,7 @@ import 'package:args/command_runner.dart';
 /// The CLI/engine version, surfaced by `info` and `--version`.
 const cliVersion = '2.1.0';
 
-/// `info` — print version, platform, and capabilities.
+/// `info` - print version, platform, and capabilities.
 class InfoCommand extends Command<int> {
   /// Creates the command. [sink] overrides stdout (for tests).
   InfoCommand({IOSink? sink}) : _out = sink ?? stdout;

@@ -8,7 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 
 import 'explore_model.dart';
 
-/// Per-photo influence radius, in SCREEN pixels — a constant, never scaled by
+/// Per-photo influence radius, in SCREEN pixels - a constant, never scaled by
 /// zoom or photo count. This is the distance at which a splat's gaussian
 /// falloff has decayed to essentially nothing. A larger radius blends nearby
 /// photos into a smoother field. Heat comes from how many splats OVERLAP within
@@ -17,12 +17,12 @@ const double kHeatRadius = 48;
 
 /// Per-photo peak alpha (0..1) deposited at a splat's exact centre, before
 /// accumulation. Deliberately low so a single isolated photo is only a faint
-/// glow; density — and thus heat — builds up only where many splats overlap and
+/// glow; density - and thus heat - builds up only where many splats overlap and
 /// their alphas sum (via [BlendMode.plus]).
 const double kHeatPointAlpha = 0.18;
 
 /// Overall opacity (0..1) of the entire composited heat overlay, including the
-/// hot red cores, so the map (streets, labels, water) always reads through it —
+/// hot red cores, so the map (streets, labels, water) always reads through it -
 /// like a reference heatmap.js / leaflet.heat layer. Tune this single knob to
 /// make the heat more or less translucent.
 const double kHeatLayerOpacity = 0.6;
@@ -58,9 +58,9 @@ class HeatBlob {
 /// [offsets] and the viewport [size].
 ///
 /// Pure (no widgets, no map camera) so the projection→cull math is unit
-/// testable: input is the already-projected screen offsets — ONE PER PHOTO, at
+/// testable: input is the already-projected screen offsets - ONE PER PHOTO, at
 /// full coordinate precision (the field is built from individual photos, never
-/// pre-grouped points) — plus the viewport [size]; output is the splat list.
+/// pre-grouped points) - plus the viewport [size]; output is the splat list.
 /// Each splat carries the same low [kHeatPointAlpha] peak weight, so a city's
 /// many photos blend into a smooth field and a lone photo stays faint; heat
 /// builds purely from OVERLAP. Splats whose influence can't reach the viewport
@@ -91,11 +91,11 @@ List<HeatBlob> computeHeatBlobs({
 /// a splat's centre to its [kHeatRadius] edge.
 ///
 /// Returns `exp(-(t/σ)²/2)` with σ tuned so the blob has a soft, rounded core
-/// and is nearly zero at the edge (t = 1) — NOT a near-flat plateau that cuts
+/// and is nearly zero at the edge (t = 1) - NOT a near-flat plateau that cuts
 /// off abruptly. Pure, so the falloff shape is unit testable: 1.0 at the centre,
 /// monotonically decreasing, and small (< ~0.05) at the rim.
 double gaussianFalloff(double t) {
-  // σ ≈ 0.38 puts the edge (t=1) at exp(-3.46) ≈ 0.031 — a clean soft fade.
+  // σ ≈ 0.38 puts the edge (t=1) at exp(-3.46) ≈ 0.031 - a clean soft fade.
   const sigma = 0.38;
   final x = t.clamp(0.0, 1.0) / sigma;
   return math.exp(-(x * x) / 2);
@@ -109,7 +109,7 @@ double gaussianFalloff(double t) {
 /// heatmap.js / leaflet.heat look but with a LONG transparent/cool tail: the low
 /// end stays fully (then barely) transparent so sparse areas reveal the map
 /// under both light and dark tiles, ramping blue→cyan→green→yellow→red only as
-/// many splats overlap and density climbs — never an abrupt jump straight to
+/// many splats overlap and density climbs - never an abrupt jump straight to
 /// opaque red. Pure, so the key stops and the transparent floor are unit
 /// testable.
 Uint8List buildHeatPalette() {
@@ -178,7 +178,7 @@ int _lerpByte(int a, int b, double f) =>
 /// decides what to splat. The two-pass density→colorize render (accumulate a
 /// soft gaussian field, then map through [buildHeatPalette]) happens in
 /// [_HeatmapLayerState], which recomputes the colorized image only when the
-/// splats or viewport change — not every paint — so panning stays smooth.
+/// splats or viewport change - not every paint - so panning stays smooth.
 class HeatmapLayer extends StatefulWidget {
   /// Creates the heat overlay from individual [photos].
   const HeatmapLayer({super.key, required this.photos});

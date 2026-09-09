@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <i>A cross-platform desktop photo toolkit — tag with GPS, map your trips,
-  prune orphan RAWs — plus a headless, LLM-friendly CLI, all powered by one
+  <i>A cross-platform desktop photo toolkit - tag with GPS, map your trips,
+  prune orphan RAWs - plus a headless, LLM-friendly CLI, all powered by one
   pure-Dart engine.</i>
 </p>
 
@@ -18,31 +18,31 @@
 
 ## The name
 
-**Stunda** comes from the Swedish **stund** — *a moment, a little while*.
+**Stunda** comes from the Swedish **stund** - *a moment, a little while*.
 
-Your photos are **stunder**: thousands of small moments dropped into folders and forgotten. Stunda is where each one gets its moment again — placed on the map, tied to its track and timeline, de-duplicated, tidied, and kept.
+Your photos are **stunder**: thousands of small moments dropped into folders and forgotten. Stunda is where each one gets its moment again - placed on the map, tied to its track and timeline, de-duplicated, tidied, and kept.
 
-> Why *Stunda* and not just *stund*? Because `stund` is already a STUN-server daemon, and we'd rather sort your photos than your network packets. Besides — point it at a shambolic library and it'll have the whole thing tagged, mapped, and tidy in a *stund*. ⏱️
+> Why *Stunda* and not just *stund*? Because `stund` is already a STUN-server daemon, and we'd rather sort your photos than your network packets. Besides - point it at a shambolic library and it'll have the whole thing tagged, mapped, and tidy in a *stund*.
 
 ## What it does
 
 You take photos. Sometimes you also have a GPX track (watch, phone, handheld
 GPS); when you don't, your Google location history covers you. Stunda writes
 accurate GPS EXIF into your photos by matching each photo's capture time against
-the first source that has a fix — GPX first (most precise), then Google.
+the first source that has a fix - GPX first (most precise), then Google.
 
 From there it helps you **see** and **tidy** the whole library: explore your
 geotagged photos on an interactive map, find visually-similar duplicates, match
 images to their RAWs, compare any two shots side by side, and run a guided
-"shrink" wizard that reclaims space. Everything is **review-first** — nothing is
+"shrink" wizard that reclaims space. Everything is **review-first** - nothing is
 changed or deleted until you confirm, and deletions go to the Trash.
 
 Two front-ends, one engine:
 
-- **Desktop app** (macOS / Linux / Windows) — a guided GUI, localized into
+- **Desktop app** (macOS / Linux / Windows) - a guided GUI, localized into
   **9 languages** (English, Français, Svenska, 中文, 日本語, Deutsch, Português,
   Español, Dansk), with an in-app **Help** section.
-- **CLI** — scriptable, with a JSON event stream and a self-describing `schema`
+- **CLI** - scriptable, with a JSON event stream and a self-describing `schema`
   command for agents.
 
 ## Supported formats
@@ -61,31 +61,31 @@ always works with no external tools.
 
 ## The desktop app
 
-Open a photo library — pick a folder, or **drag and drop** several folders
-and/or individual photos and GPS files onto the window — and Stunda scans them
+Open a photo library - pick a folder, or **drag and drop** several folders
+and/or individual photos and GPS files onto the window - and Stunda scans them
 into one library, then shows a Review summary of what it found. From the
 workspace you choose an action:
 
-- **Tag with GPS** — write location from GPX / Google Timeline / KML; sidecar or
+- **Tag with GPS** - write location from GPX / Google Timeline / KML; sidecar or
   embed for RAW, optional timezone, in place or copy. Existing coordinates are
   never overwritten unless you allow it; a dry run previews without writing.
-- **Explore on map** — pan/zoom your geotagged photos, with clusters that open
+- **Explore on map** - pan/zoom your geotagged photos, with clusters that open
   into pins. Switch between **Numbers / Heatmap / Both**, filter by a
   **Timeline** date range, **Fit to photos**, and **Save the view as PNG**. Map
   tiles are cached for offline and repeat viewing.
-- **Match Images to RAW** — remove orphan RAWs, or orphan images (both
+- **Match Images to RAW** - remove orphan RAWs, or orphan images (both
   directions), after reviewing the list.
-- **Find duplicates** — pick a **matching method**: *Fast* (perceptual hash +
+- **Find duplicates** - pick a **matching method**: *Fast* (perceptual hash +
   colour, instant, best for near-identical copies) or *Smart* (an on-device AI
   embedding that understands crops, rotations and recolours). A similarity slider
   (Exact ↔ Loose) with a live example tunes whichever method is selected, plus a
   **Keep priority** pipeline (Resolution → Quality → People & animals,
   reorderable and toggleable). Review pairs, swap, or deselect; nothing is
   deleted until you confirm. Smart degrades to Fast when no model is bundled.
-- **Comparison viewer** — open any image full-screen, with a vertical/horizontal
+- **Comparison viewer** - open any image full-screen, with a vertical/horizontal
   curtain or side-by-side synced zoom, plus an info line (name, resolution,
   size, time, GPS, EXIF).
-- **Shrink picture library** — a staged wizard (Duplicates → Orphans →
+- **Shrink picture library** - a staged wizard (Duplicates → Orphans →
   RAW + photo pairs → Low quality) building one cumulative trash list, with
   selectable low-quality criteria (blurriness / histogram / colour / exposure)
   and a final review showing the space to free.
@@ -115,7 +115,7 @@ Commands: `tag`, `map`, `photos`, `inspect`, `scan`, `prune-raw`, `duplicates`,
 `shrink`, `fix-dates`, `check`, `info`, `list-sources`, `list-providers`,
 `schema`.
 
-Every feature the desktop app has is here too — the GUI and the CLI drive the
+Every feature the desktop app has is here too - the GUI and the CLI drive the
 same engine services, so nothing is GUI-only.
 
 ```bash
@@ -159,7 +159,7 @@ go to the Trash unless you add `--rm`.
 
 Two ways to drive it as an LLM:
 
-- **MCP server** — a standard Model Context Protocol server (JSON-RPC 2.0)
+- **MCP server** - a standard Model Context Protocol server (JSON-RPC 2.0)
   covering every engine capability, so an agent can do anything the GUI can:
 
   | Tool | Does |
@@ -180,7 +180,7 @@ Two ways to drive it as an LLM:
   trash rather than delete unless `delete: true`. Runs over **stdio** (build
   `packages/mcp/bin/stunda_mcp.dart`), **and** the desktop app keeps an
   **always-on TCP** endpoint at `127.0.0.1:8787` whenever it's open.
-- **CLI JSON contract** — `--json` emits one JSON event per line; `schema`
+- **CLI JSON contract** - `--json` emits one JSON event per line; `schema`
   describes every command, option, event, and exit code.
 
 See [AGENTS.md](AGENTS.md) and [docs/mcp-client-config.json](docs/mcp-client-config.json).
@@ -214,10 +214,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 Duplicates are grouped with one of two **similarity metrics**, chosen at the top
 of the Find-duplicates screen and persisted:
 
-- **Fast** — a 256-bit perceptual DCT hash (pHash) blended with a coarse HSV
+- **Fast** - a 256-bit perceptual DCT hash (pHash) blended with a coarse HSV
   colour signature. Instant, computed for every file; best for near-identical
   copies and re-saves. Pure maths, fully unit-tested.
-- **Smart** — an on-device **image embedding**: a small Apache-2.0
+- **Smart** - an on-device **image embedding**: a small Apache-2.0
   **MobileNetV2** (ONNX Model Zoo, ~14 MB) runs over the same decoded thumbnail
   through the bundled **ONNX Runtime** via `dart:ffi`, producing an L2-normalized
   vector per image; pairs are compared by cosine similarity mapped to 0..1. This
@@ -230,9 +230,9 @@ ordered keep-rule cascade (resolution → quality → people). The `people` rule
 favours the candidate that most looks like it contains a person or pet, in two
 tiers:
 
-- **Tier 1 (metadata)** — face regions, person names, and subject/keyword hints
+- **Tier 1 (metadata)** - face regions, person names, and subject/keyword hints
   read from the file's existing metadata (no extra work).
-- **Tier 2 (on-device detection)** — when metadata is silent, a small
+- **Tier 2 (on-device detection)** - when metadata is silent, a small
   Apache-2.0 **SSD-MobileNet** COCO model runs over the thumbnail through a
   bundled **ONNX Runtime** via `dart:ffi`. This is engine-wide: it works in the
   desktop app's worker isolates **and** headlessly from plain `dart run`
@@ -261,7 +261,7 @@ cd app && flutter analyze && flutter test
 ## License
 
 Copyright © 2026 Kodsama (Alexandre Martins). Stunda is free software under
-the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see
+the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** - see
 [LICENSE](LICENSE). It comes with no warranty, to the extent permitted by law.
 
 Bundled at build time: **exiftool** (Artistic/GPL), **ONNX Runtime** (MIT), and

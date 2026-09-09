@@ -104,7 +104,7 @@ void main() {
       findsNWidgets(ShrinkStage.values.length),
     );
     expect(
-      find.text('Not reviewed yet — open to choose files.'),
+      find.text('Not reviewed yet - open to choose files.'),
       findsNWidgets(ShrinkStage.values.length),
     );
     expect(
@@ -511,7 +511,7 @@ void main() {
     expect(find.text('Lenient ↔ Strict · 80%'), findsOneWidget);
     expect(find.text('Lenient ↔ Strict · 10%'), findsNothing);
     expect(
-      find.text('Strict — flags even slightly soft or flat photos.'),
+      find.text('Strict - flags even slightly soft or flat photos.'),
       findsOneWidget,
     );
   });
@@ -525,7 +525,7 @@ void main() {
       ..openShrinkStage(ShrinkStage.lowQuality)
       ..debugSetShrinkBusy(total: 4, done: 1);
     await tester.pumpWidget(_host(c));
-    // The progress bar shows ALONE — the configuring slider/example are gone, so
+    // The progress bar shows ALONE - the configuring slider/example are gone, so
     // the two controls never stack into one confusing surface.
     expect(find.textContaining('Hashing 1 / 4'), findsOneWidget);
     expect(find.byType(QualityExamplePair), findsNothing);
@@ -677,8 +677,8 @@ void main() {
     await tester.pumpWidget(_host(c));
 
     expect(find.byType(ResultSummaryTable), findsOneWidget);
-    await tester.ensureVisible(find.text('Done — back to library'));
-    await tester.tap(find.text('Done — back to library'));
+    await tester.ensureVisible(find.text('Done - back to library'));
+    await tester.tap(find.text('Done - back to library'));
     await tester.pump();
     expect(c.screen, AppScreen.workspace);
   });

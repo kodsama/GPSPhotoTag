@@ -73,13 +73,13 @@ class CliOutput {
             : '  ${row.location!.latitude.toStringAsFixed(5)}, '
                   '${row.location!.longitude.toStringAsFixed(5)} '
                   '(${row.location!.provenance})';
-        final note = row.note == null ? '' : '  — ${row.note}';
+        final note = row.note == null ? '' : '  - ${row.note}';
         _sink.writeln(
           '${p.basename(row.path).padRight(28)} '
           '${row.status.wire.padRight(15)}$coords$note',
         );
       case DoneEvent(:final summary):
-        _sink.writeln('—' * 40);
+        _sink.writeln('-' * 40);
         final keys = summary.keys.toList()..sort();
         for (final k in keys) {
           _sink.writeln('${k.padRight(20)} ${summary[k]}');

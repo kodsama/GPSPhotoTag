@@ -4,7 +4,7 @@
 /// ([welcome]), watch it scan ([scanning]), land on the hub ([workspace]), then
 /// open a focused [action] panel and return to the hub.
 enum AppScreen {
-  /// No library chosen yet — the hero / folder picker.
+  /// No library chosen yet - the hero / folder picker.
   welcome,
 
   /// A scan is in flight; live counts update until it completes.

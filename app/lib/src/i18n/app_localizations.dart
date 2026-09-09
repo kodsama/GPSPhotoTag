@@ -3,8 +3,8 @@
 /// Each supported locale has a flat `key → string` map in `assets/i18n/<code>.json`
 /// with `{name}` placeholders for interpolation. [AppLocalizations] loads the
 /// active locale's map (via [AppLocalizationsDelegate]) and looks keys up with
-/// [tr], substituting `{placeholders}` and falling back to English — and then to
-/// the key itself — so a missing key is visible but never crashes.
+/// [tr], substituting `{placeholders}` and falling back to English - and then to
+/// the key itself - so a missing key is visible but never crashes.
 library;
 
 import 'dart:convert';
@@ -120,7 +120,7 @@ class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
         ? locale.languageCode
         : 'en';
     // English resolves SYNCHRONOUSLY from the bundled compile-time map (it is
-    // identical to en.json), so the first frame already has localizations — no
+    // identical to en.json), so the first frame already has localizations - no
     // extra pump needed in widget tests, and English (the fallback) is never a
     // frame late. Other locales load their JSON asset asynchronously.
     if (code == 'en') {
@@ -139,7 +139,7 @@ class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
       strings = {for (final e in map.entries) e.key: '${e.value}'};
     } on Object {
       // A missing/unreadable asset degrades to the compile-time English map so
-      // the UI is never blank — every lookup still resolves through tr's
+      // the UI is never blank - every lookup still resolves through tr's
       // English fallback.
       strings = kEnglishStrings;
     }

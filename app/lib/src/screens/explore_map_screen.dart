@@ -176,7 +176,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
 
   void _onMapEvent(MapEvent event) {
     _detail.onZoom(event.source.name, event.camera.zoom);
-    // Warm tiles around the view once a gesture/animation settles — debounced
+    // Warm tiles around the view once a gesture/animation settles - debounced
     // so it never fires mid-pan/zoom (a fresh event resets the timer).
     if (_settlesPrefetch(event)) {
       _prefetchDebounce?.cancel();
@@ -225,8 +225,8 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
   /// Captures the current on-screen map view (tiles + heatmap + markers as
   /// framed) and saves it to a user-chosen PNG path.
   ///
-  /// The two side-effecting shells — capturing the [RepaintBoundary] to PNG
-  /// bytes and opening the native save panel — are the only uncovered parts;
+  /// The two side-effecting shells - capturing the [RepaintBoundary] to PNG
+  /// bytes and opening the native save panel - are the only uncovered parts;
   /// the pick→write→report logic lives in [AppController.savePng]. Reports the
   /// outcome via a SnackBar (and the activity log) and never throws.
   Future<void> _saveView() async {
@@ -320,7 +320,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
     final controller = ControllerScope.of(context);
     final allPhotos = controller.explorePhotos;
     // The full selectable span across every dated photo (null when none are
-    // dated — the Timeline button is then disabled and the selector hidden).
+    // dated - the Timeline button is then disabled and the selector hidden).
     final span = dateSpanOf(allPhotos);
     // The active range, clamped to the live span (which grows as photos stream
     // in); null span means no filtering at all.
@@ -457,7 +457,7 @@ class _ExploreMapScreenState extends State<ExploreMapScreen> {
 /// The top-right toolbar row. On desktop it's a plain min-width [Row]; on
 /// mobile ([scrollable] true) the same row is wrapped in a horizontally
 /// scrollable view (reverse-aligned to the right edge) so it can be wider than
-/// a phone screen without clipping or overflowing — you scroll left to reveal
+/// a phone screen without clipping or overflowing - you scroll left to reveal
 /// any buttons that don't fit.
 class _Toolbar extends StatelessWidget {
   const _Toolbar({required this.children, required this.scrollable});
@@ -534,7 +534,7 @@ class _MapShell extends StatelessWidget {
                 maxZoom: 16,
               ),
         minZoom: 2,
-        // Allow zooming past native (19) — the last tile upscales instead of
+        // Allow zooming past native (19) - the last tile upscales instead of
         // going grey.
         maxZoom: 20,
       ),
@@ -744,8 +744,8 @@ class _ModeButton extends StatelessWidget {
 /// re-filters markers AND heatmap on every change). A "reset range" affordance
 /// ([onReset]) restores the full span; [onClose] hides the panel.
 ///
-/// Pure presentation: it holds no range state of its own — the active range
-/// lives in the screen — so the slider always reflects [selected].
+/// Pure presentation: it holds no range state of its own - the active range
+/// lives in the screen - so the slider always reflects [selected].
 class TimelinePanel extends StatelessWidget {
   /// Creates the range selector for [span], showing [selected] on the handles.
   const TimelinePanel({
@@ -776,7 +776,7 @@ class TimelinePanel extends StatelessWidget {
   bool get _isNarrowed =>
       selected.start != span.start || selected.end != span.end;
 
-  /// True when the whole library was captured at a single instant — there's
+  /// True when the whole library was captured at a single instant - there's
   /// nothing to slide between, so the slider is omitted (labels still show).
   bool get _zeroWidth => !span.end.isAfter(span.start);
 
@@ -918,7 +918,7 @@ class _BackButton extends StatelessWidget {
 
   final VoidCallback onPressed;
 
-  /// Icon-only (no label) — used on mobile, where the labelled button is too
+  /// Icon-only (no label) - used on mobile, where the labelled button is too
   /// wide for a phone and would overlap the right-hand toolbar.
   final bool compact;
 

@@ -52,7 +52,7 @@ void main() {
     // No ring before a run.
     expect(_tagCardRing(), findsNothing);
 
-    // Start a run, then return to the workspace — the run keeps going.
+    // Start a run, then return to the workspace - the run keeps going.
     controller.openAction(LibraryAction.tag);
     final run = controller.runTag();
     controller.backToLibrary();
@@ -186,7 +186,7 @@ void main() {
 
       await tester.pump();
       expect(
-        find.text('A process is still running — cancel it before quitting.'),
+        find.text('A process is still running - cancel it before quitting.'),
         findsOneWidget,
       );
 
@@ -206,7 +206,7 @@ void main() {
       expect(response, 'exit');
       await tester.pump();
       expect(
-        find.text('A process is still running — cancel it before quitting.'),
+        find.text('A process is still running - cancel it before quitting.'),
         findsNothing,
       );
     });

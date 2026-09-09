@@ -19,8 +19,8 @@ import 'preview_extract.dart';
 /// Perceptual (DCT) hashing, a colour signature, and duplicate grouping.
 ///
 /// The pipeline is: decode an image to a small thumbnail, derive two compact
-/// per-image signatures from it — a 256-bit DCT [pHash] (structure) and a coarse
-/// HSV [colorSignature] (palette) — then group files whose combined
+/// per-image signatures from it - a 256-bit DCT [pHash] (structure) and a coarse
+/// HSV [colorSignature] (palette) - then group files whose combined
 /// [imageSimilarity] is at least the [groupDuplicates] cutoff. Every function
 /// here is pure (given decoded pixels / records) so the whole detection model is
 /// unit-testable without I/O.
@@ -184,8 +184,8 @@ const int _valBins = 3;
 const int colorSignatureLength = _hueBins * _satBins + _valBins;
 
 /// A normalised coarse HSV colour histogram of [image] (a cheap palette
-/// descriptor): every pixel is binned by hue and saturation, or — when nearly
-/// grey — into a value bin, then the counts are L1-normalised so they sum to 1.
+/// descriptor): every pixel is binned by hue and saturation, or - when nearly
+/// grey - into a value bin, then the counts are L1-normalised so they sum to 1.
 /// A black image puts all its mass in the darkest value bin; a grey one spreads
 /// across the value bins; a colourful one fills the chromatic bins. Pure.
 List<double> colorSignature(img.Image image) {
@@ -276,7 +276,7 @@ double imageSimilarity(HashedFile a, HashedFile b) {
 /// Robust to crop/rotation/recolour (the embedding captures what the photo *is*,
 /// not its exact pixels). A missing embedding on either side yields a neutral 0
 /// (never groups), which is how the Smart metric degrades to nothing when the
-/// model is unavailable — callers select [SimilarityMetric.fast] in that case.
+/// model is unavailable - callers select [SimilarityMetric.fast] in that case.
 /// Pure.
 double embeddingSimilarity(HashedFile a, HashedFile b) {
   if (a.embedding.isEmpty || b.embedding.isEmpty) return 0;
@@ -285,11 +285,11 @@ double embeddingSimilarity(HashedFile a, HashedFile b) {
 
 /// Which per-pair similarity the duplicate finder uses.
 enum SimilarityMetric {
-  /// Perceptual hash (pHash) + colour signature — instant, computed for every
+  /// Perceptual hash (pHash) + colour signature - instant, computed for every
   /// file, best for near-identical copies. See [imageSimilarity].
   fast,
 
-  /// On-device embedding (cosine) — understands crops/rotations/recolours, a
+  /// On-device embedding (cosine) - understands crops/rotations/recolours, a
   /// little slower, needs the bundled model. See [embeddingSimilarity].
   smart,
 }
@@ -391,7 +391,7 @@ class HashedFile {
   /// Resolution (pixel area) used to pick the best of a group.
   int get resolution => width * height;
 
-  /// A copy of this record with [peopleScore] replaced — used to fold a Tier-2
+  /// A copy of this record with [peopleScore] replaced - used to fold a Tier-2
   /// detection result onto a record whose Tier-1 metadata score was 0.
   HashedFile withPeopleScore(double peopleScore) => HashedFile(
     path: path,
@@ -431,7 +431,7 @@ class HashedFile {
     peopleScore: peopleScore,
   );
 
-  /// A copy of this record with its Smart-metric [embedding] replaced — used by
+  /// A copy of this record with its Smart-metric [embedding] replaced - used by
   /// the hashing pipeline to fold an embedder's vector onto the freshly-hashed
   /// record.
   HashedFile withEmbedding(List<double> embedding) => HashedFile(
@@ -500,7 +500,7 @@ bool _areCompanions(HashedFile a, HashedFile b) =>
 ///   looseness percent to this cutoff across a trustworthy band.
 /// - **RAW-companion exclusion**: two files sharing a basename but differing in
 ///   RAW-ness (a RAW + its JPG/HEIC sibling) are never placed in the same group,
-///   even if their preview signatures match — they are partners, not duplicates.
+///   even if their preview signatures match - they are partners, not duplicates.
 /// - Each group's [DuplicateGroup.best] is chosen by [chooseKeeper] running the
 ///   given [pipeline] (default [KeepPipeline.standard]); the rest become its
 ///   duplicates.
@@ -545,7 +545,7 @@ List<DuplicateGroup> groupDuplicates(
   return groups;
 }
 
-/// The lower-cased basename without extension of [path] — the RAW-companion key
+/// The lower-cased basename without extension of [path] - the RAW-companion key
 /// used by [HashedFile.basename]. Reuses the engine's extension stripping.
 String basenameKey(String path) {
   final slash = path.lastIndexOf(RegExp(r'[/\\]'));
@@ -659,7 +659,7 @@ typedef _Meta = ({int width, int height, double peopleScore});
 /// 2. One `exiftool -PreviewImage` over ONLY the paths that produced no
 ///    thumbnail (RAW/HEIC, thumb-less screenshots) writes their larger preview.
 /// 3. One `exiftool -fast2 -json` reads original pixel dimensions for the whole
-///    slice ([buildBatchDimensionArgs]) — no full-resolution decode.
+///    slice ([buildBatchDimensionArgs]) - no full-resolution decode.
 /// 4. Each path is hashed from its extracted thumbnail/preview; a path with
 ///    neither falls back to decoding the source bytes directly (rare).
 ///
@@ -785,7 +785,7 @@ Future<Map<String, _Meta>> _readBatchMeta(
 typedef _HashedWithPixels = ({HashedFile file, img.Image decoded});
 
 /// Builds a [HashedFile] for [path] from its [extracted] thumbnail/preview (or,
-/// when null, by decoding the source itself — the slow fallback). Returns null
+/// when null, by decoding the source itself - the slow fallback). Returns null
 /// when nothing decodes. Dimensions prefer the batched [meta] (a width/height of
 /// 0 means "unknown" → use the decoded image's own size); the Tier-1 people
 /// score comes from the same [meta]. Also returns the decoded image so the
@@ -835,7 +835,7 @@ _HashedWithPixels? _hashFromExtract(
 /// silent) and [detector] is available, score the already-[decoded] thumbnail
 /// and return [file] with that [HashedFile.peopleScore]. Otherwise (a Tier-1
 /// score is already present, no detector, or the detector can't decide) [file]
-/// is returned unchanged. Never throws — a null/failed detection leaves Tier-1.
+/// is returned unchanged. Never throws - a null/failed detection leaves Tier-1.
 Future<HashedFile> _withTier2(
   HashedFile file,
   img.Image decoded,

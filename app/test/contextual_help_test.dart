@@ -173,7 +173,7 @@ void main() {
         // The Duplicates card is wrapped in a HelpTarget(topic: duplicates):
         // its overlay absorbs the tap (the painted child is behind an
         // IgnorePointer), so target the card text location with warnIfMissed
-        // off — the tap deliberately lands on the absorbing overlay.
+        // off - the tap deliberately lands on the absorbing overlay.
         await tester.tap(find.text('Find duplicates'), warnIfMissed: false);
         await tester.pumpAndSettle();
 

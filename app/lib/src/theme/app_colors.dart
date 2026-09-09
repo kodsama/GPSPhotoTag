@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// The Stunda palette — a warm "field-notebook / topographic map" identity:
+/// The Stunda palette - a warm "field-notebook / topographic map" identity:
 /// aged paper, ink, a terracotta route line, and a teal contour accent. Chosen
 /// to feel like a cartographer's notebook rather than a default Material app.
 abstract final class AppColors {
@@ -24,13 +24,13 @@ abstract final class AppColors {
   static const inkSoft = Color(0xFF6B6358);
 
   // Accents ---------------------------------------------------------------
-  /// Primary accent — the "route line".
+  /// Primary accent - the "route line".
   static const terracotta = Color(0xFFC25A3A);
 
   /// Pressed/darker terracotta.
   static const terracottaDark = Color(0xFFA4472B);
 
-  /// Secondary accent — topographic contour teal.
+  /// Secondary accent - topographic contour teal.
   static const contour = Color(0xFF2E6F6A);
 
   // Status ----------------------------------------------------------------

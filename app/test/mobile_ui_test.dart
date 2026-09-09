@@ -173,7 +173,7 @@ void main() {
     expect(c.screen, AppScreen.welcome);
 
     // On welcome there's nothing to go back to, so the pop is allowed through
-    // (the app would exit) — PopScope reports it did not handle it.
+    // (the app would exit) - PopScope reports it did not handle it.
     popped = await tester.binding.handlePopRoute();
     await tester.pump();
     expect(popped, isFalse, reason: 'welcome lets the real pop / exit through');

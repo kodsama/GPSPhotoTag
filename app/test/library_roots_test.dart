@@ -97,7 +97,7 @@ void main() {
 
     test('defaults to a real filesystem probe when isDirectory is omitted', () {
       // No injected probe: a nonexistent dir-like path is not a directory, so
-      // it cannot cover the file added under it — both survive.
+      // it cannot cover the file added under it - both survive.
       final out = addRoots(['/no/such/dir'], ['/no/such/dir/a.jpg']);
       expect(out, ['/no/such/dir', '/no/such/dir/a.jpg']);
     });
@@ -162,7 +162,7 @@ void main() {
 
     test('defaults to a real filesystem probe for directories', () {
       // No injected probe: a nonexistent path is not a dir and (as .txt) is
-      // ignored — exercising the default branch without touching content.
+      // ignored - exercising the default branch without touching content.
       final r = classifyDropped(['/no/such/path.txt']);
       expect(r.ignored, ['/no/such/path.txt']);
     });

@@ -2,9 +2,9 @@
 ///
 /// The duplicate-finder's `people` keep-rule favours the candidate that most
 /// looks like it contains people (or pets). Tier 1 reads that signal straight
-/// from metadata already present in the file — face regions written by phones
+/// from metadata already present in the file - face regions written by phones
 /// and photo managers (Apple Photos, Picasa/Google, Lightroom), IPTC person
-/// names, and subject/keyword hints — via the SAME batched exiftool `-json`
+/// names, and subject/keyword hints - via the SAME batched exiftool `-json`
 /// read the finder already does for dimensions (no extra process spawns).
 ///
 /// Everything here is pure (it scores a decoded exiftool JSON entry / a list of
@@ -16,7 +16,7 @@ library;
 ///
 /// These cover the common face-region and person-name conventions:
 /// - `RegionName` / `RegionType` / `RegionInfo`: XMP-mwg-rs face regions
-///   (Apple Photos, Lightroom, digiKam) — a "Face" region means a person.
+///   (Apple Photos, Lightroom, digiKam) - a "Face" region means a person.
 /// - `PersonInImage`: IPTC Extension person names (also Apple).
 /// - `Subject` / `Keywords`: free-text tags that may name people or pets.
 /// - `FacesDetected`: a numeric face count some cameras/apps write.
@@ -35,11 +35,11 @@ const List<String> kPeopleSignalTags = [
 /// 0..1). A near-tie falls through to the next rule. Tunable.
 const double kPeopleClearWinnerMargin = 0.34;
 
-/// Score when an explicit face region / person name / face count is present —
+/// Score when an explicit face region / person name / face count is present -
 /// the strongest "there are people here" evidence.
 const double _facePresentScore = 1.0;
 
-/// Score when only a subject/keyword *hint* (a person- or pet-word) is found —
+/// Score when only a subject/keyword *hint* (a person- or pet-word) is found -
 /// weaker than an explicit face region but still a positive signal.
 const double _keywordHintScore = 0.5;
 

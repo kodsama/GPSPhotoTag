@@ -21,7 +21,7 @@ import 'shrink_low_quality_review.dart';
 
 /// The "Shrink picture library" wizard.
 ///
-/// A cumulative shrink session: the hub is a step list of OPT-IN stages —
+/// A cumulative shrink session: the hub is a step list of OPT-IN stages -
 /// duplicates, orphans, redundant RAW+photo pairs, and low quality. Opening a
 /// stage navigates to that feature's REAL review surface in a deferred shrink
 /// session: the page's terminal button becomes "Add to shrink list" (folding the

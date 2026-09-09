@@ -97,14 +97,14 @@ class OnnxBundle {
 /// Resolves the detector [OnnxBundle] for [bundleDir], or null when no bundle is
 /// possible here (no [bundleDir], or an unsupported platform).
 ///
-/// The returned bundle may still be incomplete (files absent) — callers check
+/// The returned bundle may still be incomplete (files absent) - callers check
 /// [OnnxBundle.isComplete]. [operatingSystem] overrides the host OS so the
 /// per-platform library name is testable on any machine.
 OnnxBundle? resolveOnnxBundle(String? bundleDir, {String? operatingSystem}) =>
     _resolveBundle(bundleDir, kOnnxModelFileName, operatingSystem);
 
-/// Resolves the embedding [OnnxBundle] for [bundleDir] — the same per-platform
-/// ONNX Runtime library paired with the [kEmbeddingModelFileName] model — or
+/// Resolves the embedding [OnnxBundle] for [bundleDir] - the same per-platform
+/// ONNX Runtime library paired with the [kEmbeddingModelFileName] model - or
 /// null when no bundle is possible here (no [bundleDir] or an unsupported
 /// platform). The returned bundle may still be incomplete (files absent), which
 /// callers check via [OnnxBundle.isComplete] so the Smart metric degrades to

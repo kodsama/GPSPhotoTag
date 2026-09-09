@@ -48,7 +48,7 @@ class ScanningScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               alignment: WrapAlignment.center,
-              // On mobile the library is photos only — folders, GPS tracks,
+              // On mobile the library is photos only - folders, GPS tracks,
               // Timeline and "unsupported" don't apply, so show just the photo
               // count. Desktop keeps the full per-category tally.
               children: controller.isMobile

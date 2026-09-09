@@ -129,7 +129,7 @@ class UnsupportedFile {
 /// unsupported tallies) are **exact**. The [photos], [gpxFiles], [kmlFiles],
 /// and [googleFiles] path lists are kept in full because downstream tagging
 /// and source-pooling need them. The [unsupported] sample list is capped (see
-/// [unsupportedPathCap]) to bound memory on huge trees — [unsupportedCount],
+/// [unsupportedPathCap]) to bound memory on huge trees - [unsupportedCount],
 /// [unsupportedByCategory], and [unsupportedByExtension] stay exact even when
 /// the sample list is truncated.
 @immutable

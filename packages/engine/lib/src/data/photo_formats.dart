@@ -70,7 +70,7 @@ abstract final class PhotoFormats {
   /// unsupported if it isn't real location data.
   static bool isGpsSource(String path) => gpsSource.contains(extOf(path));
 
-  /// Whether [path] is a supported library input — a taggable photo or a
+  /// Whether [path] is a supported library input - a taggable photo or a
   /// GPS-source file. Used to classify individually added / dropped files.
   static bool isSupported(String path) => isPhoto(path) || isGpsSource(path);
 

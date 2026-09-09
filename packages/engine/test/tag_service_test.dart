@@ -43,7 +43,7 @@ class _ThrowingBackend extends _FakeBackend {
   }) async => throw StateError('boom');
 }
 
-/// A registry that can read but never write — drives the no-writer branch.
+/// A registry that can read but never write - drives the no-writer branch.
 class _NoWriterRegistry extends _FakeRegistry {
   _NoWriterRegistry(super.backend);
 
@@ -240,7 +240,7 @@ void main() {
 
   test('no write strategy -> error (sidecar disabled for embed)', () async {
     // .raf is readable via the sidecar backend (knows no sidecar exists, so no
-    // capture time) — drive the no-writer branch with a fake instead.
+    // capture time) - drive the no-writer branch with a fake instead.
     final meta = PhotoMeta(captureNaive: naive);
     final backend = _FakeBackend(meta);
     // Reader present, but writerFor null: a registry that reads but cannot write.

@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 /// it survives navigating away from the action's screen.
 ///
 /// An action is in exactly one of three phases:
-/// - **idle** — nothing in flight and nothing waiting to be reviewed.
-/// - **running** — work is in flight, optionally with a known [progress]
+/// - **idle** - nothing in flight and nothing waiting to be reviewed.
+/// - **running** - work is in flight, optionally with a known [progress]
 ///   fraction (null while the size is unknown → render an indeterminate ring).
-/// - **needs review** — the run finished with something for the user to look at
+/// - **needs review** - the run finished with something for the user to look at
 ///   (e.g. duplicates were found), surfaced as a pulsing attention badge until
 ///   the user opens the action.
 ///

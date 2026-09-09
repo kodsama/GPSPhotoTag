@@ -16,7 +16,7 @@ import '../services/locator.dart';
 /// Orchestrates the `tag` operation: for each photo, read its time, resolve a
 /// coordinate from the sources, and write GPS via the appropriate backend.
 ///
-/// Emits a [Stream] of [EngineEvent]s — one [ItemEvent] per photo, periodic
+/// Emits a [Stream] of [EngineEvent]s - one [ItemEvent] per photo, periodic
 /// [ProgressEvent]s, and a final [DoneEvent] with the status tally. The CLI
 /// serialises these to JSON lines; the GUI routes them to controllers. The same
 /// method runs unchanged inside a worker isolate.

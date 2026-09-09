@@ -31,15 +31,15 @@ void main() {
     sub = p.join(root.path, 'sub');
     Directory(sub).createSync();
 
-    // Paired RAW + JPG in the same folder — must survive.
+    // Paired RAW + JPG in the same folder - must survive.
     _touch(root.path, 'DSCF1.RAF');
     _touch(root.path, 'DSCF1.JPG');
 
-    // Orphan RAW with a sidecar — both must be removed.
+    // Orphan RAW with a sidecar - both must be removed.
     _touch(root.path, 'DSCF2.RAF');
     _touch(root.path, 'DSCF2.RAF.xmp');
 
-    // Companion lives in a different folder — RAW must survive (tree-wide).
+    // Companion lives in a different folder - RAW must survive (tree-wide).
     _touch(root.path, 'DSCF3.RAF');
     _touch(sub, 'DSCF3.JPG');
   });
@@ -130,7 +130,7 @@ void main() {
 
       final events = await Pruner(trash: trash).trashPaths([orphan]).toList();
 
-      // Only the chosen path and its sidecar are acted on — the paired RAW the
+      // Only the chosen path and its sidecar are acted on - the paired RAW the
       // user did not select is never touched.
       expect(trash.trashed, unorderedEquals([orphan, sidecar]));
       expect(trash.trashed, isNot(contains(p.join(root.path, 'DSCF1.RAF'))));

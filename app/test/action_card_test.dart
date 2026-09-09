@@ -16,13 +16,13 @@ void main() {
         _wrap(
           ActionCard(
             action: LibraryAction.tag,
-            readiness: const ActionReadiness.ready('Ready — 1 source'),
+            readiness: const ActionReadiness.ready('Ready - 1 source'),
             onOpen: () {},
           ),
         ),
       );
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.text('Ready — 1 source'), findsOneWidget);
+      expect(find.text('Ready - 1 source'), findsOneWidget);
     });
 
     testWidgets('overlays a determinate ring while running', (tester) async {
@@ -119,7 +119,7 @@ void main() {
         _wrap(
           ActionCard(
             action: LibraryAction.duplicates,
-            readiness: const ActionReadiness.ready('Ready — 5 photos'),
+            readiness: const ActionReadiness.ready('Ready - 5 photos'),
             runState: ActionRunState.active(progress: 0.4),
             onOpen: () {},
           ),
@@ -129,7 +129,7 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('40%'), findsOneWidget);
       // The idle readiness chip is replaced while running.
-      expect(find.text('Ready — 5 photos'), findsNothing);
+      expect(find.text('Ready - 5 photos'), findsNothing);
     });
 
     testWidgets('a finished run shows a tappable results-ready chip', (

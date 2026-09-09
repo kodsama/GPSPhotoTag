@@ -5,7 +5,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import '../cli_output.dart';
 
-/// `prune-raw` — trash (or delete) one side of the RAW/photo pairing.
+/// `prune-raw` - trash (or delete) one side of the RAW/photo pairing.
 ///
 /// `--direction orphan-raws` (the default) removes RAWs with no JPG/HEIC
 /// companion; `orphan-images` removes non-RAW photos with no RAW. Paired

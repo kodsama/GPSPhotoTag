@@ -38,7 +38,7 @@ fi
 # Percentage with two decimals, computed in awk to avoid bc dependency.
 PERCENT="$(awk -v h="$HIT" -v f="$FOUND" 'BEGIN { printf "%.2f", (h / f) * 100 }')"
 
-echo "Coverage for $LCOV_FILE: ${PERCENT}% (${HIT}/${FOUND} lines) — gate ≥ ${MIN_PERCENT}%"
+echo "Coverage for $LCOV_FILE: ${PERCENT}% (${HIT}/${FOUND} lines) - gate ≥ ${MIN_PERCENT}%"
 
 # Compare with awk (handles decimals; exit 1 if below min).
 if awk -v p="$PERCENT" -v m="$MIN_PERCENT" 'BEGIN { exit !(p < m) }'; then

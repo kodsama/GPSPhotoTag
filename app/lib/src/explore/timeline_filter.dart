@@ -28,7 +28,7 @@ DateSpan? dateSpanOf(Iterable<ExplorePhoto> photos) {
 /// Pure and order-stable. Photos with a null/unknown [ExplorePhoto.date] are
 /// ALWAYS kept (they can't be range-filtered, so the Timeline filter never
 /// drops them). A dated photo is kept when its date is not before [start] and
-/// not after [end] — both ends inclusive.
+/// not after [end] - both ends inclusive.
 List<ExplorePhoto> filterPhotosByDateRange(
   Iterable<ExplorePhoto> photos, {
   required DateTime start,

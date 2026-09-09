@@ -2,7 +2,7 @@ import '../data/photo_formats.dart';
 
 /// How a single photo path relates to the RAW/JPG pairing in a library.
 enum PairKind {
-  /// A RAW file with no JPG/HEIC companion anywhere in the tree — a deletion
+  /// A RAW file with no JPG/HEIC companion anywhere in the tree - a deletion
   /// candidate.
   orphanRaw,
 
@@ -40,7 +40,7 @@ class RawPairing {
   /// Every input photo path, classified.
   final List<PairedFile> files;
 
-  /// Paths of RAW files with no companion — the deletion candidates.
+  /// Paths of RAW files with no companion - the deletion candidates.
   List<String> get orphanRaws => [
     for (final f in files)
       if (f.kind == PairKind.orphanRaw) f.path,

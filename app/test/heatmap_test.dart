@@ -198,7 +198,7 @@ void main() {
 
     test('overlapping splats produce a hotter (more opaque) core', () async {
       // Many coincident faint splats vs one: the piled-up density must read
-      // hotter (a higher palette index / more opaque alpha) — overlap drives
+      // hotter (a higher palette index / more opaque alpha) - overlap drives
       // heat, not a single splat.
       Future<int> coreAlpha(List<HeatBlob> blobs) async {
         final image = (await renderHeatmapImage(

@@ -93,7 +93,7 @@ void main() {
           runner: _ControllableScanRunner(runner, scanCtrl.stream),
         );
 
-        // Start the scan without awaiting — sets screen to scanning.
+        // Start the scan without awaiting - sets screen to scanning.
         // ignore: unawaited_futures
         c.startScan('/library');
         // Pump a microtask so startScan assigns _scanSub.
@@ -106,16 +106,16 @@ void main() {
         );
         await Future<void>.value();
 
-        // Abandon the in-flight scan — changeLibrary() must cancel _scanSub.
+        // Abandon the in-flight scan - changeLibrary() must cancel _scanSub.
         c.changeLibrary();
         expect(c.screen, AppScreen.welcome);
 
-        // Now deliver ScanDoneEvent — with the fix, _scanSub is null so the
+        // Now deliver ScanDoneEvent - with the fix, _scanSub is null so the
         // event is discarded and the screen stays on welcome.
         scanCtrl.add(ScanDoneEvent(fakeScan(photos: const ['/library/a.jpg'])));
         await Future<void>.value();
 
-        // Screen must stay on welcome — stale ScanDoneEvent must not navigate.
+        // Screen must stay on welcome - stale ScanDoneEvent must not navigate.
         expect(c.screen, AppScreen.welcome);
       },
     );
@@ -870,7 +870,7 @@ void main() {
       expect(c.hasEnvironmentWarning, isFalse);
     });
 
-    test('is idempotent — the probe runs at most once', () async {
+    test('is idempotent - the probe runs at most once', () async {
       var probes = 0;
       final c = AppController(
         probeToolkit: () async {
@@ -1185,7 +1185,7 @@ void main() {
       'addRootPaths subsumes a child root under a newly added parent',
       () async {
         // A real dir holding a file: start with the file root, then add the
-        // parent dir. Containment-aware merge swaps the child for the parent —
+        // parent dir. Containment-aware merge swaps the child for the parent -
         // the list length is unchanged (1 -> 1) but contents differ, so it must
         // still rescan on the new single parent root.
         final fake = FakeEngineRunner();

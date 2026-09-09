@@ -162,7 +162,7 @@ void main() {
     // Deselecting flips the checkbox tooltip to the keep-both message.
     c.setDuplicateRemoval(0, false);
     await tester.pump();
-    expect(find.byTooltip('Keep both files — remove neither'), findsOneWidget);
+    expect(find.byTooltip('Keep both files - remove neither'), findsOneWidget);
   });
 
   testWidgets('prune: direction options, chips and move button tooltips', (

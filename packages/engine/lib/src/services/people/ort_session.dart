@@ -247,7 +247,7 @@ class OrtSession {
 
   /// Runs the model on one float32 NCHW image tensor in [input] (length
   /// `3 * side * side`, channel-major: all R, then all G, then all B) and
-  /// returns the model's single output tensor as a flat float list — used by the
+  /// returns the model's single output tensor as a flat float list - used by the
   /// image embedder, whose model takes a normalized `[1,3,H,W]` float input and
   /// emits a feature/logit vector. Throws on a native failure.
   List<double> runEmbedding(Float32List input, {required int side}) {
@@ -366,7 +366,7 @@ class _OrtApi {
         .asFunction<Pointer<Pointer<Void>> Function(int)>();
     // Request API v26 (not the newest): ORT's C API is backward-compatible, so
     // a newer desktop lib (1.27) still serves it, while the latest ONNX Runtime
-    // *Android* AAR (1.26) — which doesn't yet offer v27 — also works. The
+    // *Android* AAR (1.26) - which doesn't yet offer v27 - also works. The
     // detector only calls 1.0-era functions, whose ordinals are stable, so the
     // older interface request is safe on every platform.
     _api = getApi(26);

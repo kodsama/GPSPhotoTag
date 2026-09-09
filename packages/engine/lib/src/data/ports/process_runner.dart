@@ -38,7 +38,7 @@ abstract interface class ProcessRunner {
 /// Augments `PATH` with the usual package-manager install locations before
 /// launching. This matters because a GUI app started from Finder/Dock inherits
 /// a minimal `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`) that omits Homebrew
-/// (`/opt/homebrew/bin`, `/usr/local/bin`) and MacPorts — so without this, a
+/// (`/opt/homebrew/bin`, `/usr/local/bin`) and MacPorts - so without this, a
 /// system `exiftool` (or `perl`) would appear "missing" in the desktop app even
 /// when installed.
 class SystemProcessRunner implements ProcessRunner {

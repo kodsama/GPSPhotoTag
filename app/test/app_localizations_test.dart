@@ -187,7 +187,7 @@ void main() {
     });
   });
 
-  group('Settings — Home actions section', () {
+  group('Settings - Home actions section', () {
     Future<void> pumpSettings(
       WidgetTester tester,
       AppController controller,

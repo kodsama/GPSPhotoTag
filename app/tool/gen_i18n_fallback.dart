@@ -14,7 +14,7 @@ void main() {
       jsonDecode(File('assets/i18n/en.json').readAsStringSync())
           as Map<String, dynamic>;
   final buf = StringBuffer()
-    ..writeln('// GENERATED from assets/i18n/en.json — do not edit by hand.')
+    ..writeln('// GENERATED from assets/i18n/en.json - do not edit by hand.')
     ..writeln('// Regenerate with: dart run tool/gen_i18n_fallback.dart')
     ..writeln('//')
     ..writeln(

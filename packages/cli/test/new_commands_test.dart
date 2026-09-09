@@ -539,7 +539,7 @@ void main() {
 
     test('photos falls back to the shared map-service factory', () async {
       // No photos in the directory, so it stops at bad_input before the
-      // factory would need exiftool — but the command is still fully wired.
+      // factory would need exiftool - but the command is still fully wired.
       final code = await runCliWithSink([
         '--json',
         'photos',

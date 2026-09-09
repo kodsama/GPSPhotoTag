@@ -254,7 +254,7 @@ void main() {
       expect(logs.any((l) => l.contains('client connected')), isTrue);
     });
 
-    // C-02: concurrent-chunk race — the first tool deliberately delays so a
+    // C-02: concurrent-chunk race - the first tool deliberately delays so a
     // second chunk arriving while the first await is suspended can corrupt the
     // shared buffer and/or reorder responses.  The fix (future-chain tail)
     // ensures both lines parse correctly and responses arrive in request-id order.
@@ -295,7 +295,7 @@ void main() {
       });
 
       // Send both requests as TWO separate TCP chunks without awaiting between
-      // them — this is the pipelining scenario.  The slow tool's 100 ms delay
+      // them - this is the pipelining scenario.  The slow tool's 100 ms delay
       // means its async callback is suspended while the second chunk arrives.
       final req1 = jsonEncode({
         'jsonrpc': '2.0',
@@ -309,12 +309,12 @@ void main() {
         'method': 'tools/call',
         'params': {'name': 'fast', 'arguments': <String, Object?>{}},
       });
-      socket.writeln(req1); // chunk 1 — starts a slow await
+      socket.writeln(req1); // chunk 1 - starts a slow await
       await socket.flush();
       // Yield to the event loop so the server starts processing req1 and
       // suspends at its Future.delayed before req2 arrives.
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      socket.writeln(req2); // chunk 2 — races with the first in buggy code
+      socket.writeln(req2); // chunk 2 - races with the first in buggy code
       await socket.flush();
 
       await gotTwo.future.timeout(const Duration(seconds: 5));

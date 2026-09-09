@@ -87,7 +87,7 @@ vendor_windows_exe() {
   local urls=()
   if [ -n "$ver" ]; then
     # exiftool.org only hosts the CURRENT version's Windows zip (older 404s) and
-    # GitHub ships no Windows .exe — SourceForge archives every version, so it's
+    # GitHub ships no Windows .exe - SourceForge archives every version, so it's
     # the reliable source.
     urls+=("https://exiftool.org/exiftool-${ver}_64.zip")
     urls+=("https://downloads.sourceforge.net/project/exiftool/exiftool-${ver}_64.zip")

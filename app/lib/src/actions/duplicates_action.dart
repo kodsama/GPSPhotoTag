@@ -22,7 +22,7 @@ import 'shrink_action.dart' show ShrinkAddButton;
 /// Like the other destructive actions, nothing is removed until the user
 /// reviews and confirms. A similarity slider (Exact ↔ Loose) maps to a Hamming
 /// threshold; pressing "Find duplicates" hashes every photo off the UI isolate
-/// and shows the matches as pairs — best on the LEFT, the duplicate on the
+/// and shows the matches as pairs - best on the LEFT, the duplicate on the
 /// RIGHT. Each pair can be swapped (flip which side is kept) or deselected (keep
 /// both). The "Remove duplicates on the right" button gathers the still-selected
 /// right-side files and trashes them behind a silly-word confirm gate.
@@ -392,7 +392,7 @@ class _KeepRuleLabel extends StatelessWidget {
 /// explainer. Reordering or toggling drives the controller's pipeline, which
 /// re-decides the kept (left) side of the review.
 ///
-/// Every [KeepRule] — including [KeepRule.people] — is reorderable/toggleable.
+/// Every [KeepRule] - including [KeepRule.people] - is reorderable/toggleable.
 /// The people rule's label carries a tooltip noting it uses the people/pet tags
 /// already present in the photos (see [keepRuleTooltip]).
 class _KeepPipelinePanel extends StatelessWidget {
@@ -766,7 +766,7 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
     return AlertDialog(
       title: Text(context.tr('dup_confirm_title', {'count': widget.count})),
       // Scroll only the content so the soft keyboard (which shrinks the viewport
-      // on mobile) can't make it overflow — while the actions stay in the
+      // on mobile) can't make it overflow - while the actions stay in the
       // AlertDialog's OverflowBar, which wraps to a column when too narrow
       // (avoiding a horizontal overflow that whole-dialog `scrollable` causes).
       content: SingleChildScrollView(

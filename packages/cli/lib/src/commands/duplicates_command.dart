@@ -5,7 +5,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import '../cli_output.dart';
 
-/// `duplicates` — group visually-similar photos and trash the non-kept copies.
+/// `duplicates` - group visually-similar photos and trash the non-kept copies.
 ///
 /// Review-first like the GUI: without `--apply` it reports the groups and
 /// removes nothing.

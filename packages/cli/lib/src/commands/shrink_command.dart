@@ -5,7 +5,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import '../cli_output.dart';
 
-/// `shrink` — run the opt-in shrink stages over a library.
+/// `shrink` - run the opt-in shrink stages over a library.
 ///
 /// Mirrors the GUI wizard: stages are opt-in, a file staged by an earlier stage
 /// is never re-counted by a later one, and nothing is removed without

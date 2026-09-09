@@ -78,7 +78,7 @@ String formatCaptureTime(DateTime date) {
 /// [name] is the basename; [fileSize] is the on-disk byte count (null = omit);
 /// [meta] supplies dimensions/date/GPS; [exif] supplies camera/exposure tags.
 /// The GPS segment is included only when [FileMeta.hasGps] AND both coordinates
-/// are present — the present-gating the viewer relies on. Pure so the info line
+/// are present - the present-gating the viewer relies on. Pure so the info line
 /// (incl. GPS gating) is unit-testable.
 List<InfoSegment> compareInfoSegments({
   required String name,

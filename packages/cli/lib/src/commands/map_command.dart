@@ -6,7 +6,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 import '../cli_output.dart';
 import '../source_loader.dart';
 
-/// `map` — render a density heatmap PNG of where photos were taken (read-only).
+/// `map` - render a density heatmap PNG of where photos were taken (read-only).
 class MapCommand extends Command<int> {
   /// Registers the `map` flags. [sink] overrides stdout (for tests).
   ///

@@ -175,7 +175,7 @@ void main() {
         final client = MockClient((_) async {
           calls++;
           // Simulate a concurrent writer dropping the tile on disk during the
-          // first (failing) fetch — the post-failure path must serve it.
+          // first (failing) fetch - the post-failure path must serve it.
           if (calls == 1) {
             File(cache.pathFor(2, 0, 0))
               ..parent.createSync(recursive: true)

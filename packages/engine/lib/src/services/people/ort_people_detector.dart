@@ -1,7 +1,7 @@
 /// The real Tier-2 [PeopleDetector]: an on-device SSD-MobileNet COCO model run
 /// through a bundled ONNX Runtime via `dart:ffi`.
 ///
-/// It composes the pure pieces — [resolveOnnxBundle] to find the lib + model,
+/// It composes the pure pieces - [resolveOnnxBundle] to find the lib + model,
 /// [preprocessToNhwcUint8] to build the input tensor, [OrtSession] to run, and
 /// [peopleScoreFromDetections] to fold the outputs into a 0..1 score. It is
 /// total: any failure (missing bundle, load error, decode/inference error)
@@ -30,7 +30,7 @@ class OrtPeopleDetector implements PeopleDetector {
 
   /// Builds a detector from a [bundleDir] (the dir holding the ORT library and
   /// model). Returns an unavailable detector when no bundle resolves, the files
-  /// are absent, or the session fails to load — never throws.
+  /// are absent, or the session fails to load - never throws.
   ///
   /// [operatingSystem] overrides the host OS for [resolveOnnxBundle] (testing).
   factory OrtPeopleDetector.fromBundleDir(

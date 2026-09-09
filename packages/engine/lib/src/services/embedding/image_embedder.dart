@@ -3,8 +3,8 @@
 /// The Fast metric compares perceptual hashes; the Smart metric instead asks a
 /// small on-device CNN for a feature vector per image and compares directions
 /// (cosine), which is far more robust to crop/rotation/recolour. Producing that
-/// vector needs a bundled model and native runtime, so — exactly like the
-/// Tier-2 [PeopleDetector] — it is expressed as this narrow interface with a
+/// vector needs a bundled model and native runtime, so - exactly like the
+/// Tier-2 [PeopleDetector] - it is expressed as this narrow interface with a
 /// [NoopImageEmbedder] default that always reports "unavailable". With the
 /// default in place the duplicate finder has no embeddings, so the Smart metric
 /// gracefully degrades to Fast (the CLI, MCP, and a GUI without a model all
@@ -24,7 +24,7 @@ abstract interface class ImageEmbedder {
   /// [embedDecoded] and should fall back to the Fast perceptual metric.
   bool get isAvailable;
 
-  /// An L2-normalized embedding vector for the already-decoded [image] — used by
+  /// An L2-normalized embedding vector for the already-decoded [image] - used by
   /// the hashing pipeline, which has decoded the thumbnail already, to avoid a
   /// re-decode. Returns null when this embedder can't decide (unavailable or
   /// inference failed). Never throws.

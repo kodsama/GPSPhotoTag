@@ -50,6 +50,6 @@ class BufferSink implements IOSink {
   Future<void> get done => Future<void>.value();
 }
 
-/// A minimal valid JPEG (SOI + EOI) — enough for [JpegExifBackend] to splice an
+/// A minimal valid JPEG (SOI + EOI) - enough for [JpegExifBackend] to splice an
 /// Exif APP1 block into. Avoids depending on `package:image` in the CLI package.
 Uint8List minimalJpeg() => Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]);

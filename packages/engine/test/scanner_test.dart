@@ -247,7 +247,7 @@ void main() {
     final r = await _resultOf(
       await FolderScanner().scan([dirRoot, fileRoot]).toList(),
     );
-    // a.jpg, b.png, e.webp under 2025/06 — a.jpg only once despite two roots.
+    // a.jpg, b.png, e.webp under 2025/06 - a.jpg only once despite two roots.
     expect(r.photoCount, 3);
     expect(r.photos.where((path) => p.basename(path) == 'a.jpg').length, 1);
   });

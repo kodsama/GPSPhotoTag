@@ -268,7 +268,7 @@ void main() {
       other,
     ], FixDatesMode.exif).toList();
 
-    // Both files surface as errors (not just the first) — the run did not abort.
+    // Both files surface as errors (not just the first) - the run did not abort.
     final items = events.whereType<ItemEvent>().toList();
     expect(items, hasLength(2));
     expect(items.every((e) => e.row.status == PhotoStatus.error), isTrue);

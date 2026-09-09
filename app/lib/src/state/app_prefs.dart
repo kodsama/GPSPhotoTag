@@ -17,7 +17,7 @@ import 'library_action.dart';
 ///
 /// Construct directly with explicit values (tests), or via [load] which reads
 /// `preferences.json` in a given directory. [save] writes the current values
-/// back (best-effort — persistence never throws into the UI).
+/// back (best-effort - persistence never throws into the UI).
 class AppPrefs {
   /// Creates a prefs bag. [file] is the backing JSON path (null disables saving,
   /// useful in tests that only assert in-memory behaviour).
@@ -120,7 +120,7 @@ class AppPrefs {
         prefs.homeActions = HomeActionsConfig.fromJson(map['homeActions']);
       }
     } on Object {
-      // No saved preferences yet (or unreadable) — keep the defaults.
+      // No saved preferences yet (or unreadable) - keep the defaults.
     }
     return prefs;
   }

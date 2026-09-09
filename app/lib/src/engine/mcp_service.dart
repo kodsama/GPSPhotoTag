@@ -14,7 +14,7 @@ typedef _IsolateSpawner = Future<Isolate> Function(
 });
 
 /// Runs the MCP server on a localhost TCP socket in a dedicated worker isolate,
-/// started automatically when the app launches — so an LLM always has a live
+/// started automatically when the app launches - so an LLM always has a live
 /// endpoint while Stunda is open, without ever touching the UI isolate.
 class McpService extends ChangeNotifier {
   /// Creates the service. [exiftoolBundleDir] is the on-disk dir of the bundled
@@ -125,7 +125,7 @@ Future<void> _serverEntry(_Config cfg) async {
       cfg.send.send({'ready': port});
       return; // serveTcp keeps the socket open; the isolate stays alive.
     } on Object {
-      continue; // port busy — try the next.
+      continue; // port busy - try the next.
     }
   }
   cfg.send.send({

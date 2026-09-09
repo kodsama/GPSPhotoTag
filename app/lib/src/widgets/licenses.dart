@@ -1,5 +1,5 @@
 /// A curated licenses page: Stunda's own license plus the notable attached
-/// software (one entry per component — not the per-package/per-file dump that
+/// software (one entry per component - not the per-package/per-file dump that
 /// Flutter's default license page produces).
 library;
 

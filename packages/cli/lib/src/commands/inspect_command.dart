@@ -6,7 +6,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import '../exit_codes.dart';
 
-/// `inspect` — dimensions, capture date, GPS, camera and exposure per photo.
+/// `inspect` - dimensions, capture date, GPS, camera and exposure per photo.
 ///
 /// The headless form of the comparison viewer's info strip, so an agent can ask
 /// what shot a photo and how big it is without opening a window. Read-only.

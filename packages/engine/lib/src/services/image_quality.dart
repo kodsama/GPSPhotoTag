@@ -7,7 +7,7 @@ import 'package:image/image.dart' as img;
 /// Every metric here is computed on the small (~160 px) thumbnail the duplicate
 /// finder already decodes for the perceptual hash, NOT the full-resolution
 /// source. That makes scoring effectively free (the decode is reused) at the
-/// cost of absolute precision — which is fine because the scores are only ever
+/// cost of absolute precision - which is fine because the scores are only ever
 /// compared *within a duplicate group* (the same scene at similar sizes), where
 /// the thumbnail is a faithful proxy for relative sharpness/contrast/colour.
 ///
@@ -26,16 +26,16 @@ const double _colorfulnessWeight = 0.2;
 /// The four map onto the four stored [ImageQuality] components. The Shrink stage
 /// exposes them as toggles and filters on [compositeFrom] over the enabled set.
 enum QualityParam {
-  /// Sharpness ([ImageQuality.sharpness]) — "Blurriness".
+  /// Sharpness ([ImageQuality.sharpness]) - "Blurriness".
   sharpness,
 
-  /// Contrast ([ImageQuality.contrast]) — "Histogram".
+  /// Contrast ([ImageQuality.contrast]) - "Histogram".
   contrast,
 
-  /// Colourfulness ([ImageQuality.colorfulness]) — "Color".
+  /// Colourfulness ([ImageQuality.colorfulness]) - "Color".
   color,
 
-  /// Exposure ([ImageQuality.exposure]) — "Exposure".
+  /// Exposure ([ImageQuality.exposure]) - "Exposure".
   exposure,
 }
 

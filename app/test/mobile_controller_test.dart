@@ -478,7 +478,7 @@ void main() {
       expect(c.shrinkSelectedCount, 1);
 
       // Also stage a duplicates candidate, whose path is a PROXY path (not a
-      // filename) — so the trash routing must normalise BOTH kinds of staged
+      // filename) - so the trash routing must normalise BOTH kinds of staged
       // entry to proxy paths.
       c.openShrinkStage(ShrinkStage.duplicates);
       c.debugSetDuplicatePairs([

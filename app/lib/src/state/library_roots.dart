@@ -20,8 +20,8 @@ bool isAddableRoot(String path, {bool isDirectory = false}) =>
 /// Returns [current] with [additions] merged in, preserving add order and
 /// keeping the set free of redundant roots via CONTAINMENT-aware dedup:
 ///
-///  * An addition already COVERED by an existing directory root — equal to it,
-///    or nested inside it — is skipped: it is already scanned through the
+///  * An addition already COVERED by an existing directory root - equal to it,
+///    or nested inside it - is skipped: it is already scanned through the
 ///    parent (e.g. adding `/pics/trip` or `/pics/a.jpg` when `/pics` is a
 ///    root). An exact duplicate of any existing root is likewise skipped.
 ///  * A directory addition that CONTAINS existing roots SUBSUMES them: the now
@@ -95,7 +95,7 @@ class DroppedPaths {
   /// Dropped paths that are neither a directory nor a supported file.
   final List<String> ignored;
 
-  /// Directories + supported files, in that order — every path that should be
+  /// Directories + supported files, in that order - every path that should be
   /// merged into the library as a root.
   List<String> get accepted => [...directories, ...files];
 

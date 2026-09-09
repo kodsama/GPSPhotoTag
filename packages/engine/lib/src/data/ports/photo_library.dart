@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:meta/meta.dart';
 
 /// One photo in the device photo library (iOS Photos / Android MediaStore),
-/// described by the structured metadata those APIs expose directly — no file
+/// described by the structured metadata those APIs expose directly - no file
 /// read, no exiftool.
 ///
 /// This is the mobile counterpart to a scanned file path: the app enumerates
@@ -86,7 +86,7 @@ class LibraryAsset {
 /// MediaStore).
 ///
 /// The concrete implementation lives in the Flutter app (it wraps a plugin and
-/// platform channels) and runs on the **main isolate** — the only place
+/// platform channels) and runs on the **main isolate** - the only place
 /// platform channels work. The engine never calls this from a worker isolate;
 /// it only ever sees the plain temp files [exportProxy] produces. Abstracting it
 /// here keeps the orchestration testable with a fake library.

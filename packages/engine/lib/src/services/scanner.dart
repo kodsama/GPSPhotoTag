@@ -32,12 +32,12 @@ const _googleMarkers = [
 /// Each root may be a DIRECTORY (walked recursively as below) or a single FILE
 /// (classified directly). This lets a library be assembled from several folders
 /// and/or hand-picked images and GPS files. A file that appears under more than
-/// one root — for example a file root that also lives inside a directory root —
+/// one root - for example a file root that also lives inside a directory root -
 /// is counted exactly once.
 ///
 /// Designed for trees with hundreds of thousands of files in arbitrary nesting
 /// (years/months, split jpg/raw/gps folders, or all mixed). A bounded worker
-/// pool reads directories concurrently — the walk is I/O-bound — and running
+/// pool reads directories concurrently - the walk is I/O-bound - and running
 /// totals are emitted as throttled [ScanProgressEvent]s so a UI stays
 /// responsive. In the app this runs off the UI isolate.
 ///

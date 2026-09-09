@@ -8,7 +8,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 /// Prepares the ONNX bundle dir on mobile (Android/iOS), or returns null on
 /// desktop (use [locateBundledOnnx] there).
 ///
-/// On mobile the two `.onnx` models ship as Flutter assets — not real files —
+/// On mobile the two `.onnx` models ship as Flutter assets - not real files -
 /// and the ONNX Runtime native library is provided by the OS dynamic loader
 /// (the Android AAR / the iOS CocoaPod framework). This copies both models from
 /// the asset bundle into `<supportDir>/onnx/` (idempotent) and returns that dir

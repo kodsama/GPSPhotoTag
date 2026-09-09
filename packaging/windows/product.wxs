@@ -9,7 +9,7 @@
   docs/RELEASE.md and the release.yml "Build .msi (WiX v3)" step.
 
   The UpgradeCode and MainExecutable Guid below are PERMANENT project-owned
-  GUIDs. They must NEVER be changed — Windows Installer uses UpgradeCode to
+  GUIDs. They must NEVER be changed - Windows Installer uses UpgradeCode to
   identify the product across versions (in-place upgrades via MajorUpgrade),
   and a different GUID would create a second Add/Remove Programs entry.
   The Product Id="*" auto-generates per build (correct for versioned releases).

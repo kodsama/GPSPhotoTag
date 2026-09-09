@@ -7,7 +7,7 @@ import '../cli_output.dart';
 import '../exit_codes.dart';
 import '../source_loader.dart';
 
-/// `tag` — write GPS EXIF into photos from GPX and/or Google location history.
+/// `tag` - write GPS EXIF into photos from GPX and/or Google location history.
 class TagCommand extends Command<int> {
   /// Registers the `tag` flags. [sink] overrides stdout (for tests).
   // ignore: prefer_initializing_formals

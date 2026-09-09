@@ -609,7 +609,7 @@ void main() {
       c.returnToShrinkWizard();
 
       final callsBefore = fake.calls.where((e) => e == 'findDuplicates').length;
-      // Re-open: the found pairs AND the deselection are restored — no re-hash.
+      // Re-open: the found pairs AND the deselection are restored - no re-hash.
       c.openShrinkStage(ShrinkStage.duplicates);
       expect(c.duplicatePairs, isNotNull);
       expect(c.duplicatePairs!.length, 1);

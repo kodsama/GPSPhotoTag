@@ -68,7 +68,7 @@ List<ContourArc> contourArcs(Size size, {double spacing = 64}) {
 }
 
 /// Paints the default very-light map background: a faint grid plus topographic
-/// contour arcs in the paper/contour palette. Scales to any window — no asset.
+/// contour arcs in the paper/contour palette. Scales to any window - no asset.
 class MapBackgroundPainter extends CustomPainter {
   /// Creates the painter for the given [brightness].
   const MapBackgroundPainter({required this.brightness});

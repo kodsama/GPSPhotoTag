@@ -12,7 +12,7 @@ import '../theme/app_theme.dart';
 ///
 /// [supported] groups (a photo format or a GPS source) show a checkbox per row
 /// so the user can exclude files from processing; unsupported groups are
-/// read-only (informational — they are never processed). [gps] sources read
+/// read-only (informational - they are never processed). [gps] sources read
 /// their metadata in-process; image groups stream it via the engine.
 Future<void> showFileListDialog(
   BuildContext context, {
@@ -46,7 +46,7 @@ class FileListDialog extends StatefulWidget {
     required this.gps,
   });
 
-  /// Dialog title, e.g. "JPG — 2887 files".
+  /// Dialog title, e.g. "JPG - 2887 files".
   final String title;
 
   /// The file paths in this group, in scan order.

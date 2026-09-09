@@ -40,7 +40,7 @@ void main() {
     await tester.tap(find.text('JPG'));
     await tester.pumpAndSettle();
 
-    expect(find.text('JPG — 2 files'), findsOneWidget);
+    expect(find.text('JPG - 2 files'), findsOneWidget);
     expect(find.byType(Checkbox), findsNWidgets(2));
     expect(find.text('a.jpg'), findsOneWidget);
     expect(find.text('b.jpg'), findsOneWidget);
@@ -131,9 +131,9 @@ void main() {
 
     await tester.tap(find.text('GPX'));
     await tester.pumpAndSettle();
-    // The file doesn't exist on disk, so it reads as a bare meta — no checkbox
+    // The file doesn't exist on disk, so it reads as a bare meta - no checkbox
     // assertion here, but the dialog opens read/write for a supported source.
-    expect(find.text('GPX — 1 files'), findsOneWidget);
+    expect(find.text('GPX - 1 files'), findsOneWidget);
     expect(find.byType(Checkbox), findsOneWidget);
   });
 
@@ -152,7 +152,7 @@ void main() {
     await tester.tap(find.textContaining('Videos (1)'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Videos — 1 files'), findsOneWidget);
+    expect(find.text('Videos - 1 files'), findsOneWidget);
     expect(find.text('clip.mp4'), findsOneWidget);
     expect(find.byType(Checkbox), findsNothing);
     expect(find.text('Select all'), findsNothing);

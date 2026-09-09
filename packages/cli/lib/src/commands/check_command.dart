@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:stunda_engine/stunda_engine.dart';
 
-/// `check` — probe for exiftool (RAW-embed / HEIC via exiftool).
+/// `check` - probe for exiftool (RAW-embed / HEIC via exiftool).
 class CheckCommand extends Command<int> {
   /// Creates the command. [sink] overrides stdout (for tests); [runner]
   /// overrides how external tools are probed (tests inject a fake so the
@@ -36,7 +36,7 @@ class CheckCommand extends Command<int> {
       for (final t in tools) {
         final mark = t.present ? '✓' : '✗';
         final ver = t.version == null ? '' : ' (${t.version})';
-        _out.writeln('$mark ${t.name}$ver — ${t.purpose}');
+        _out.writeln('$mark ${t.name}$ver - ${t.purpose}');
         if (!t.present && t.installCommand != null) {
           _out.writeln('    install: ${t.installCommand}');
         }

@@ -42,7 +42,7 @@ ExplorePhoto _datedPhoto(String path, double lat, double lon, DateTime date) =>
       ),
     );
 
-/// The photos currently feeding the (live) [HeatmapLayer] — a direct read of
+/// The photos currently feeding the (live) [HeatmapLayer] - a direct read of
 /// what the filtered set hands the heatmap.
 List<ExplorePhoto> _heatmapPhotos(WidgetTester tester) =>
     tester.widget<HeatmapLayer>(find.byType(HeatmapLayer)).photos;
@@ -655,7 +655,7 @@ void main() {
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    // The start label moved off the span start — the range narrowed.
+    // The start label moved off the span start - the range narrowed.
     expect(find.text('2020-01-01 00:00'), findsNothing);
   });
 
@@ -684,7 +684,7 @@ void main() {
     await tester.tap(find.text('OK')); // accept default time
     await tester.pumpAndSettle();
 
-    // The end moved off the span end — the range narrowed.
+    // The end moved off the span end - the range narrowed.
     expect(find.text('2020-01-31 00:00'), findsNothing);
   });
 

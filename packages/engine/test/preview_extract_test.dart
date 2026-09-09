@@ -129,7 +129,7 @@ void main() {
     });
   });
 
-  group('extractPreview — full', () {
+  group('extractPreview - full', () {
     test(
       'picks the largest produced file (PreviewImage over Thumbnail)',
       () async {
@@ -182,7 +182,7 @@ void main() {
     });
   });
 
-  group('extractPreview — thumb', () {
+  group('extractPreview - thumb', () {
     test(
       'picks the smallest produced file (the dedicated thumbnail)',
       () async {
@@ -202,7 +202,7 @@ void main() {
     );
   });
 
-  group('extractPreview — none produced', () {
+  group('extractPreview - none produced', () {
     test('returns null when exiftool writes no embedded image', () async {
       final src = writeSource('DSCF3.RAF');
       final runner = _EmptyRunner();
@@ -229,7 +229,7 @@ void main() {
     });
   });
 
-  group('extractPreview — cache', () {
+  group('extractPreview - cache', () {
     test('skips re-extraction when the cached file is fresh', () async {
       final src = writeSource('DSCF4.RAF');
       final cacheDir = p.join(tmp.path, 'cache');

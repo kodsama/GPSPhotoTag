@@ -3,7 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:stunda_engine/stunda_engine.dart';
 
 /// Extensions Flutter's `Image.file` can decode for a thumbnail/fullscreen
-/// view. HEIC/HEIF and RAW are excluded — they fall back to a placeholder.
+/// view. HEIC/HEIF and RAW are excluded - they fall back to a placeholder.
 const _decodableExtensions = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'};
 
 /// Whether [path] is an image Flutter can decode (so we can show a real
@@ -15,7 +15,7 @@ bool isDecodableImage(String path) {
 }
 
 /// Extensions Flutter's `Image` can't decode natively but exiftool can extract
-/// an embedded JPEG preview from — RAW formats plus HEIC/HEIF.
+/// an embedded JPEG preview from - RAW formats plus HEIC/HEIF.
 const _extractableExtensions = {
   'raf',
   'nef',
@@ -53,7 +53,7 @@ String fileTypeLabel(String path) {
 /// One geotagged photo to plot on the Explore map.
 ///
 /// Carries the file [path], its decimal-degree coordinates, and the [meta] read
-/// from exiftool (used to render the detail panel — dimensions, date, …). This
+/// from exiftool (used to render the detail panel - dimensions, date, …). This
 /// is plain, Flutter-free data so the grouping/navigation logic below is unit
 /// testable without a widget tree.
 class ExplorePhoto {
@@ -93,7 +93,7 @@ class ExplorePhoto {
   /// The coordinate as a flutter_map [LatLng].
   LatLng get position => LatLng(latitude, longitude);
 
-  /// The capture date from [meta], or null when unknown — the field the
+  /// The capture date from [meta], or null when unknown - the field the
   /// Timeline range filter keys off (null-dated photos are never filtered out).
   DateTime? get date => meta?.date;
 }

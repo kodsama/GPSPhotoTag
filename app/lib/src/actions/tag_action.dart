@@ -11,7 +11,7 @@ import '../widgets/run_view.dart';
 /// The Tag-with-GPS flow: every [TagOptions] field, a primary button that names
 /// the commitment ("Tag N photos" / "Preview N photos" for dry-run), live
 /// progress with per-item rows, an error surface, the result summary, and a
-/// "Done — back to library" affordance.
+/// "Done - back to library" affordance.
 class TagAction extends StatelessWidget {
   /// Creates the tag action body.
   const TagAction({super.key});

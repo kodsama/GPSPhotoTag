@@ -1,7 +1,7 @@
 /// Reusable frosted-glass surface used across the shell (header, action cards,
 /// content panels). A [BackdropFilter] blurs whatever sits behind it (the
 /// app-wide background + veil), over a semi-transparent surface fill with a
-/// hairline border and a soft shadow — legible in both light and dark themes.
+/// hairline border and a soft shadow - legible in both light and dark themes.
 library;
 
 import 'dart:ui';

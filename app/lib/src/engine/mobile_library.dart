@@ -207,7 +207,7 @@ FolderScanResult synthesizeScan(
   );
 }
 
-/// A geotagged asset ready to plot on the Explore map on mobile — coordinates
+/// A geotagged asset ready to plot on the Explore map on mobile - coordinates
 /// come from enumeration, and the image loads by [assetId] (not a file path).
 class MobileExplorePhoto {
   /// Creates a plottable mobile photo.
@@ -225,7 +225,7 @@ class MobileExplorePhoto {
   final String assetId;
 
   /// The already-exported proxy JPEG path for this asset, or null when none was
-  /// exported — the decodable file the map renders.
+  /// exported - the decodable file the map renders.
   final String? proxyPath;
 
   /// Latitude in signed decimal degrees.
@@ -365,7 +365,7 @@ class MobileTagPhoto {
   final bool hasGps;
 }
 
-/// Lower-cased basename without its extension — the RAW-companion match key,
+/// Lower-cased basename without its extension - the RAW-companion match key,
 /// kept here so the mobile filename pairing matches the engine's logic.
 String _stem(String filename) {
   final dot = filename.lastIndexOf('.');

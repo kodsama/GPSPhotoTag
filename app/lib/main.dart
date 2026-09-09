@@ -146,11 +146,11 @@ class _StundaAppState extends State<StundaApp> {
     _lifecycle = AppLifecycleListener(onExitRequested: _onExitRequested);
     // Always-on MCP endpoint for LLM clients, started only for the real app
     // (an injected controller in tests must not spawn a server isolate) and
-    // only on desktop — the MCP TCP/stdio server is a desktop-only feature and
+    // only on desktop - the MCP TCP/stdio server is a desktop-only feature and
     // its exiftool probe would misfire on mobile (no bundled exiftool there).
     if (widget.controller == null && !_controller.isMobile) {
       _controller.mcp.start();
-      // Silent startup probe — surfaces a dismissible banner only if exiftool
+      // Silent startup probe - surfaces a dismissible banner only if exiftool
       // can't launch. Non-blocking; the walkthrough stays fully usable.
       _controller.checkEnvironment();
     }

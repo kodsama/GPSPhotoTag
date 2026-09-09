@@ -20,16 +20,16 @@ import 'shrink_action.dart' show ShrinkAddButton;
 ///
 /// The user sets a quality threshold, finds the photos scoring below it (hashing
 /// off the UI isolate, reusing the composite quality the hasher computes), then
-/// ticks the ones to add to the shrink list. Pure selection — nothing is trashed
+/// ticks the ones to add to the shrink list. Pure selection - nothing is trashed
 /// here; the chosen files fold into the staged set on
 /// [AppController.addActiveStageToShrinkList].
 ///
 /// The surface has three unambiguous modes so the threshold control and the
 /// hashing progress bar never stack into one confusing control:
-///   * configuring (idle, not yet reviewed) — the explainer + threshold slider
+///   * configuring (idle, not yet reviewed) - the explainer + threshold slider
 ///     + kept-vs-flagged example + Find button;
-///   * hashing (busy) — ONLY the "Hashing N / M" progress bar;
-///   * results (reviewed, not busy) — the below-threshold candidate list.
+///   * hashing (busy) - ONLY the "Hashing N / M" progress bar;
+///   * results (reviewed, not busy) - the below-threshold candidate list.
 class ShrinkLowQualityReview extends StatelessWidget {
   /// Creates the low-quality review surface.
   const ShrinkLowQualityReview({super.key});
@@ -45,11 +45,11 @@ class ShrinkLowQualityReview extends StatelessWidget {
       children: [
         Text(context.tr('shrink_low_quality_intro'), style: text.bodyMedium),
         const SizedBox(height: 16),
-        // Mode 1 — hashing: show ONLY the progress bar (no slider/example), so
+        // Mode 1 - hashing: show ONLY the progress bar (no slider/example), so
         // the threshold control can never be confused with the progress bar.
         if (controller.shrinkBusy)
           _HashingBar(progress: controller.hashProgress)
-        // Mode 3 — results: the criteria toggles (so the found set can be
+        // Mode 3 - results: the criteria toggles (so the found set can be
         // re-filtered WITHOUT re-hashing) above the below-threshold candidates.
         else if (controller.shrinkLowQReviewed) ...[
           _CriteriaToggles(controller: controller),
@@ -75,7 +75,7 @@ class ShrinkLowQualityReview extends StatelessWidget {
               _LowQRow(controller: controller, file: h),
           ],
         ]
-        // Mode 2 — configuring: explainer + threshold slider + example + Find.
+        // Mode 2 - configuring: explainer + threshold slider + example + Find.
         else ...[
           Text(context.tr('shrink_quality_explainer'), style: text.bodySmall),
           const SizedBox(height: 12),

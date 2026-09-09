@@ -33,7 +33,7 @@ List<String> _tagsFor(PreviewSize size) => switch (size) {
 /// [source] into [outDir], one file per tag.
 ///
 /// Uses `-b -W <outDir>/%f_%t.%s` so exiftool writes the *binary* image to disk
-/// (named like `DSCF0637_PreviewImage.jpg`) instead of to stdout — the engine's
+/// (named like `DSCF0637_PreviewImage.jpg`) instead of to stdout - the engine's
 /// [ProcessRunner] returns stdout as a String, which would corrupt binary. `-m`
 /// ignores minor warnings so a missing tag never fails the whole call.
 List<String> buildExtractArgs(String source, String outDir, PreviewSize size) =>

@@ -64,7 +64,7 @@ class ContentPanel extends StatelessWidget {
 
   /// Chip specs for the supported section: photo formats (by count desc) then
   /// GPS sources. Each carries the file paths behind it so a tap can open the
-  /// drill-down dialog. Counts are plain integers — no thousands grouping.
+  /// drill-down dialog. Counts are plain integers - no thousands grouping.
   static List<_ChipSpec> _supportedChips(
     BuildContext context,
     FolderScanResult scan,
@@ -283,7 +283,7 @@ class _UnsupportedGroups extends StatelessWidget {
   }
 }
 
-/// One muted "Images (12): tif, bmp…" row — tappable to open a read-only list.
+/// One muted "Images (12): tif, bmp…" row - tappable to open a read-only list.
 class _CategoryRow extends StatelessWidget {
   const _CategoryRow({
     required this.label,

@@ -14,7 +14,7 @@ String formatExifDateTime(DateTime dt) {
 ///
 /// Accepts an optional [raw] parameter typed as [Object?]; callers that receive
 /// exiftool JSON output (where the value may not be a [String]) should pass the
-/// raw JSON value directly — non-String objects are coerced via [toString].
+/// raw JSON value directly - non-String objects are coerced via [toString].
 /// Returns null when [raw] is null, too short, or the fields do not parse.
 DateTime? parseExifDateTimeNaive(Object? raw) {
   if (raw == null) return null;

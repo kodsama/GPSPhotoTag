@@ -5,8 +5,8 @@ import 'explore_model.dart';
 ///
 /// A point can hold several photos (a burst at one spot), so the overlay pages
 /// through them with prev/next and a "1 / N" counter. This class is pure and
-/// immutable so the paging arithmetic — wrap-around, the counter, the single-
-/// vs-multi distinction — is unit testable without a widget.
+/// immutable so the paging arithmetic - wrap-around, the counter, the single-
+/// vs-multi distinction - is unit testable without a widget.
 class DetailSelection {
   /// Opens [point] at [index] (clamped into range).
   DetailSelection({required this.point, int index = 0})

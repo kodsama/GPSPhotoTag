@@ -32,7 +32,7 @@ void main() {
     test('spans the earliest and latest dates, ignoring nulls', () {
       final span = dateSpanOf([
         _p('/mid', date: _d(2021, 6, 15)),
-        _p('/null'), // no date — ignored
+        _p('/null'), // no date - ignored
         _p('/late', date: _d(2022, 1, 1)),
         _p('/early', date: _d(2020, 1, 1)),
       ]);

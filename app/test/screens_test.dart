@@ -128,7 +128,7 @@ void main() {
 
       expect(find.byType(ActionCard), findsNothing);
       expect(
-        find.text('All actions are hidden — enable some in Settings.'),
+        find.text('All actions are hidden - enable some in Settings.'),
         findsOneWidget,
       );
     });
@@ -314,9 +314,9 @@ void main() {
 
       expect(controller.lastSummary, {'tagged': 1});
       expect(find.text('total'), findsOneWidget);
-      expect(find.text('Done — back to library'), findsOneWidget);
+      expect(find.text('Done - back to library'), findsOneWidget);
 
-      await tester.tap(find.text('Done — back to library'));
+      await tester.tap(find.text('Done - back to library'));
       await tester.pumpAndSettle();
       expect(controller.screen, AppScreen.workspace);
     });
@@ -559,7 +559,7 @@ void main() {
 
         expect(fake.calls, contains('trashPaths'));
         expect(fake.lastTrashedPaths, ['/library/orphan.raf']);
-        expect(find.text('Done — back to library'), findsOneWidget);
+        expect(find.text('Done - back to library'), findsOneWidget);
       },
     );
 

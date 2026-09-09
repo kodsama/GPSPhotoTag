@@ -113,16 +113,16 @@ jobs:
         run: flutter test --coverage
 
       # --- Coverage gate (≥99.5% line coverage per package) -------------------
-      - name: Coverage gate — engine
+      - name: Coverage gate - engine
         run: bash tool/check_coverage.sh packages/engine/coverage/lcov.info "${COVERAGE_MIN}"
 
-      - name: Coverage gate — cli
+      - name: Coverage gate - cli
         run: bash tool/check_coverage.sh packages/cli/coverage/lcov.info "${COVERAGE_MIN}"
 
-      - name: Coverage gate — mcp
+      - name: Coverage gate - mcp
         run: bash tool/check_coverage.sh packages/mcp/coverage/lcov.info "${COVERAGE_MIN}"
 
-      - name: Coverage gate — app
+      - name: Coverage gate - app
         run: bash tool/check_coverage.sh app/coverage/lcov.info "${COVERAGE_MIN}"
 
       - name: Upload coverage reports
@@ -268,7 +268,7 @@ jobs:
         run: flutter pub get
 
       # Mobile bundles no exiftool (engine uses the device photo library) and no
-      # desktop ONNX dylibs (Android AAR / iOS pod provide the runtime) — only
+      # desktop ONNX dylibs (Android AAR / iOS pod provide the runtime) - only
       # the .onnx models. This trims ~40-55MB from the app vs. the desktop set.
       - name: Clear exiftool assets (not bundled on mobile)
         run: bash tool/fetch-exiftool.sh --no-exiftool

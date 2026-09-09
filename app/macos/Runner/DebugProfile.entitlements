@@ -4,7 +4,7 @@
 <dict>
 	<!-- Sandbox OFF: Stunda is a local desktop tool (not Mac App Store).
 	     It must read/write user-chosen photo folders and run the bundled
-	     exiftool (a perl subprocess) — both forbidden under the sandbox. -->
+	     exiftool (a perl subprocess) - both forbidden under the sandbox. -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
 	<key>com.apple.security.cs.allow-jit</key>

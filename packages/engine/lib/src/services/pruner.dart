@@ -8,7 +8,7 @@ import '../domain/photo_row.dart';
 import '../domain/status.dart';
 import 'raw_pairing.dart';
 
-/// Finds and removes orphan RAW files — RAWs with no same-named JPG/HEIC
+/// Finds and removes orphan RAW files - RAWs with no same-named JPG/HEIC
 /// companion anywhere in the scanned tree.
 ///
 /// A RAW is an orphan when no `.jpg/.jpeg/.heic/.heif` file shares its basename
@@ -103,7 +103,7 @@ class Pruner {
   /// Moves exactly the given [paths] (plus any `<path>.xmp` sidecar) to the
   /// Trash, or permanently deletes them when [delete] is true.
   ///
-  /// Unlike [prune], this trashes the explicit list the caller chose — it never
+  /// Unlike [prune], this trashes the explicit list the caller chose - it never
   /// re-scans or re-classifies. It backs the GUI's "preview → select → confirm"
   /// flow, where the user has already reviewed and selected the candidates, so
   /// nothing is removed blind. Emits an [ItemEvent] per file

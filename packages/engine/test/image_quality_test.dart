@@ -7,7 +7,7 @@ img.Image _flat(int w, int h, [int v = 128]) =>
     img.Image(width: w, height: h)..clear(img.ColorRgb8(v, v, v));
 
 /// A tight vertical-stripe pattern (2-px period) so neighbouring pixels differ
-/// strongly — high Laplacian variance and high luma spread.
+/// strongly - high Laplacian variance and high luma spread.
 img.Image _stripes(int w, int h) {
   final image = img.Image(width: w, height: h);
   for (var y = 0; y < h; y++) {

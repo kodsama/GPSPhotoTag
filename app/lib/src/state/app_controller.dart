@@ -191,7 +191,7 @@ class AppController extends ChangeNotifier {
   /// Sets the theme to light or dark explicitly, persisting the choice.
   ///
   /// The header passes the *currently displayed* brightness so the first tap
-  /// always flips what the user sees — even from [ThemeMode.system].
+  /// always flips what the user sees - even from [ThemeMode.system].
   void setDark(bool dark) =>
       setThemeMode(dark ? ThemeMode.dark : ThemeMode.light);
 
@@ -259,7 +259,7 @@ class AppController extends ChangeNotifier {
 
   HomeActionsConfig _homeActions = HomeActionsConfig.standard;
 
-  /// The full home-action configuration (order + hidden set) — what the Settings
+  /// The full home-action configuration (order + hidden set) - what the Settings
   /// editor lists, every action in its current order.
   HomeActionsConfig get homeActions => _homeActions;
 
@@ -330,7 +330,7 @@ class AppController extends ChangeNotifier {
   ///
   /// Destructive actions preview first: opening an idle [LibraryAction.pruneRaw]
   /// classifies the library (cheap, in-process) so the panel can show a
-  /// reviewable, selectable list — nothing is removed until the user confirms.
+  /// reviewable, selectable list - nothing is removed until the user confirms.
   void openAction(LibraryAction action) {
     // The Explore map is a full screen, not an action panel: route it there and
     // start loading coordinates.
@@ -363,7 +363,7 @@ class AppController extends ChangeNotifier {
   }
 
   /// Returns from an action panel to the workspace hub WITHOUT cancelling any
-  /// run — the run keeps going in the background and its card shows progress.
+  /// run - the run keeps going in the background and its card shows progress.
   ///
   /// The live run fields are only reset when the action being left is idle, so a
   /// finished-and-reviewed action returns to a clean slate next time.
@@ -413,7 +413,7 @@ class AppController extends ChangeNotifier {
 
   /// Navigates one in-app step "back" for the system back button/gesture, which
   /// would otherwise pop the single route and quit the app (there is no
-  /// Navigator stack — navigation is modelled by [screen]). Maps action and
+  /// Navigator stack - navigation is modelled by [screen]). Maps action and
   /// explore back to the workspace hub, the workspace and an in-flight scan back
   /// to welcome, and is a no-op on welcome (so the caller lets the real pop
   /// through and the app exits).
@@ -537,7 +537,7 @@ class AppController extends ChangeNotifier {
   /// rescans the combined set. A no-op when nothing new is added.
   Future<void> addRootPaths(Iterable<String> paths) async {
     final next = addRoots(_roots, paths);
-    // A no-op when the merge changed nothing — every addition was already
+    // A no-op when the merge changed nothing - every addition was already
     // covered (containment-aware), so the root list is identical. (A subsume
     // can keep the length while swapping a child for its parent, so compare
     // contents, not just length.)
@@ -636,7 +636,7 @@ class AppController extends ChangeNotifier {
   /// Scans the device photo library on mobile: requests access, enumerates
   /// assets, exports a downscaled proxy JPEG per asset, and lands on the
   /// workspace with a synthesized [FolderScanResult] whose `photos` are the
-  /// proxy paths — so every existing desktop runner works unchanged.
+  /// proxy paths - so every existing desktop runner works unchanged.
   ///
   /// A no-op on desktop (where [isMobile] is false). On denied access it sets
   /// [photoPermissionDenied] and returns to the welcome screen.
@@ -846,7 +846,7 @@ class AppController extends ChangeNotifier {
   ///
   /// Cancelling the (sole) stream subscription tears down the worker isolate via
   /// the runner's `onCancel`, so further events are ignored and nothing keeps
-  /// running. A cancelled run leaves no partial destructive side effects — trash
+  /// running. A cancelled run leaves no partial destructive side effects - trash
   /// runs act atomically inside the worker, so cancelling before they finish
   /// simply stops them.
   void cancelAction(LibraryAction action) {
@@ -857,7 +857,7 @@ class AppController extends ChangeNotifier {
       _activeAction = null;
       _running = false;
       // A cancelled subscription never fires onDone, so settle the run's Future
-      // here — otherwise callers awaiting runTag()/etc. hang forever.
+      // here - otherwise callers awaiting runTag()/etc. hang forever.
       if (_runCompleter?.isCompleted == false) _runCompleter!.complete();
       _runCompleter = null;
     }
@@ -1202,7 +1202,7 @@ class AppController extends ChangeNotifier {
     final scan = _scan;
     if (scan == null) return;
     // On mobile every asset's GPS + date are already known from enumeration, so
-    // build the map points directly — no proxy read, no engine round-trip. The
+    // build the map points directly - no proxy read, no engine round-trip. The
     // marker/detail images load from each asset's already-exported proxy JPEG.
     if (isMobile) {
       _loadExploreFromAssets();
@@ -1259,7 +1259,7 @@ class AppController extends ChangeNotifier {
   }
 
   /// Builds the Explore map points directly from the mobile library's geotagged
-  /// assets (synchronously — coordinates and dates come from enumeration). Each
+  /// assets (synchronously - coordinates and dates come from enumeration). Each
   /// point's image is its already-exported proxy JPEG, so the desktop map +
   /// detail panel render it unchanged.
   void _loadExploreFromAssets() {
@@ -1403,7 +1403,7 @@ class AppController extends ChangeNotifier {
     ];
     // Classify EVERY asset the way desktop's TagService does, so the summary
     // tallies noTimestamp / alreadyTagged / noGps alongside tagged /
-    // interpolated — not just the assets that resolved to a fix.
+    // interpolated - not just the assets that resolved to a fix.
     final outcomes = classifyTagOutcomes(
       photos,
       pool,
@@ -1618,7 +1618,7 @@ class AppController extends ChangeNotifier {
 
   /// Trashes the user-selected candidates after an explicit confirm.
   ///
-  /// Only reached once the user has reviewed the preview and confirmed — the
+  /// Only reached once the user has reviewed the preview and confirmed - the
   /// destructive-actions-preview-first principle. Sends exactly the selected
   /// paths (plus their sidecars, handled in the engine) to the Trash.
   Future<void> runTrashSelected() {
@@ -1811,7 +1811,7 @@ class AppController extends ChangeNotifier {
       for (final member in members) {
         if (identical(member, keeper)) continue;
         // Preserve the prior selection for the relationship this member was part
-        // of — the prior pair where it appeared on EITHER side (the keeper may
+        // of - the prior pair where it appeared on EITHER side (the keeper may
         // have flipped, swapping which file is the "other").
         final prior = groupPairs
             .where(
@@ -1880,7 +1880,7 @@ class AppController extends ChangeNotifier {
       _log('Found ${groups.length} duplicate group(s)');
       _findingDuplicates = false;
       _hashProgress = HashProgress();
-      // Finishing with matches pulses the card's attention badge — unless the
+      // Finishing with matches pulses the card's attention badge - unless the
       // user is watching this action (the results render in-panel) or none were
       // found, in which case it returns to idle.
       final watching =
@@ -1987,7 +1987,7 @@ class AppController extends ChangeNotifier {
 
   /// Per-stage snapshot of the working review state (found results + the user's
   /// selections), so leaving a stage and re-opening it within one shrink session
-  /// restores it instantly — no re-classify, no re-hash, no lost ticks. A stage
+  /// restores it instantly - no re-classify, no re-hash, no lost ticks. A stage
   /// is cached on every leave ([returnToShrinkWizard]/[addActiveStageToShrinkList])
   /// and restored on re-open; [clearShrinkStage] and a fresh wizard drop it.
   final Map<ShrinkStage, _ShrinkStageCache> _stageCache = {};
@@ -2129,7 +2129,7 @@ class AppController extends ChangeNotifier {
   bool isLowQParamEnabled(QualityParam param) => _lowQParams.contains(param);
 
   /// The hashed files scoring strictly below the current quality threshold when
-  /// scored on only the enabled [lowQParams], in hash order — the low-quality
+  /// scored on only the enabled [lowQParams], in hash order - the low-quality
   /// review's selectable candidates. Recomputed from the ALREADY-HASHED
   /// per-component scores, so a toggle change never triggers a re-hash.
   List<HashedFile> get shrinkLowQCandidates => [
@@ -2193,7 +2193,7 @@ class AppController extends ChangeNotifier {
   /// returns here; nothing is trashed until the final confirm.
   ///
   /// Re-opening a stage already visited this session RESTORES its cached review
-  /// state (found results + the user's selections) instead of re-priming — no
+  /// state (found results + the user's selections) instead of re-priming - no
   /// re-classify, no re-hash. Only the first visit primes the surface fresh:
   /// duplicates clears any prior pairs (the page hashes on demand), orphans
   /// classifies the library for the prune review, redundant-pairs classifies and
@@ -2530,8 +2530,8 @@ class AppController extends ChangeNotifier {
   /// The ORIGINAL-asset info backing the compare/preview info line on mobile for
   /// proxy [path]: its real filename, a [FileMeta] carrying the original
   /// dimensions / capture date / GPS, and its on-disk byte size. Null on desktop
-  /// or when [path] doesn't resolve to an asset (then the desktop info line —
-  /// proxy name + read meta — is used unchanged). The proxy itself is downscaled
+  /// or when [path] doesn't resolve to an asset (then the desktop info line -
+  /// proxy name + read meta - is used unchanged). The proxy itself is downscaled
   /// and stripped, so none of this can be read from the file.
   MobileInfo? mobileInfoForProxyPath(String path) {
     final asset = assetForProxyPath(path);

@@ -1,7 +1,7 @@
 /// The real [ImageEmbedder]: an on-device MobileNetV2 model run through a
 /// bundled ONNX Runtime via `dart:ffi`.
 ///
-/// It composes the pure pieces — [resolveEmbeddingBundle] to find the lib +
+/// It composes the pure pieces - [resolveEmbeddingBundle] to find the lib +
 /// model, [preprocessToNchwFloat] to build the normalized input tensor,
 /// [OrtSession] to run, and [l2Normalize] to turn the output feature vector into
 /// a unit direction. It is total: any failure (missing bundle, load error,
@@ -29,7 +29,7 @@ class OrtImageEmbedder implements ImageEmbedder {
 
   /// Builds an embedder from a [bundleDir] (the dir holding the ORT library and
   /// the embedding model). Returns an unavailable embedder when no bundle
-  /// resolves, the files are absent, or the session fails to load — never
+  /// resolves, the files are absent, or the session fails to load - never
   /// throws.
   ///
   /// [operatingSystem] overrides the host OS for [resolveEmbeddingBundle]

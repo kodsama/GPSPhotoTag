@@ -1,6 +1,6 @@
 /// An in-app Help page: a scrollable, sectioned guide to every feature, reached
-/// from the Settings overflow menu. Each section is data — a title key plus a
-/// list of body keys — so the structure is unit-testable and every string is
+/// from the Settings overflow menu. Each section is data - a title key plus a
+/// list of body keys - so the structure is unit-testable and every string is
 /// localized through `context.tr`.
 ///
 /// The page can be opened at a specific section ([showHelp] with a `section`):
@@ -125,7 +125,7 @@ String sectionForTopic(HelpTopic topic) => switch (topic) {
 /// Wraps a control so that, while contextual help mode is active, a click on it
 /// opens the Help page at the control's [topic] section INSTEAD of triggering
 /// the control's own action (the tap is absorbed and help mode is exited). When
-/// help mode is off it is transparent — the [child] behaves exactly as normal.
+/// help mode is off it is transparent - the [child] behaves exactly as normal.
 class HelpTarget extends StatelessWidget {
   /// Wraps [child], routing help-mode taps to the Help section for [topic].
   const HelpTarget({super.key, required this.topic, required this.child});

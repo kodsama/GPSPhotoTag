@@ -672,7 +672,7 @@ Directory previewCacheDir() =>
     Directory(p.join(Directory.systemTemp.path, 'stunda_preview_cache'));
 
 /// How many paths each worker hands to one [hashFilesBatch] call: a single
-/// exiftool spawn covers the whole chunk, so larger chunks mean fewer spawns —
+/// exiftool spawn covers the whole chunk, so larger chunks mean fewer spawns -
 /// capped so a chunk's argument list stays well within OS limits.
 @visibleForTesting
 const int hashBatchChunk = 150;

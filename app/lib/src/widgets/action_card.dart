@@ -192,7 +192,7 @@ class _ActionCardState extends State<ActionCard>
 }
 
 /// A thin determinate/indeterminate bar shown on the card while its background
-/// run is in flight — an unmistakable "processing" affordance.
+/// run is in flight - an unmistakable "processing" affordance.
 class _ProgressStrip extends StatelessWidget {
   const _ProgressStrip({required this.progress});
 

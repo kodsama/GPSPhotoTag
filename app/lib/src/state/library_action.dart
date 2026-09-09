@@ -12,7 +12,7 @@ typedef Translator = String Function(
 /// Whether an action can run against the current library, plus a short reason.
 ///
 /// [labelKey]/[labelParams] resolve (via a [Translator]) to the action card's
-/// readiness chip text ("Ready — 3 sources", "No GPS sources found"). When
+/// readiness chip text ("Ready - 3 sources", "No GPS sources found"). When
 /// [enabled] is false the card is disabled.
 @immutable
 class ActionReadiness {
@@ -49,7 +49,7 @@ class ActionReadiness {
 /// Adding a future action is one entry in [LibraryAction.all]: give it an [id],
 /// an [icon], a [title], a one-line [description], and a [readiness] function
 /// over the [FolderScanResult]. The workspace grid, the action screen header,
-/// and routing all read from this list — no other code changes.
+/// and routing all read from this list - no other code changes.
 enum LibraryAction {
   /// Write GPS coordinates into photos from the scanned tracks & history.
   tag(
@@ -191,7 +191,7 @@ enum LibraryAction {
 /// The default is [LibraryAction.all]'s order (Explore first) with everything
 /// visible. (De)serialization is tolerant: unknown action ids are dropped, and
 /// any action missing from a saved order is appended VISIBLE in its canonical
-/// order — so adding a new [LibraryAction] later still shows for existing users.
+/// order - so adding a new [LibraryAction] later still shows for existing users.
 @immutable
 class HomeActionsConfig {
   /// Creates a config from an explicit [order] and [hidden] set. Callers should
@@ -236,7 +236,7 @@ class HomeActionsConfig {
   /// Whether [action] is currently visible (not hidden).
   bool isVisible(LibraryAction action) => !hidden.contains(action);
 
-  /// The ordered, visible-only actions — what the workspace grid renders.
+  /// The ordered, visible-only actions - what the workspace grid renders.
   List<LibraryAction> get visibleInOrder => [
     for (final action in order)
       if (!hidden.contains(action)) action,

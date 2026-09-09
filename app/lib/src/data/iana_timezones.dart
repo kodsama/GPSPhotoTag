@@ -5,7 +5,7 @@
 ///     | sed 's|^./||' | grep -E '^[A-Z]' \\
 ///     | grep -vE '^(SystemV|Factory$|leapseconds|tzdata.*)' | grep '/' | sort -u
 ///
-/// Used to populate the Tag action's timezone dropdown. Pure data — no logic.
+/// Used to populate the Tag action's timezone dropdown. Pure data - no logic.
 library;
 
 /// Every IANA timezone name, sorted, for the timezone picker.

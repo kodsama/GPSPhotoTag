@@ -4,7 +4,7 @@ import '../../domain/timed_point.dart';
 
 /// Parses a GPX document into time-ordered [TimedPoint]s.
 ///
-/// Reads `<trkpt>`, `<rtept>` and `<wpt>` elements — each must carry `lat`/`lon`
+/// Reads `<trkpt>`, `<rtept>` and `<wpt>` elements - each must carry `lat`/`lon`
 /// attributes and a `<time>` child (ISO-8601). Points without a parseable time
 /// are skipped (waypoints often lack one). The result is sorted ascending by
 /// time, which the [locator] relies on for binary search.

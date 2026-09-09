@@ -280,7 +280,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Explore on map'), findsOneWidget);
-      // The card is ready (1 photo) — readiness label shows the count.
+      // The card is ready (1 photo) - readiness label shows the count.
       expect(find.text('1 photos'), findsWidgets);
     });
   });
@@ -344,7 +344,7 @@ void main() {
     });
   });
 
-  group('PhotoThumbnail — RAW/HEIC preview extraction', () {
+  group('PhotoThumbnail - RAW/HEIC preview extraction', () {
     testWidgets('shows a spinner, then the extracted JPEG for a RAF', (
       tester,
     ) async {
@@ -437,7 +437,7 @@ void main() {
         // LayoutBuilder takes `!constraints.hasBoundedWidth` and the decode
         // width basis falls back to `height`. The downstream cover Image can't
         // lay out at infinite width (it asserts), but the LayoutBuilder branch
-        // we care about has already run — we assert on the computed decode width
+        // we care about has already run - we assert on the computed decode width
         // captured at first build, then clear the expected layout assertion.
         final dir = Directory.systemTemp.createTempSync('raw_unbounded');
         addTearDown(() => dir.deleteSync(recursive: true));
@@ -466,7 +466,7 @@ void main() {
         // height-derived cacheWidth is built (still under unbounded width).
         await tester.idle();
         await tester.pump();
-        tester.takeException(); // the cover image asserts again — drain it.
+        tester.takeException(); // the cover image asserts again - drain it.
 
         // Decode width derives from height (100) * dpr (3) * 2 = 600, proving
         // the unbounded fallback path was taken (LayoutBuilder used `height`,

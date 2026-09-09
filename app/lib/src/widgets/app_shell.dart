@@ -71,7 +71,7 @@ class _AppShellState extends State<AppShell> {
         },
         child: body,
       );
-      // The help cursor only means something with a pointer — skip it on mobile.
+      // The help cursor only means something with a pointer - skip it on mobile.
       if (!controller.isMobile) {
         body = MouseRegion(cursor: SystemMouseCursors.help, child: body);
       }

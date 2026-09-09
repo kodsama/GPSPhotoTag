@@ -6,7 +6,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 import '../cli_output.dart';
 import '../source_loader.dart';
 
-/// `fix-dates` — realign file timestamps and EXIF capture dates.
+/// `fix-dates` - realign file timestamps and EXIF capture dates.
 class FixDatesCommand extends Command<int> {
   /// Registers the `fix-dates` flags. [sink] overrides stdout (for tests).
   // ignore: prefer_initializing_formals

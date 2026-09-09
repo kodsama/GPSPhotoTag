@@ -21,7 +21,7 @@ class _FakeTrash implements Trash {
 }
 
 /// exiftool is never present in the test environment, so every invocation
-/// fails and `hashFilesBatch` falls back to decoding the source bytes — which
+/// fails and `hashFilesBatch` falls back to decoding the source bytes - which
 /// is exactly the no-exiftool path a plain `dart run` takes.
 class _FailingRunner implements ProcessRunner {
   @override

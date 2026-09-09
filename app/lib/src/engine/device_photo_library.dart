@@ -16,8 +16,8 @@ import 'package:stunda_engine/stunda_engine.dart';
 /// [PhotoLibrary] port.
 ///
 /// Enumeration, metadata, thumbnails, full bytes, and deletion go through the
-/// `photo_manager` plugin (iOS Photos / Android MediaStore). GPS write-back —
-/// the one thing the plugin cannot do — goes through a small native method
+/// `photo_manager` plugin (iOS Photos / Android MediaStore). GPS write-back -
+/// the one thing the plugin cannot do - goes through a small native method
 /// channel ([_gpsChannel]): iOS `PHAssetChangeRequest.location`, Android
 /// `ExifInterface` on the MediaStore entry.
 ///

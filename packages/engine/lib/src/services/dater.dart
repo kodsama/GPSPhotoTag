@@ -58,8 +58,8 @@ class Dater {
     for (final path in files) {
       try {
         // Consume the per-file stream with `await for` (not `yield*`): an error
-        // thrown inside the delegated async* body — e.g. _exif.read or
-        // setLastModified failing — is rethrown at the await point and caught
+        // thrown inside the delegated async* body - e.g. _exif.read or
+        // setLastModified failing - is rethrown at the await point and caught
         // here, so one bad file is recorded as an error and the run continues.
         final stream = switch (mode) {
           FixDatesMode.exif => _fromExif(

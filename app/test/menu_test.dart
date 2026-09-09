@@ -132,7 +132,7 @@ void main() {
       // The first section heading is visible at the top.
       expect(find.text('Getting started'), findsOneWidget);
 
-      // The page scrolls — a later section is reachable by scrolling.
+      // The page scrolls - a later section is reachable by scrolling.
       await tester.dragUntilVisible(
         find.text('For power users'),
         find.byType(Scrollable).first,

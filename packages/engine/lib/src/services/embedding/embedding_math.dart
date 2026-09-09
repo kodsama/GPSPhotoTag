@@ -12,7 +12,7 @@ import 'dart:typed_data';
 
 /// Returns [vector] L2-normalized to unit length, as a [Float32List].
 ///
-/// A zero (or empty) vector is returned unchanged — it has no direction, so the
+/// A zero (or empty) vector is returned unchanged - it has no direction, so the
 /// cosine against anything is 0 (a neutral, never-grouping similarity).
 Float32List l2Normalize(List<double> vector) {
   var sumSq = 0.0;

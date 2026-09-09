@@ -492,7 +492,7 @@ void main() {
     await c.runTrashDuplicates(); // completes → lastSummary set, not running
     await tester.pumpWidget(_host(c));
 
-    expect(find.text('Done — back to library'), findsOneWidget);
+    expect(find.text('Done - back to library'), findsOneWidget);
   });
 
   testWidgets('surfaces an error banner when a run errors', (tester) async {

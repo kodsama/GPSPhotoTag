@@ -30,7 +30,7 @@ class ActionScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                // Navigating back NEVER cancels the run — it keeps going in the
+                // Navigating back NEVER cancels the run - it keeps going in the
                 // background and the workspace card shows its progress. Mid
                 // shrink session a stage page was reached from the wizard, so
                 // back returns there; standalone it returns to the library. This

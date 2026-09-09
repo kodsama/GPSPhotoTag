@@ -24,7 +24,7 @@ const double _exactSimilarity = 0.98;
 
 /// The min-similarity cutoff at the Loose (100%) end. Deliberately kept high
 /// enough (~0.55) that the loosest setting still groups genuinely-similar photos
-/// rather than unrelated ones — the whole point of the new metric's full-range,
+/// rather than unrelated ones - the whole point of the new metric's full-range,
 /// trustworthy distance.
 const double _looseSimilarity = 0.55;
 
@@ -78,8 +78,8 @@ String similarityExampleKey(int percent) {
 /// example-degradation mapping, the threshold → caption-bucket key, and the
 /// always-visible picked-threshold label. Kept Flutter-free so the mappings are
 /// unit-testable away from any widget. Quality here is the engine's composite
-/// score — a blend of sharpness, contrast, and colourfulness (see
-/// `ImageQuality`) — and the stage flags photos scoring below the threshold.
+/// score - a blend of sharpness, contrast, and colourfulness (see
+/// `ImageQuality`) - and the stage flags photos scoring below the threshold.
 
 /// Maps a 0..1 quality [threshold] to a 0..1 "degradation amount" the example
 /// painter applies to its FLAGGED tile (0 = crisp/vivid, 1 = very blurry/flat).
@@ -271,6 +271,6 @@ String pickSillyWord(Random random) =>
     sillyWords[random.nextInt(sillyWords.length)];
 
 /// Whether [typed] matches the [expected] silly word (case-insensitive, trimmed)
-/// — the gate that enables the Trash button in the confirm dialog.
+/// - the gate that enables the Trash button in the confirm dialog.
 bool sillyWordMatches(String typed, String expected) =>
     typed.trim().toLowerCase() == expected.trim().toLowerCase();

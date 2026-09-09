@@ -37,8 +37,8 @@ void main() {
   });
 
   // These tests run the worker entry points IN-PROCESS (not via Isolate.spawn)
-  // against a real ReceivePort, so the worker bodies — invisible to coverage
-  // when they run on a spawned isolate — are exercised directly.
+  // against a real ReceivePort, so the worker bodies - invisible to coverage
+  // when they run on a spawned isolate - are exercised directly.
 
   group('buildWorkerRunner', () {
     test('returns a plain system runner when no bundle dir is given', () {
@@ -183,7 +183,7 @@ void main() {
           ),
         );
         // One record per path (the synthetic JPEG carries no camera tags, so
-        // the record may be empty — the path is what proves the worker ran).
+        // the record may be empty - the path is what proves the worker ran).
         expect(events.whereType<CuratedExif>().map((m) => m.path), [jpg]);
       },
     );
@@ -227,7 +227,7 @@ void main() {
           ),
         );
         // The JPEG hashes (via the batch fallback decode); the text file is
-        // skipped (undecodable) — but both still emit a progress tick.
+        // skipped (undecodable) - but both still emit a progress tick.
         final hashed = events.whereType<HashedFile>().toList();
         expect(hashed.map((h) => h.path), [jpg]);
         // One `1` tick per input file (hashed or skipped) keeps the bar moving.

@@ -8,7 +8,7 @@ import '../theme/app_colors.dart';
 /// The LEFT tile is a fixed reference scene; the RIGHT tile is the SAME scene
 /// drawn by the same painter but perturbed by [variance] (0 = pixel-identical,
 /// 1 = "same place, a different shot"). A "≈" sits between them. The whole thing
-/// is drawn with a [CustomPainter] — no bundled image assets — so it stays light
+/// is drawn with a [CustomPainter] - no bundled image assets - so it stays light
 /// and matches the app's cartographic feel.
 class ExampleScenePair extends StatelessWidget {
   /// Builds the example pair at [variance] (0..1) with the [caption] below it.
@@ -61,7 +61,7 @@ class ExampleScenePair extends StatelessWidget {
 /// matches near-identical copies). The Smart metric is shown as a reference tile
 /// and the SAME scene cropped/rotated/recoloured, joined by "≈", because the embedder
 /// embedding still recognises it as the same photo. Both are drawn with the
-/// shared [CustomPainter] — no bundled image assets — so they stay light and
+/// shared [CustomPainter] - no bundled image assets - so they stay light and
 /// deterministic.
 class MetricIllustration extends StatelessWidget {
   /// Builds the illustration. [transformed] draws the right tile as a
@@ -114,7 +114,7 @@ class MetricIllustration extends StatelessWidget {
   }
 }
 
-/// Paints the reference scene cropped, rotated, and recoloured — the kind of
+/// Paints the reference scene cropped, rotated, and recoloured - the kind of
 /// edit the Smart (embedding) metric still recognises as the same photo,
 /// where a pixel hash would not. Deterministic (no inputs).
 class _SmartScenePainter extends CustomPainter {
@@ -129,7 +129,7 @@ class _SmartScenePainter extends CustomPainter {
       ..scale(1.25)
       ..translate(-size.width / 2 - size.width * 0.08, -size.height / 2);
     // Reuse the reference scene painter, perturbed only by a colour shift (the
-    // recolour) — structure stays the same, so the embedding still matches.
+    // recolour) - structure stays the same, so the embedding still matches.
     _ScenePainter(variance: 0.35).paint(canvas, size);
     canvas.restore();
   }
@@ -161,7 +161,7 @@ class _SceneTile extends StatelessWidget {
 ///
 /// At variance 0 the scene is the fixed reference. As variance grows the painter
 /// progressively (a) warms/dims the sky, (b) nudges + resizes the sun, then
-/// (c) shifts the mountain heights/positions — so the tile reads as "same place,
+/// (c) shifts the mountain heights/positions - so the tile reads as "same place,
 /// a different shot" by the loosest level. Every offset is a pure function of
 /// [variance], so the render is deterministic.
 class _ScenePainter extends CustomPainter {
@@ -233,10 +233,10 @@ class _ScenePainter extends CustomPainter {
 /// stage flags: a KEPT sample (sharp, high-contrast, vivid) on the LEFT versus a
 /// FLAGGED sample on the RIGHT, degraded by [degradation] (0 = identical to the
 /// kept side, 1 = very blurry/flat/grey). The degradation visibly reduces the
-/// three real quality components — edge crispness (sharpness), tonal range
-/// (contrast), and saturation (colourfulness) — so the user SEES what a
-/// low-quality photo looks like. Drawn with a [CustomPainter] — no bundled image
-/// assets — to match the app's cartographic feel and stay deterministic.
+/// three real quality components - edge crispness (sharpness), tonal range
+/// (contrast), and saturation (colourfulness) - so the user SEES what a
+/// low-quality photo looks like. Drawn with a [CustomPainter] - no bundled image
+/// assets - to match the app's cartographic feel and stay deterministic.
 class QualityExamplePair extends StatelessWidget {
   /// Builds the kept-vs-flagged pair. [degradation] (0..1) controls how degraded
   /// the flagged (right) tile looks; [keptLabel]/[flaggedLabel] caption the
@@ -349,7 +349,7 @@ class _QualityTile extends StatelessWidget {
 /// vivid colours. As degradation grows the painter (a) softens the horizon edge
 /// into a blurry band (less sharpness), (b) compresses the sky/ground tones
 /// toward a flat mid-grey (less contrast), and (c) desaturates the colours
-/// toward grey (less colourfulness) — the three components of the engine's
+/// toward grey (less colourfulness) - the three components of the engine's
 /// composite quality. Every step is a pure function of [degradation], so the
 /// render is deterministic.
 class _QualityScenePainter extends CustomPainter {

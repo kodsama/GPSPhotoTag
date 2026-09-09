@@ -53,7 +53,7 @@ Future<ServerSocket> serveTcp(
         .bind(client)
         .listen(
           (chunk) {
-            // Buffer management is synchronous — no await here — so the shared
+            // Buffer management is synchronous - no await here - so the shared
             // buffer is never mutated concurrently.
             buffer += chunk;
             final parts = buffer.split('\n');

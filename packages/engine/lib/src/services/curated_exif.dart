@@ -5,7 +5,7 @@ import '../internal/json_utils.dart';
 
 /// A curated set of camera/exposure EXIF tags for the big-preview viewer.
 ///
-/// Holds only the human-interesting fields the info strip shows — camera
+/// Holds only the human-interesting fields the info strip shows - camera
 /// [make]/[model], [lens], [iso], [exposure] (shutter), [fNumber] aperture, and
 /// [focalLength]. Every field is optional because most files carry only some of
 /// them. Plain, Flutter-free data so it crosses the isolate/CLI boundary as JSON

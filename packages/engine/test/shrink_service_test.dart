@@ -37,7 +37,7 @@ void _noisy(String path, int seed) {
   File(path).writeAsBytesSync(img.encodeJpg(image));
 }
 
-/// A flat grey JPEG: no sharpness, no contrast, no colour — bottom of the
+/// A flat grey JPEG: no sharpness, no contrast, no colour - bottom of the
 /// composite-quality scale, so the low-quality stage must catch it.
 void _flat(String path) {
   final image = img.Image(width: 48, height: 48);

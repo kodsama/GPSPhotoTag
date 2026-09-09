@@ -341,7 +341,7 @@ List<McpTool> buildTools({
     McpTool(
       name: 'list_photos',
       description:
-          'List geotagged photos with their coordinates and capture time — '
+          'List geotagged photos with their coordinates and capture time - '
           'the data behind the Explore map. Read-only.',
       inputSchema: const {
         'type': 'object',
@@ -380,7 +380,7 @@ List<McpTool> buildTools({
       name: 'describe_photos',
       description:
           'Per photo: dimensions, capture date, GPS, camera, lens and '
-          'exposure — the comparison viewer\u0027s info strip. Read-only.',
+          'exposure - the comparison viewer\u0027s info strip. Read-only.',
       inputSchema: const {
         'type': 'object',
         'required': ['photos'],

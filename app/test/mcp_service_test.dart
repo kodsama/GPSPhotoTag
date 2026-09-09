@@ -135,7 +135,7 @@ void main() {
     expect(service.port, isNull);
   });
 
-  // AC: T-02 — error path when Isolate.spawn itself throws.
+  // AC: T-02 - error path when Isolate.spawn itself throws.
   // Exercising this required the IsolateSpawner seam; before the seam existed,
   // the catch block was guarded by coverage:ignore-start and had no test because
   // Isolate.spawn cannot be made to throw under `flutter test` without injection.

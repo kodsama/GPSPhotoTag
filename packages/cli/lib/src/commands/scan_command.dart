@@ -6,7 +6,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 
 import '../exit_codes.dart';
 
-/// `scan` — walk a library and report what it holds, changing nothing.
+/// `scan` - walk a library and report what it holds, changing nothing.
 ///
 /// The headless form of the GUI's Review summary: photo/track/history counts,
 /// the per-extension breakdown, and the unsupported buckets. Read-only.

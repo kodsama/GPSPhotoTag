@@ -7,8 +7,8 @@ import '../state/library_roots.dart';
 import '../theme/app_theme.dart';
 
 /// The workspace header strip: the library's name, a compact stat line, an
-/// "Add folder" button, a "Change library" button, and — when the library spans
-/// more than one root — a removable chip per root.
+/// "Add folder" button, a "Change library" button, and - when the library spans
+/// more than one root - a removable chip per root.
 class LibraryBar extends StatelessWidget {
   /// Builds the bar over [scan] (the completed library scan).
   const LibraryBar({super.key, required this.scan});

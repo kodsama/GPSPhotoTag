@@ -15,7 +15,7 @@ import 'shrink_action.dart' show ShrinkAddButton;
 ///
 /// Where both a RAW and its non-RAW partner exist, the user picks which side to
 /// drop (keep the photo, or keep the RAW), reviews the drop-side files, and ticks
-/// the ones to add to the shrink list. Pure selection — nothing is trashed here;
+/// the ones to add to the shrink list. Pure selection - nothing is trashed here;
 /// the chosen files are folded into the cumulative staged set on
 /// [AppController.addActiveStageToShrinkList].
 class ShrinkPairsReview extends StatelessWidget {

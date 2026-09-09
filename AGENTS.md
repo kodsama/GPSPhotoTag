@@ -1,9 +1,9 @@
 # Stunda for agents
 
 > **Two ways to drive this tool as an LLM:**
-> 1. **MCP server** (recommended) — a standard Model Context Protocol server, see
+> 1. **MCP server** (recommended) - a standard Model Context Protocol server, see
 >    [MCP](#mcp-model-context-protocol) below. Best for any MCP client.
-> 2. **CLI JSON contract** — `--json` + `schema`, documented in the rest of this
+> 2. **CLI JSON contract** - `--json` + `schema`, documented in the rest of this
 >    file. Best for shell scripts and ad-hoc automation.
 
 
@@ -15,7 +15,7 @@ it programmatically.
 
 ## Discovery flow
 
-1. **Read the schema.** Run `stunda schema` — it prints a JSON document
+1. **Read the schema.** Run `stunda schema` - it prints a JSON document
    describing every command, its options, the event shapes, and the exit codes.
    Parse it; do not hard-code command knowledge.
 2. **Probe the environment.** Run `stunda --json check` to learn which
@@ -26,9 +26,9 @@ it programmatically.
 
 ## Global flags
 
-- `--json` — emit one JSON object per line on stdout (machine mode). Always pass
+- `--json` - emit one JSON object per line on stdout (machine mode). Always pass
   this when driving the tool programmatically.
-- `--verbose` — include `debug`-level log events.
+- `--verbose` - include `debug`-level log events.
 
 ## Event contract (`--json`)
 
@@ -50,8 +50,8 @@ One JSON object per line on stdout. The `event` field discriminates:
 
 | code | meaning |
 |---|---|
-| `0` | ok — every item succeeded |
-| `2` | partial — some `no_gps` / `no_timestamp` / per-item `error` |
+| `0` | ok - every item succeeded |
+| `2` | partial - some `no_gps` / `no_timestamp` / per-item `error` |
 | `3` | bad input / arguments |
 | `4` | a required external tool is missing |
 | `5` | internal error |
@@ -76,7 +76,7 @@ stunda --json fix-dates -p ~/Pictures/Trip --mode exif
 
 Parse `done.summary` for the final tally; treat exit `2` as "completed, review
 the `no_gps`/`error` items", not as failure. Never rely on the human-readable
-output — it is not stable; the `--json` stream is.
+output - it is not stable; the `--json` stream is.
 
 ## MCP (Model Context Protocol)
 
@@ -91,10 +91,10 @@ block **and** a `structuredContent` object: `{ ok, summary, count, items[], logs
 
 **Two transports, same tools:**
 
-- **stdio** (recommended for clients that spawn a subprocess) — run the compiled
+- **stdio** (recommended for clients that spawn a subprocess) - run the compiled
   binary `stunda_mcp` (build it with
   `dart compile exe packages/mcp/bin/stunda_mcp.dart -o stunda_mcp`).
-- **TCP** — the desktop app starts the server on `127.0.0.1:8787` (next free
+- **TCP** - the desktop app starts the server on `127.0.0.1:8787` (next free
   port up to 8796) **whenever the app is open**; newline-delimited JSON-RPC. Run
   the binary the same way with `--tcp [--port N]`.
 

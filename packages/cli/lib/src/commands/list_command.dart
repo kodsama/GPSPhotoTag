@@ -19,7 +19,7 @@ void _print(
   }
 }
 
-/// `list-sources` — enumerate supported location sources.
+/// `list-sources` - enumerate supported location sources.
 class ListSourcesCommand extends Command<int> {
   /// Creates the command. [sink] overrides stdout (for tests).
   ListSourcesCommand({IOSink? sink}) : _out = sink ?? stdout;
@@ -44,7 +44,7 @@ class ListSourcesCommand extends Command<int> {
   }
 }
 
-/// `list-providers` — enumerate tile/geocoder providers.
+/// `list-providers` - enumerate tile/geocoder providers.
 class ListProvidersCommand extends Command<int> {
   /// Creates the command. [sink] overrides stdout (for tests).
   ListProvidersCommand({IOSink? sink}) : _out = sink ?? stdout;

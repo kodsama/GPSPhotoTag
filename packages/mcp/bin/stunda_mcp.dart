@@ -8,7 +8,7 @@ import 'package:stunda_mcp/stunda_mcp.dart';
 ///
 /// Default transport is **stdio** (an MCP client spawns this binary). Pass
 /// `--tcp [--port N]` to instead serve on a localhost TCP socket (default
-/// 8787). In stdio mode nothing but JSON-RPC is ever written to stdout — all
+/// 8787). In stdio mode nothing but JSON-RPC is ever written to stdout - all
 /// diagnostics go to stderr.
 Future<void> main(List<String> args) async {
   const runner = SystemProcessRunner();

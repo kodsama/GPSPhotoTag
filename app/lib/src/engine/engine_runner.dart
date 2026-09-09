@@ -49,7 +49,7 @@ abstract interface class EngineRunner {
   Stream<CuratedExif> readCuratedExif(List<String> paths);
 
   /// Extracts an embedded JPEG preview of [path] (a RAW/HEIC file) on a worker
-  /// isolate via the bundled exiftool, returning the cached JPEG path — or null
+  /// isolate via the bundled exiftool, returning the cached JPEG path - or null
   /// when the file carries no usable embedded image. [full] picks the largest
   /// preview (fullscreen) vs the small thumbnail (list miniature).
   Future<String?> extractPreview(String path, {bool full = false});
@@ -75,7 +75,7 @@ abstract interface class EngineRunner {
     void Function(int done, int total)? onProgress,
   });
 
-  /// Whether the Smart (embedding) metric can run here — true only when an
+  /// Whether the Smart (embedding) metric can run here - true only when an
   /// embedding model + ONNX Runtime are bundled and load. The UI uses this to
   /// show the "fell back to Fast" note when Smart is selected but unavailable.
   bool get smartAvailable;

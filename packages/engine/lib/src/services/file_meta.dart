@@ -12,7 +12,7 @@ import '../internal/json_utils.dart';
 /// Per-file metadata shown in the drill-down dialog.
 ///
 /// Carries just enough to render an informative row: whether the file has GPS,
-/// image [width]/[height] and capture [date], or — for a GPS source file — its
+/// image [width]/[height] and capture [date], or - for a GPS source file - its
 /// [pointCount] and the [spanStart]–[spanEnd] of its points. Every field beyond
 /// [path] is optional because metadata streams in progressively and some files
 /// legitimately lack a given field.
@@ -96,7 +96,7 @@ Stream<FileMeta> readImageMeta(
     final end = (i + chunk < paths.length) ? i + chunk : paths.length;
     final batch = paths.sublist(i, end);
     final result = await runner.run('exiftool', [
-      // -fast2 skips MakerNotes and the trailer — without it, files with a
+      // -fast2 skips MakerNotes and the trailer - without it, files with a
       // large embedded trailer (e.g. Pixel Motion Photos *.MP.jpg) make
       // exiftool scan the whole multi-MB file, ~30x slower.
       '-fast2',

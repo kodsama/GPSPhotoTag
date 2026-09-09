@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// The Stunda logo drawn as a crisp vector — a map pin whose lens frames a
+/// The Stunda logo drawn as a crisp vector - a map pin whose lens frames a
 /// tiny landscape. Used in the in-app header; mirrors `assets/logo.svg` (the app
 /// icon source) so brand and app stay consistent.
 class LogoMark extends StatelessWidget {

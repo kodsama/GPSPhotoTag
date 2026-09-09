@@ -10,7 +10,7 @@ import 'package:stunda_engine/stunda_engine.dart';
 import 'package:stunda_mcp/stunda_mcp.dart';
 import 'package:test/test.dart';
 
-/// Fails every spawn, so hashing decodes source bytes and GPS reads throw —
+/// Fails every spawn, so hashing decodes source bytes and GPS reads throw -
 /// the no-exiftool environment a plain `dart run` sees.
 class _FailingRunner implements ProcessRunner {
   @override

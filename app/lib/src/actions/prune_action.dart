@@ -172,7 +172,7 @@ class _FilterRow extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            // Orphan RAWs — selectable deletion candidates in direction A.
+            // Orphan RAWs - selectable deletion candidates in direction A.
             FilterChip(
               label: Text(context.tr('prune_chip_orphan_raws')),
               tooltip: context.tr('tt_prune_chip'),
@@ -193,7 +193,7 @@ class _FilterRow extends StatelessWidget {
                 controller.setKindVisible(PairKind.photoWithRaw, v);
               },
             ),
-            // Orphan images — selectable deletion candidates in direction B.
+            // Orphan images - selectable deletion candidates in direction B.
             FilterChip(
               label: Text(context.tr('prune_chip_photos_no_raw')),
               tooltip: context.tr('tt_prune_chip'),

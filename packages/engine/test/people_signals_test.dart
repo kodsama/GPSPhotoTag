@@ -19,7 +19,7 @@ void main() {
     });
   });
 
-  group('peopleScoreFromTags — face regions (score 1.0)', () {
+  group('peopleScoreFromTags - face regions (score 1.0)', () {
     test('a named XMP-mwg-rs region scores 1.0', () {
       expect(peopleScoreFromTags({'RegionName': 'Alice'}), 1.0);
     });
@@ -95,7 +95,7 @@ void main() {
     });
   });
 
-  group('peopleScoreFromTags — person names (score 1.0)', () {
+  group('peopleScoreFromTags - person names (score 1.0)', () {
     test('a PersonInImage name scores 1.0', () {
       expect(peopleScoreFromTags({'PersonInImage': 'Carol'}), 1.0);
     });
@@ -110,7 +110,7 @@ void main() {
     });
   });
 
-  group('peopleScoreFromTags — detected faces (score 1.0)', () {
+  group('peopleScoreFromTags - detected faces (score 1.0)', () {
     test('a positive numeric FacesDetected scores 1.0', () {
       expect(peopleScoreFromTags({'FacesDetected': 3}), 1.0);
     });
@@ -128,7 +128,7 @@ void main() {
     });
   });
 
-  group('peopleScoreFromTags — keyword hints (score 0.5)', () {
+  group('peopleScoreFromTags - keyword hints (score 0.5)', () {
     test('a person word in Subject scores 0.5', () {
       expect(peopleScoreFromTags({'Subject': 'portrait of a friend'}), 0.5);
     });
@@ -151,7 +151,7 @@ void main() {
     });
   });
 
-  group('peopleScoreFromTags — precedence & no-signal', () {
+  group('peopleScoreFromTags - precedence & no-signal', () {
     test('a face region beats a co-present keyword hint (1.0 not 0.5)', () {
       expect(
         peopleScoreFromTags({'RegionName': 'Alice', 'Subject': 'dog'}),

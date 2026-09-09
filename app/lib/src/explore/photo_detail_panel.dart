@@ -17,7 +17,7 @@ import 'explore_model.dart';
 ///
 /// Shows the thumbnail/miniature, the [meta] (filename, date, W×H, and
 /// coordinates when present) and an expand control to view the image fullscreen.
-/// This is the same preview the map overlay shows — only the chrome differs.
+/// This is the same preview the map overlay shows - only the chrome differs.
 Future<void> showPhotoPreviewDialog(
   BuildContext context, {
   required String path,
@@ -55,8 +55,8 @@ int? fileSizeOf(String path) {
   try {
     return File(path).statSync().size;
     // coverage:ignore-start
-    // File.statSync never throws — a missing/unreadable path returns a FileStat
-    // with type notFound (size -1), not a FileSystemException — so this guard is
+    // File.statSync never throws - a missing/unreadable path returns a FileStat
+    // with type notFound (size -1), not a FileSystemException - so this guard is
     // a defensive belt-and-braces that cannot be triggered under `flutter test`.
   } on FileSystemException {
     return null;

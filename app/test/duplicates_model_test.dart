@@ -161,7 +161,7 @@ void main() {
     test('strict thresholds flag even slightly soft photos', () {
       expect(qualityExampleKey(0.56), 'lowq_strict');
       expect(qualityExampleKey(1.0), 'lowq_strict');
-      expect(label(0.8), 'Strict — flags even slightly soft or flat photos.');
+      expect(label(0.8), 'Strict - flags even slightly soft or flat photos.');
     });
 
     test('clamps out-of-range inputs to the end buckets', () {
@@ -277,7 +277,7 @@ void main() {
             other: _hf('/c'),
             removeSelected: false,
           ),
-          // Duplicate target /b again — must appear once.
+          // Duplicate target /b again - must appear once.
           DuplicatePair(kept: _hf('/d'), other: _hf('/b')),
         ];
         expect(selectedRemovalPaths(pairs), ['/b']);

@@ -26,7 +26,7 @@ HashedFile hf(
 );
 
 void main() {
-  group('chooseKeeper — resolution rule', () {
+  group('chooseKeeper - resolution rule', () {
     test(
       'a clear resolution winner stops early (quality is never consulted)',
       () {
@@ -49,7 +49,7 @@ void main() {
     });
   });
 
-  group('chooseKeeper — quality rule', () {
+  group('chooseKeeper - quality rule', () {
     test(
       'near-equal resolution falls through; quality picks the clear winner',
       () {
@@ -68,7 +68,7 @@ void main() {
     });
   });
 
-  group('chooseKeeper — final tie-break', () {
+  group('chooseKeeper - final tie-break', () {
     test('all rules tie → larger file size, then smallest path', () {
       final small = hf('/z.jpg', fileSize: 100);
       final big = hf('/y.jpg', fileSize: 999);
@@ -82,7 +82,7 @@ void main() {
     });
   });
 
-  group('chooseKeeper — ordering & flags', () {
+  group('chooseKeeper - ordering & flags', () {
     test('reordering rules changes the outcome', () {
       // A high-res-but-dull file vs a low-res-but-crisp file, where neither is a
       // clear winner under its OWN first rule but is under the other.

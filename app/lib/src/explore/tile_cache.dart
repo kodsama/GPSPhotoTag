@@ -130,7 +130,7 @@ class TileCache {
   ///
   /// A cached file on disk is served directly (instant, offline, bypasses the
   /// concurrency gate, and acts as the stale fallback for a tile that can no
-  /// longer be re-fetched — once written, a tile is kept forever). On a cache
+  /// longer be re-fetched - once written, a tile is kept forever). On a cache
   /// miss the OSM tile is fetched through the shared gate (at most a handful of
   /// network fetches at once, [highPriority] ones served first), retried with
   /// backoff on a transient failure, written to disk atomically (temp file +
@@ -217,7 +217,7 @@ class TileCache {
 /// The list of `(z, x, y)` tile coordinates covering the whole world for zoom
 /// levels [minZoom]..[maxZoom] inclusive (each zoom z has `2^z * 2^z` tiles).
 ///
-/// z0..z3 is 1 + 4 + 16 + 64 = 85 tiles — the rough world view seeded on first
+/// z0..z3 is 1 + 4 + 16 + 64 = 85 tiles - the rough world view seeded on first
 /// run so the map paints immediately instead of showing grey.
 List<(int z, int x, int y)> seedTileCoordinates({
   int minZoom = 0,

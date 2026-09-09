@@ -264,7 +264,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.runAsync(() async {
-        // No `controller:` argument — exercises the widget.controller == null
+        // No `controller:` argument - exercises the widget.controller == null
         // branch in initState (builds its own AppController) and in dispose
         // (calls _controller.dispose()). MCP lifecycle and env-probe behaviour
         // are covered separately in mcp_service_test.dart.
@@ -281,7 +281,7 @@ void main() {
         await Future<void>.delayed(const Duration(seconds: 2));
         await tester.pump();
 
-        // Replace the tree — exercises the dispose() controller == null branch.
+        // Replace the tree - exercises the dispose() controller == null branch.
         await tester.pumpWidget(const SizedBox());
         await tester.pump();
         // Brief pause so any spawned resources finish releasing before the
@@ -322,7 +322,7 @@ void main() {
       ..debugSetToolkit([_tool('exiftool')]);
     await _pumpApp(tester, controller);
 
-    // The standalone toggle is gone — the theme lives in the overflow menu.
+    // The standalone toggle is gone - the theme lives in the overflow menu.
     await tester.tap(find.byTooltip('Open settings, licenses, and appearance'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Appearance:'));

@@ -295,7 +295,7 @@ class MapService {
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         // Bound each request so a stalled connection can't hang the whole
-        // render — a timeout falls through to backoff/retry, then to a
+        // render - a timeout falls through to backoff/retry, then to a
         // basemap-less render.
         final res = await _client.get(url).timeout(const Duration(seconds: 12));
         if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
@@ -303,7 +303,7 @@ class MapService {
           if (decoded != null) return decoded;
         }
       } on Object {
-        // Network error — fall through to backoff/retry.
+        // Network error - fall through to backoff/retry.
       }
       await Future<void>.delayed(Duration(milliseconds: 150 * (attempt + 1)));
     }

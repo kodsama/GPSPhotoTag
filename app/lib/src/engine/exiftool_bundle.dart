@@ -31,8 +31,8 @@ String? locateBundledExiftool() => exiftoolBundleDirFor(
 /// app executable's [exeDir], or null when no runnable bundle exists there.
 ///
 /// Pure aside from the final `existsSync` probe, so both the macOS app-bundle
-/// layout and the Linux/Windows `data/flutter_assets` layout — and the Windows
-/// `exiftool.exe` vs POSIX `perl` script split — are unit-testable on any host.
+/// layout and the Linux/Windows `data/flutter_assets` layout - and the Windows
+/// `exiftool.exe` vs POSIX `perl` script split - are unit-testable on any host.
 @visibleForTesting
 String? exiftoolBundleDirFor({
   required String operatingSystem,

@@ -120,7 +120,7 @@ class _BatchRunner implements ProcessRunner {
 }
 
 /// A 256-bit pHash (4×64-bit words) with the first [setBits] high bits set, so
-/// two such hashes differ by a known number of bits — letting grouping tests
+/// two such hashes differ by a known number of bits - letting grouping tests
 /// dial [imageSimilarity] precisely.
 List<int> _pHashWithBits(int setBits) {
   final words = List<int>.filled(4, 0);
@@ -192,7 +192,7 @@ void main() {
   group('pHashFromLuma', () {
     test('a flat field hashes deterministically (same input → same hash)', () {
       // Every non-DC coefficient is ~0, so the hash is dominated by float noise
-      // around the median — but it is still fully deterministic, which is all
+      // around the median - but it is still fully deterministic, which is all
       // grouping needs (two identical inputs must collide).
       expect(
         pHashFromLuma(List<double>.filled(32 * 32, 128)),
@@ -230,7 +230,7 @@ void main() {
 
     test('robust to a brightness shift (the DC term is excluded)', () {
       // A +30 brightness offset shifts mainly the DC term (excluded from the
-      // hash), so only a small fraction of the 256 structural bits move — far
+      // hash), so only a small fraction of the 256 structural bits move - far
       // fewer than the ~128 an unrelated image would.
       final base = _stripes(64, 64, low: 20, high: 200);
       final brighter = _stripes(64, 64, low: 50, high: 230);
@@ -1267,7 +1267,7 @@ int _grouped(List<DuplicateGroup> groups) =>
     groups.fold(0, (sum, g) => sum + g.size);
 
 /// A vertical-stripe pattern (alternating bright/dark columns) so neighbouring
-/// pixels differ — exercising real structure in the pHash. [phase] shifts the
+/// pixels differ - exercising real structure in the pHash. [phase] shifts the
 /// stripes horizontally; [low]/[high] set the dark/bright levels (raise both to
 /// simulate a brightness shift).
 img.Image _stripes(

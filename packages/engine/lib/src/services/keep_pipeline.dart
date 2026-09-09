@@ -5,7 +5,7 @@ import 'people_signals.dart';
 ///
 /// A [KeepPipeline] is an ORDERED list of [KeepRule]s, each with an enabled
 /// flag; placement is priority. [chooseKeeper] runs the enabled rules in order
-/// and keeps the first one's *clear winner* — a candidate whose score beats the
+/// and keeps the first one's *clear winner* - a candidate whose score beats the
 /// runner-up by more than that rule's threshold. A near-tie falls through to the
 /// next rule; if every rule ties, a deterministic final tie-break (larger file,
 /// then path) decides. Everything here is pure so the cascade is unit-testable.
@@ -19,7 +19,7 @@ enum KeepRule {
   quality,
 
   /// Prefer the candidate that most looks like it contains people (or pets),
-  /// using [HashedFile.peopleScore] — the Tier-1 metadata signal (face regions,
+  /// using [HashedFile.peopleScore] - the Tier-1 metadata signal (face regions,
   /// person names, subject/keyword hints). A clear winner needs a
   /// [kPeopleClearWinnerMargin] lead; a near-tie (or all-zero scores, when no
   /// candidate carries people metadata) falls through to the next rule.
@@ -154,7 +154,7 @@ HashedFile chooseKeeper(List<HashedFile> candidates, KeepPipeline pipeline) {
 }
 
 /// The clear winner of [candidates] under [rule], or null when the top two are
-/// within the rule's threshold (a near-tie) — or the rule has no scoring yet.
+/// within the rule's threshold (a near-tie) - or the rule has no scoring yet.
 HashedFile? _clearWinner(List<HashedFile> candidates, KeepRule rule) {
   switch (rule) {
     case KeepRule.resolution:
