@@ -59,6 +59,10 @@ class McpService extends ChangeNotifier {
   int _restarts = 0;
   static const _maxRestarts = 3;
 
+  /// The last error the worker reported, kept so the exit that may follow it
+  /// can say what actually went wrong instead of "exited".
+  String? _lastWorkerError;
+
   /// Starts the server, trying ports in [base]..[base]+9 until one binds.
   Future<void> start({int base = 8787}) async {
     if (_isolate != null) return;
@@ -103,16 +107,18 @@ class McpService extends ChangeNotifier {
   }
 
   void _onMessage(Object? message) {
-    // `onExit` sends null and `onError` sends [error, stackTrace]. Both mean
-    // the socket is gone; without them the last `ready` port stays on display
-    // as live forever, which is what left the status green against a dead
-    // server.
+    // `onExit` sends null, `onError` sends [error, stackTrace]. Only the exit
+    // proves the worker is gone: an error it survives must not trigger a
+    // respawn, or a second server binds the next port alongside the live one
+    // and the endpoint becomes ambiguous.
     if (message == null) {
-      _onWorkerLost('MCP server worker exited');
+      _onWorkerExited(_lastWorkerError ?? 'MCP server worker exited');
       return;
     }
     if (message is List) {
-      _onWorkerLost('MCP server worker crashed: ${message.first}');
+      _lastWorkerError = 'MCP server worker error: ${message.first}';
+      _error = _lastWorkerError;
+      notifyListeners();
       return;
     }
     if (message is! Map) return;
@@ -120,6 +126,7 @@ class McpService extends ChangeNotifier {
       _port = message['ready'] as int;
       _error = null;
       _restarts = 0;
+      _lastWorkerError = null;
       notifyListeners();
     } else if (message['error'] is String) {
       // The worker reports its own failure and then returns, so an `onExit`
@@ -137,7 +144,7 @@ class McpService extends ChangeNotifier {
 
   /// Drops the stale port and brings the worker back, so an LLM reconnecting
   /// hours later finds a socket instead of a port number nothing answers on.
-  void _onWorkerLost(String reason) {
+  void _onWorkerExited(String reason) {
     // Fatal isolate errors deliver on both ports; the first call closes the
     // receive port, so this guard swallows the duplicate.
     if (_receive == null) return;
@@ -152,6 +159,7 @@ class McpService extends ChangeNotifier {
     }
     _restarts++;
     _error = reason;
+    _lastWorkerError = null;
     notifyListeners();
     start(base: _base);
   }

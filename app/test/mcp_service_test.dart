@@ -286,6 +286,62 @@ void main() {
     expect(await _answers(service.port!), isTrue);
   });
 
+  test('an error the worker survives does not spawn a second server', () async {
+    // The rough edge this pins: the process was seen holding two listeners at
+    // once, one of them silent. `onError` only says an error was reported, and
+    // if the isolate lives through it a respawn binds the next port alongside
+    // the still-serving one, leaving the endpoint ambiguous. Only `onExit`
+    // proves the worker is gone.
+    SendPort? errorPort;
+    final service = McpService(
+      spawn: (entry, message, {debugName, onExit, onError}) {
+        errorPort = onError;
+        return Isolate.spawn(
+          entry,
+          message,
+          debugName: debugName,
+          onExit: onExit,
+          onError: onError,
+        );
+      },
+    );
+    addTearDown(service.stop);
+    await service.start(base: 19600);
+
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!service.running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(service.running, isTrue);
+    final bound = service.port!;
+
+    // Report an error the way a live isolate would, without killing it.
+    errorPort!.send(<String>['synthetic failure', 'stack']);
+    await Future<void>.delayed(const Duration(seconds: 2));
+
+    expect(
+      service.port,
+      bound,
+      reason: 'a survivable error must not move the endpoint',
+    );
+    expect(service.error, contains('synthetic failure'));
+    expect(
+      await _answers(bound),
+      isTrue,
+      reason: 'the original worker is still the one serving',
+    );
+    // Nothing may have bound the next port in the range.
+    await expectLater(
+      Socket.connect(
+        InternetAddress.loopbackIPv4,
+        bound + 1,
+        timeout: const Duration(seconds: 2),
+      ),
+      throwsA(isA<SocketException>()),
+      reason: 'a duplicate worker would be listening here',
+    );
+  });
+
   test('gives up loudly when the worker cannot stay alive', () async {
     // A worker that dies on every spawn must not be retried forever.
     final service = McpService(
